@@ -3,30 +3,8 @@
     <div class="min-h-screen bg-gray-100 pb-20">
 
         <!-- HEADER -->
-        <div class="bg-indigo-500 rounded-b-[35px] px-4 py-5 text-white">
 
-            <div class="max-w-6xl mx-auto flex items-center gap-3">
-
-                <!-- Avatar -->
-                <div class="w-14 h-14 rounded-full overflow-hidden bg-white">
-                    <img
-                        src="https://ui-avatars.com/api/?name={{ auth()->user()->name }}"
-                        class="w-full h-full object-cover">
-                </div>
-
-                <!-- Greeting -->
-                <div>
-                    <p class="text-sm opacity-90">Hello,</p>
-                    <h2 class="font-bold text-lg">
-                        {{ auth()->user()->name }}
-                    </h2>
-                </div>
-
-            </div>
-
-        </div>
-
-        <div class="max-w-6xl mx-auto px-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
             <!-- CLOCK CARD -->
             <div class="-mt-5 bg-white rounded-3xl shadow p-5 text-center">
@@ -75,92 +53,177 @@
 
             </div>
 
-            <!-- MENU -->
-            <div class="mt-6 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+            @if($latestPermission)
 
-                <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">📥</div>
-                    <p class="text-sm mt-2">Datang</p>
-                </a>
+            <div class="mt-5 bg-white rounded-3xl p-5 shadow">
 
-                <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">📤</div>
-                    <p class="text-sm mt-2">Pulang</p>
-                </a>
+                <h3 class="font-bold text-gray-700 mb-2">
+                    Status Izin Terakhir
+                </h3>
 
-                <a href="/izin" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">📝</div>
-                    <p class="text-sm mt-2">Izin</p>
-                </a>
+                <div class="flex justify-between items-center">
 
-                <a href="/cuti" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">📅</div>
-                    <p class="text-sm mt-2">Cuti</p>
-                </a>
+                    <div>
+                        <p class="text-sm text-gray-500">
+                            {{ $latestPermission->jenis }}
+                        </p>
 
-                <a href="/fingerprint" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">👆</div>
-                    <p class="text-sm mt-2">Finger</p>
-                </a>
+                        <p class="font-semibold">
+                            {{ $latestPermission->tanggal }}
+                        </p>
+                    </div>
 
-                <a href="/register-face" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">👤</div>
-                    <p class="text-sm mt-2">Register</p>
-                </a>
+                    <div>
+                        @if($latestPermission->status == 'pending')
+                        <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
+                            Pending
+                        </span>
 
-                <a href="/history" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">📊</div>
-                    <p class="text-sm mt-2">History</p>
-                </a>
+                        @elseif($latestPermission->status == 'approved')
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                            Approved
+                        </span>
 
-                <a href="/profile" class="bg-white rounded-2xl p-4 shadow text-center">
-                    <div class="text-3xl">⚙️</div>
-                    <p class="text-sm mt-2">Profile</p>
-                </a>
+                        @elseif($latestPermission->status == 'rejected')
+                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+                            Rejected
+                        </span>
+                        @endif
+                    </div>
+
+                </div>
+
+            </div>
+
+            @endif
+
+            <div class="max-w-7xl mx-auto px-10 sm:px-10 lg:px-10">
+
+                @if(session('success'))
+                <div
+                    id="success-alert"
+                    class="mt-4 bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-2xl shadow">
+
+                    {{ session('success') }}
+
+                </div>
+                @endif
+
+
+                <!-- MENU -->
+                <div class="mt-6 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+
+                    <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">📥</div>
+                        <p class="text-sm mt-2">Datang</p>
+                    </a>
+
+                    <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">📤</div>
+                        <p class="text-sm mt-2">Pulang</p>
+                    </a>
+
+                    <a href="/izin" class="relative bg-white rounded-2xl p-4 shadow text-center">
+
+                        @if($pendingPermissionCount > 0)
+                        <span class="absolute top-2 right-2 min-w-[22px] h-[22px] flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
+                            {{ $pendingPermissionCount }}
+                        </span>
+                        @endif
+
+                        <div class="text-3xl">📝</div>
+                        <p class="text-sm mt-2">Izin</p>
+
+                    </a>
+
+                    <a href="/cuti" class="relative bg-white rounded-2xl p-4 shadow text-center">
+
+                        @if($pendingLeaveCount > 0)
+                        <span class="absolute top-2 right-2 min-w-[22px] h-[22px] flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
+                            {{ $pendingLeaveCount }}
+                        </span>
+                        @endif
+
+                        <div class="text-3xl">📅</div>
+                        <p class="text-sm mt-2">Cuti</p>
+
+                    </a>
+                    <!-- <a href="/fingerprint" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">👆</div>
+                        <p class="text-sm mt-2">Finger</p>
+                    </a> -->
+
+                    <a href="/register-face" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">👤</div>
+                        <p class="text-sm mt-2">Register</p>
+                    </a>
+
+                    <a href="/history" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">📊</div>
+                        <p class="text-sm mt-2">History</p>
+                    </a>
+
+                    <!-- <a href="/profile" class="bg-white rounded-2xl p-4 shadow text-center">
+                        <div class="text-3xl">⚙️</div>
+                        <p class="text-sm mt-2">Profile</p>
+                    </a> -->
+
+                </div>
+
+            </div>
+
+            <!-- MOBILE NAV -->
+            <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg md:hidden">
+
+                <div class="grid grid-cols-3 text-center py-3">
+
+                    <a href="/dashboard">
+                        🏠
+                        <p class="text-xs">Home</p>
+                    </a>
+
+                    <a href="/history">
+                        📋
+                        <p class="text-xs">History</p>
+                    </a>
+
+                    <a href="/profile">
+                        👤
+                        <p class="text-xs">Profile</p>
+                    </a>
+
+                </div>
 
             </div>
 
         </div>
 
-        <!-- MOBILE NAV -->
-        <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg md:hidden">
+        <script>
+            setTimeout(() => {
+                const alertBox = document.getElementById('success-alert');
 
-            <div class="grid grid-cols-3 text-center py-3">
+                if (alertBox) {
+                    alertBox.style.display = 'none';
+                }
+            }, 3000);
 
-                <a href="/dashboard">
-                    🏠
-                    <p class="text-xs">Home</p>
-                </a>
+            function updateClock() {
 
-                <a href="/history">
-                    📋
-                    <p class="text-xs">History</p>
-                </a>
+                const now = new Date();
 
-                <a href="/profile">
-                    👤
-                    <p class="text-xs">Profile</p>
-                </a>
+                const clock = document.getElementById("clock");
 
-            </div>
-
-        </div>
-
-    </div>
-
-    <script>
-        function updateClock() {
-
-            const now = new Date();
-
-            document.getElementById("clock").innerHTML =
+                if (clock) {
+                    clock.innerHTML =
+                        now.toLocaleTimeString('id-ID') + " WIB";
+                }
                 now.toLocaleTimeString('id-ID') + " WIB";
 
-        }
+            }
 
-        setInterval(updateClock, 1000);
+            setInterval(updateClock, 1000);
 
-        updateClock();
-    </script>
+            updateClock();
+        </script>
 
 </x-app-layout>

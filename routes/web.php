@@ -3,6 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\HistoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,6 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     ])->name('dashboard');
 
 
+
     /*
     |--------------------------------------------------------------------------
     | Attendance Pages
@@ -54,22 +58,50 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Leave Pages
     |--------------------------------------------------------------------------
     */
-    Route::view('/izin', 'izin')
-        ->name('izin');
+    Route::get('/izin', [
+        PermissionController::class,
+        'create'
+    ])->name('izin');
 
-    Route::view('/cuti', 'cuti')
-        ->name('cuti');
+    Route::post('/izin', [
+        PermissionController::class,
+        'store'
+    ])->name('izin.store');
 
+    Route::get('/cuti', [
+        LeaveController::class,
+        'create'
+    ])->name('cuti');
+
+    Route::post('/cuti', [
+        LeaveController::class,
+        'store'
+    ])->name('cuti.store');
+
+    // izin
+    Route::get('/izin/history', [
+        PermissionController::class,
+        'history'
+    ])->name('izin.history');
+
+
+    // cuti
+    Route::get('/cuti/history', [
+        LeaveController::class,
+        'history'
+    ])->name('cuti.history');
 
     /*
     |--------------------------------------------------------------------------
     | History
     |--------------------------------------------------------------------------
     */
-    Route::view('/history', 'history')
-        ->name('history');
 
-
+    Route::get(
+        '/history',
+        [HistoryController::class, 'index']
+    )->name('history');
+    
     /*
     |--------------------------------------------------------------------------
     | Profile

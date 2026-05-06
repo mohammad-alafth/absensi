@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\Permission;
+use App\Models\Leave;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -11,6 +13,11 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Attendance Today
+        |--------------------------------------------------------------------------
+        */
         $todayAttendance = Attendance::where(
             'user_id',
             $user->id
@@ -18,6 +25,11 @@ class DashboardController extends Controller
             ->whereDate('tanggal', today())
             ->first();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Attendance History
+        |--------------------------------------------------------------------------
+        */
         $histories = Attendance::where(
             'user_id',
             $user->id
@@ -26,42 +38,67 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Schedule
+        |--------------------------------------------------------------------------
+        */
+        $dayNumber = Carbon::now()->dayOfWeekIso;
+
+        $isWorkingDay = $dayNumber <= 5;
+
+        $schedule = $isWorkingDay
+            ? '08:00 - 17:00 WIB'
+            : 'Hari Libur';
 
         /*
         |--------------------------------------------------------------------------
-        | Schedule Logic
+        | Permission (Izin)
         |--------------------------------------------------------------------------
         */
+        $latestPermission = Permission::where(
+            'user_id',
+            $user->id
+        )
+            ->latest()
+            ->first();
 
-        $today = Carbon::now();
+        $pendingPermissionCount = Permission::where(
+            'user_id',
+            $user->id
+        )
+            ->where('status', 'pending')
+            ->count();
 
-        // ISO day:
-        // 1 = Monday
-        // 5 = Friday
-        // 6 = Saturday
-        // 7 = Sunday
+        /*
+        |--------------------------------------------------------------------------
+        | Leave (Cuti)
+        |--------------------------------------------------------------------------
+        */
+        $latestLeave = Leave::where(
+            'user_id',
+            $user->id
+        )
+            ->latest()
+            ->first();
 
-        $dayNumber = $today->dayOfWeekIso;
-
-        if ($dayNumber >= 1 && $dayNumber <= 5) {
-
-            $schedule = '08:00 - 17:00 WIB';
-
-            $isWorkingDay = true;
-        } else {
-
-            $schedule = 'Hari Libur';
-
-            $isWorkingDay = false;
-        }
-
+        $pendingLeaveCount = Leave::where(
+            'user_id',
+            $user->id
+        )
+            ->where('status', 'pending')
+            ->count();
 
         return view('dashboard', compact(
             'user',
             'todayAttendance',
             'histories',
             'schedule',
-            'isWorkingDay'
+            'isWorkingDay',
+            'latestPermission',
+            'pendingPermissionCount',
+            'latestLeave',
+            'pendingLeaveCount'
         ));
     }
 }

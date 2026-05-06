@@ -85,27 +85,27 @@ Route::middleware([
 |--------------------------------------------------------------------------
 */
 
-    Route::prefix('device')
-        ->middleware('throttle:10,1')
-        ->group(function () {
+Route::prefix('device')
+    ->middleware(['auth:sanctum', 'throttle:10,1'])
+    ->group(function () {
 
-            Route::post('/face/register', [
-                FaceController::class,
-                'register'
-            ]);
+        Route::post('/face/register', [
+            FaceController::class,
+            'register'
+        ]);
 
-            Route::post('/face/scan', [
-                FaceController::class,
-                'matchFace'
-            ]);
+        Route::post('/face/scan', [
+            FaceController::class,
+            'matchFace'
+        ]);
 
-            Route::post('/fingerprint/register', [
-                FaceController::class,
-                'registerFingerprint'
-            ]);
+        Route::post('/fingerprint/register', [
+            FaceController::class,
+            'registerFingerprint'
+        ]);
 
-            Route::post('/fingerprint/scan', [
-                FaceController::class,
-                'fingerprint'
-            ]);
-        });
+        Route::post('/fingerprint/scan', [
+            FaceController::class,
+            'fingerprint'
+        ]);
+    });

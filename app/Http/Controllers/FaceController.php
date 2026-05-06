@@ -80,122 +80,108 @@ class FaceController extends Controller
     */
     public function matchFace(Request $request)
     {
+        // 🔐 WAJIB LOGIN
+        $user = auth()->user();
 
+        if (!$user) {
+            return response()->json([
+                'message' => 'Session habis, silakan login ulang'
+            ], 401);
+        }
+
+        // 📅 VALIDASI HARI KERJA
         if ($scheduleError = $this->validateWorkingSchedule()) {
             return $scheduleError;
         }
+
+        // 📥 VALIDASI INPUT
         $request->validate([
-            'descriptor' => 'required|array',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
             'accuracy' => 'required|numeric'
         ]);
-        if ($request->accuracy > 80) {
+
+        // 📍 TOLERANSI GPS (INDOOR FRIENDLY)
+        if ($request->accuracy > 150) {
             return response()->json([
-                'message' => 'GPS kurang akurat. Pindah ke area terbuka.'
+                'message' => 'GPS kurang akurat (' . round($request->accuracy) . 'm)'
             ], 403);
         }
-        $input = $request->descriptor;
-        $users = User::whereNotNull('face_descriptor')->get();
 
-        foreach ($users as $user) {
+        // 🏢 KOORDINAT KANTOR (PEKANBARU)
+        $officeLat = 0.4761258;
+        $officeLng = 101.41906;
+        $radius = 100;
 
-            $savedDescriptors = json_decode($user->face_descriptor, true);
+        $jarak = $this->distance(
+            $request->latitude,
+            $request->longitude,
+            $officeLat,
+            $officeLng
+        );
 
-            if (!$savedDescriptors || !is_array($savedDescriptors)) {
-                continue;
-            }
+        // DEBUG LOG
+        \Log::info('ABSENSI GPS', [
+            'user' => $user->id,
+            'lat' => $request->latitude,
+            'lng' => $request->longitude,
+            'accuracy' => $request->accuracy,
+            'jarak' => $jarak
+        ]);
 
-            // detect old format (single descriptor)
-            if (isset($savedDescriptors[0]) && is_float($savedDescriptors[0])) {
-                $savedDescriptors = [$savedDescriptors];
-            }
+        // 🚫 DI LUAR AREA
+        if ($jarak > $radius) {
+            return response()->json([
+                'message' => 'Di luar area (' . round($jarak) . ' meter)'
+            ], 403);
+        }
 
-            $bestDistance = 999;
+        $today = now()->toDateString();
 
-            foreach ($savedDescriptors as $saved) {
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereDate('tanggal', $today)
+            ->first();
 
-                if (!is_array($saved)) {
-                    continue;
-                }
+        // =====================
+        // ✅ ABSEN MASUK
+        // =====================
+        if (!$attendance) {
 
-                $distance = $this->compare($input, $saved);
+            Attendance::create([
+                'user_id' => $user->id,
+                'tanggal' => now(),
+                'jam_masuk' => now(),
+                'status' => now()->format('H:i') > '08:00' ? 'terlambat' : 'hadir'
+            ]);
 
-                if ($distance < $bestDistance) {
-                    $bestDistance = $distance;
-                }
-            }
+            return response()->json([
+                'message' => 'Absen MASUK: ' . $user->name
+            ]);
+        }
 
-            // 🔥 threshold ketat
-            if ($bestDistance < 0.45) {
+        // =====================
+        // ✅ ABSEN KELUAR
+        // =====================
+        if (!$attendance->jam_keluar) {
 
-                // 🔥 VALIDASI LOKASI
-                $officeLat = 1.045678;
-                $officeLng = 104.030123;
-
-                $jarak = $this->distance(
-                    $request->latitude,
-                    $request->longitude,
-                    $officeLat,
-                    $officeLng
-                );
-
-                if ($jarak > 100) {
-                    return response()->json([
-                        'message' => 'Di luar area (' . round($jarak) . ' m)'
-                    ], 403);
-                }
-
-                $today = now()->toDateString();
-
-                $attendance = Attendance::where('user_id', $user->id)
-                    ->whereDate('tanggal', $today)
-                    ->first();
-
-                // 🔥 MASUK
-                if (!$attendance) {
-
-                    Attendance::create([
-                        'user_id' => $user->id,
-                        'tanggal' => now(),
-                        'jam_masuk' => now(),
-                        'status' => now()->format('H:i') > '08:00' ? 'terlambat' : 'hadir'
-                    ]);
-
-                    return response()->json([
-                        'message' => 'Absen MASUK: ' . $user->name,
-                        'confidence' => round(1 - $bestDistance, 3)
-                    ]);
-                }
-
-                // 🔥 KELUAR
-                if (!$attendance->jam_keluar) {
-
-                    // checkout hanya setelah jam 17:00
-                    if (now()->format('H:i') < '17:00') {
-                        return response()->json([
-                            'message' => 'Belum waktunya absen pulang'
-                        ], 403);
-                    }
-
-                    $attendance->update([
-                        'jam_keluar' => now()
-                    ]);
-
-                    return response()->json([
-                        'message' => 'Absen KELUAR: ' . $user->name
-                    ]);
-                }
-
+            if (now()->format('H:i') < '17:00') {
                 return response()->json([
-                    'message' => 'Sudah absen lengkap'
-                ], 400);
+                    'message' => 'Belum waktunya absen pulang'
+                ], 403);
             }
+
+            $attendance->update([
+                'jam_keluar' => now()
+            ]);
+
+            return response()->json([
+                'message' => 'Absen KELUAR: ' . $user->name
+            ]);
         }
 
         return response()->json([
-            'message' => 'Wajah tidak dikenali'
-        ], 404);
+            'message' => 'Sudah absen lengkap'
+        ], 400);
     }
 
     private function validateWorkingSchedule()
@@ -307,19 +293,17 @@ class FaceController extends Controller
     */
     private function distance($lat1, $lon1, $lat2, $lon2)
     {
-        $theta = $lon1 - $lon2;
+        $earthRadius = 6371000; // meter
 
-        $dist =
-            sin(deg2rad($lat1)) *
-            sin(deg2rad($lat2)) +
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
 
-            cos(deg2rad($lat1)) *
-            cos(deg2rad($lat2)) *
-            cos(deg2rad($theta));
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLon / 2) * sin($dLon / 2);
 
-        $dist = acos($dist);
-        $dist = rad2deg($dist);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-        return $dist * 60 * 1.1515 * 1609.344;
+        return $earthRadius * $c;
     }
 }
