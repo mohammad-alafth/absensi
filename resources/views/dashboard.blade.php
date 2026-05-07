@@ -55,6 +55,7 @@
 
             @if($latestPermission)
 
+
             <div class="mt-5 bg-white/80 backdrop-blur-md border border-white/50 rounded-3xl p-5 shadow-xl">
 
                 <h3 class="font-bold text-gray-700 mb-2">
@@ -210,12 +211,15 @@
                     </a>
 
                     <!-- REGISTER -->
+                    @if(auth()->user()->role === 'admin')
+
+                    <!-- REGISTER -->
                     <a href="/register-face"
                         class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-        min-h-[110px] sm:min-h-[120px]
-        flex flex-col items-center justify-center
-        shadow-lg hover:shadow-2xl hover:-translate-y-1
-        transition duration-300 active:scale-95">
+    min-h-[110px] sm:min-h-[120px]
+    flex flex-col items-center justify-center
+    shadow-lg hover:shadow-2xl hover:-translate-y-1
+    transition duration-300 active:scale-95">
 
                         <div class="text-4xl drop-shadow-md">
                             👤
@@ -226,6 +230,8 @@
                         </p>
 
                     </a>
+
+                    @endif
 
                     <!-- HISTORY -->
                     <a href="/history"
@@ -244,6 +250,32 @@
                         </p>
 
                     </a>
+
+                    @if(str_starts_with(auth()->user()->role, 'pj_'))
+
+                    <!-- APPROVAL -->
+                    <a href="{{ route('pj.dashboard') }}"
+                        class="relative bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400
+    rounded-3xl
+    min-h-[110px] sm:min-h-[120px]
+    flex flex-col items-center justify-center
+    shadow-xl hover:shadow-2xl hover:-translate-y-1
+    transition duration-300 active:scale-95 text-white overflow-hidden">
+
+                        <!-- glow -->
+                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
+
+                        <div class="relative text-4xl drop-shadow-lg">
+                            🧑‍💼
+                        </div>
+
+                        <p class="relative text-sm sm:text-base mt-2 font-bold">
+                            Approval PJ
+                        </p>
+
+                    </a>
+
+                    @endif
 
                 </div>
 

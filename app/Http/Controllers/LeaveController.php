@@ -22,7 +22,7 @@ class LeaveController extends Controller
             ->where('status', 'approved')
             ->sum('total_days');
 
-        $remainingLeave = 12 - $usedLeave;
+        $remainingLeave = 4 - $usedLeave;
 
         if ($remainingLeave < 0) {
             $remainingLeave = 0;
@@ -68,7 +68,7 @@ class LeaveController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Parse tanggal
+        | Parse Tanggal
         |--------------------------------------------------------------------------
         */
         $startDate = Carbon::parse(
@@ -82,7 +82,7 @@ class LeaveController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Validasi tanggal
+        | Validasi Tanggal
         |--------------------------------------------------------------------------
         */
         if ($endDate->lt($startDate)) {
@@ -98,13 +98,56 @@ class LeaveController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Hitung total hari
+        | Hitung Total Hari
         |--------------------------------------------------------------------------
         */
         $totalDays =
             $startDate->diffInDays(
                 $endDate
             ) + 1;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FLOW ROLE
+        |--------------------------------------------------------------------------
+        */
+        $userRole = auth()->user()->role;
+
+        // default user biasa
+        $status = 'pending';
+
+        $pjStatus = 'pending';
+
+        $hrdStatus = 'pending';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PJ
+        |--------------------------------------------------------------------------
+        */
+        if (str_starts_with($userRole, 'pj_')) {
+
+            $status = 'waiting_hrd';
+
+            $pjStatus = 'approved';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HRD
+        |--------------------------------------------------------------------------
+        */
+        if ($userRole == 'hrd') {
+
+            $status = 'approved';
+
+            $pjStatus = 'approved';
+
+            $hrdStatus = 'approved';
+        }
 
 
         /*
@@ -136,15 +179,33 @@ class LeaveController extends Controller
 
             'emergency_contact' => $request->emergency_contact,
 
-            'status' => 'pending'
+            /*
+            |--------------------------------------------------------------------------
+            | STATUS
+            |--------------------------------------------------------------------------
+            */
+            'status' => $status,
 
+            /*
+            |--------------------------------------------------------------------------
+            | PJ
+            |--------------------------------------------------------------------------
+            */
+            'pj_status' => $pjStatus,
+
+            /*
+            |--------------------------------------------------------------------------
+            | HRD
+            |--------------------------------------------------------------------------
+            */
+            'hrd_status' => $hrdStatus,
         ]);
 
 
         return redirect('/dashboard')
             ->with(
                 'success',
-                'Pengajuan cuti berhasil dikirim dan sedang menunggu approval.'
+                'Pengajuan cuti berhasil dikirim.'
             );
     }
 
@@ -209,10 +270,11 @@ class LeaveController extends Controller
     */
     public function history()
     {
-        $leaves = Leave::where(
-            'user_id',
-            auth()->id()
-        )
+        $leaves = Leave::with([
+            'pjApprover',
+            'hrdApprover'
+        ])
+            ->where('user_id', auth()->id())
             ->latest()
             ->get();
 

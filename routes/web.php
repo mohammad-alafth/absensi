@@ -6,6 +6,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\HistoryController;
+use App\Http\Controllers\PJ\PJDashboardController;
+use App\Http\Controllers\PJ\PJLeaveController;
+use App\Http\Controllers\PJ\PJPermissionController;
+use App\Http\Controllers\PJ\PJOvertimeController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -101,7 +106,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         '/history',
         [HistoryController::class, 'index']
     )->name('history');
-    
+
     /*
     |--------------------------------------------------------------------------
     | Profile
@@ -121,6 +126,73 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ProfileController::class,
         'destroy'
     ])->name('profile.destroy');
+
+
+    Route::middleware(['auth'])
+        ->prefix('pj')
+        ->group(function () {
+
+            /*
+        |--------------------------------------------------------------------------
+        | DASHBOARD PJ
+        |--------------------------------------------------------------------------
+        */
+            Route::get('/dashboard', [
+                PJDashboardController::class,
+                'index'
+            ])->name('pj.dashboard');
+
+
+            /*
+        |--------------------------------------------------------------------------
+        | CUTI
+        |--------------------------------------------------------------------------
+        */
+            Route::get('/cuti', [
+                PJLeaveController::class,
+                'index'
+            ])->name('pj.cuti');
+
+            Route::post('/cuti/{id}/approve', [
+                PJLeaveController::class,
+                'approve'
+            ])->name('pj.cuti.approve');
+
+            Route::post('/cuti/{id}/reject', [
+                PJLeaveController::class,
+                'reject'
+            ])->name('pj.cuti.reject');
+
+            /*
+        |--------------------------------------------------------------------------
+        | IZIN
+        |--------------------------------------------------------------------------
+        */
+            Route::get('/izin', [
+                PJPermissionController::class,
+                'index'
+            ])->name('pj.izin');
+
+
+            /*
+        |--------------------------------------------------------------------------
+        | LEMBUR
+        |--------------------------------------------------------------------------
+        */
+            Route::get('/lembur', [
+                PJOvertimeController::class,
+                'index'
+            ])->name('pj.lembur');
+        });
+    Route::prefix('hrd')
+        ->middleware(['auth'])
+        ->group(function () {
+
+            Route::get('/cuti', [
+                PJLeaveController::class,
+                'index'
+            ])->name('hrd.cuti');
+        });
 });
 
 require __DIR__ . '/auth.php';

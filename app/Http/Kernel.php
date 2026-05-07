@@ -8,5 +8,6 @@ class Kernel extends HttpKernel
 {
     protected $middlewareAliases = [
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'pj' => \App\Http\Middleware\EnsureUserIsPJ::class,
     ];
 }
