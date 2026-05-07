@@ -1,6 +1,6 @@
 <x-app-layout>
 
-    <div class="min-h-screen bg-gray-100 pb-20">
+    <div class="min-h-screen bg-gray-100 pb-28">
 
         <!-- Header -->
         <div class="bg-indigo-500 rounded-b-[35px] px-4 py-5 text-white">

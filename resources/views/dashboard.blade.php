@@ -1,17 +1,17 @@
 <x-app-layout>
 
-    <div class="min-h-screen bg-gray-100 pb-20">
+    <div class="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-cyan-50 pb-28">
 
         <!-- HEADER -->
 
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
 
             <!-- CLOCK CARD -->
-            <div class="-mt-5 bg-white rounded-3xl shadow p-5 text-center">
+            <div class="-mt-5 bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl shadow-xl p-5 text-center">
 
                 <h1
                     id="clock"
-                    class="text-3xl font-bold text-indigo-600">
+                    class="text-3xl font-extrabold bg-gradient-to-r from-indigo-500 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
                 </h1>
 
                 <p class="text-gray-500 text-sm mt-2">
@@ -31,7 +31,7 @@
             </div>
 
             <!-- BANNER -->
-            <div class="mt-5 bg-indigo-500 rounded-3xl p-5 text-white">
+            <div class="mt-5 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-500 rounded-3xl p-5 text-white shadow-2xl">
 
                 <div class="flex justify-between items-center">
 
@@ -55,7 +55,7 @@
 
             @if($latestPermission)
 
-            <div class="mt-5 bg-white rounded-3xl p-5 shadow">
+            <div class="mt-5 bg-white/80 backdrop-blur-md border border-white/50 rounded-3xl p-5 shadow-xl">
 
                 <h3 class="font-bold text-gray-700 mb-2">
                     Status Izin Terakhir
@@ -97,12 +97,12 @@
 
             @endif
 
-            <div class="max-w-7xl mx-auto px-10 sm:px-10 lg:px-10">
+            <div class="max-w-full mx-auto px-10 sm:px-10 lg:px-10">
 
                 @if(session('success'))
                 <div
                     id="success-alert"
-                    class="mt-4 bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-2xl shadow">
+                    class="mt-4 bg-emerald-100/80 backdrop-blur border border-emerald-300 text-emerald-700 px-4 py-3 rounded-2xl shadow">
 
                     {{ session('success') }}
 
@@ -111,119 +111,170 @@
 
 
                 <!-- MENU -->
-                <div class="mt-6 grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
 
-                    <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">📥</div>
-                        <p class="text-sm mt-2">Datang</p>
+                    <!-- DATANG -->
+                    <a href="/face"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[95px] sm:min-h-[110px]
+        flex flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
+
+                        <div class="text-3xl drop-shadow-md">
+                            📥
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            Datang
+                        </p>
+
                     </a>
 
-                    <a href="/face" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">📤</div>
-                        <p class="text-sm mt-2">Pulang</p>
+                    <!-- PULANG -->
+                    <a href="/face"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[110px] sm:min-h-[120px]
+        flex flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
+
+                        <div class="text-4xl drop-shadow-md">
+                            📤
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            Pulang
+                        </p>
+
                     </a>
 
-                    <a href="/izin" class="relative bg-white rounded-2xl p-4 shadow text-center">
+                    <!-- IZIN -->
+                    <a href="/izin"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[110px] sm:min-h-[120px]
+        flex flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
 
                         @if($pendingPermissionCount > 0)
-                        <span class="absolute top-2 right-2 min-w-[22px] h-[22px] flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
+                        <span
+                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
+            flex items-center justify-center
+            bg-gradient-to-r from-pink-500 to-red-500
+            text-white text-xs font-bold rounded-full shadow-lg">
+
                             {{ $pendingPermissionCount }}
+
                         </span>
                         @endif
 
-                        <div class="text-3xl">📝</div>
-                        <p class="text-sm mt-2">Izin</p>
+                        <div class="text-4xl drop-shadow-md">
+                            📝
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            Izin
+                        </p>
 
                     </a>
 
-                    <a href="/cuti" class="relative bg-white rounded-2xl p-4 shadow text-center">
+                    <!-- CUTI -->
+                    <a href="/cuti"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[110px] sm:min-h-[120px]
+        flex flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
 
                         @if($pendingLeaveCount > 0)
-                        <span class="absolute top-2 right-2 min-w-[22px] h-[22px] flex items-center justify-center bg-red-500 text-white text-xs rounded-full">
+                        <span
+                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
+            flex items-center justify-center
+            bg-gradient-to-r from-pink-500 to-red-500
+            text-white text-xs font-bold rounded-full shadow-lg">
+
                             {{ $pendingLeaveCount }}
+
                         </span>
                         @endif
 
-                        <div class="text-3xl">📅</div>
-                        <p class="text-sm mt-2">Cuti</p>
+                        <div class="text-4xl drop-shadow-md">
+                            📅
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            Cuti
+                        </p>
 
                     </a>
-                    <!-- <a href="/fingerprint" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">👆</div>
-                        <p class="text-sm mt-2">Finger</p>
-                    </a> -->
 
-                    <a href="/register-face" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">👤</div>
-                        <p class="text-sm mt-2">Register</p>
+                    <!-- REGISTER -->
+                    <a href="/register-face"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[110px] sm:min-h-[120px]
+        flex flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
+
+                        <div class="text-4xl drop-shadow-md">
+                            👤
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            Register
+                        </p>
+
                     </a>
 
-                    <a href="/history" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">📊</div>
-                        <p class="text-sm mt-2">History</p>
-                    </a>
+                    <!-- HISTORY -->
+                    <a href="/history"
+                        class="hidden sm:flex relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+        min-h-[120px]
+        flex-col items-center justify-center
+        shadow-lg hover:shadow-2xl hover:-translate-y-1
+        transition duration-300 active:scale-95">
 
-                    <!-- <a href="/profile" class="bg-white rounded-2xl p-4 shadow text-center">
-                        <div class="text-3xl">⚙️</div>
-                        <p class="text-sm mt-2">Profile</p>
-                    </a> -->
+                        <div class="text-4xl drop-shadow-md">
+                            📊
+                        </div>
 
-                </div>
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
+                            History
+                        </p>
 
-            </div>
-
-            <!-- MOBILE NAV -->
-            <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg md:hidden">
-
-                <div class="grid grid-cols-3 text-center py-3">
-
-                    <a href="/dashboard">
-                        🏠
-                        <p class="text-xs">Home</p>
-                    </a>
-
-                    <a href="/history">
-                        📋
-                        <p class="text-xs">History</p>
-                    </a>
-
-                    <a href="/profile">
-                        👤
-                        <p class="text-xs">Profile</p>
                     </a>
 
                 </div>
 
             </div>
 
-        </div>
+            <script>
+                setTimeout(() => {
+                    const alertBox = document.getElementById('success-alert');
 
-        <script>
-            setTimeout(() => {
-                const alertBox = document.getElementById('success-alert');
+                    if (alertBox) {
+                        alertBox.style.display = 'none';
+                    }
+                }, 3000);
 
-                if (alertBox) {
-                    alertBox.style.display = 'none';
+                function updateClock() {
+
+                    const now = new Date();
+
+                    const clock = document.getElementById("clock");
+
+                    if (clock) {
+                        clock.innerHTML =
+                            now.toLocaleTimeString('id-ID') + " WIB";
+                    }
+                    now.toLocaleTimeString('id-ID') + " WIB";
+
                 }
-            }, 3000);
 
-            function updateClock() {
+                setInterval(updateClock, 1000);
 
-                const now = new Date();
-
-                const clock = document.getElementById("clock");
-
-                if (clock) {
-                    clock.innerHTML =
-                        now.toLocaleTimeString('id-ID') + " WIB";
-                }
-                now.toLocaleTimeString('id-ID') + " WIB";
-
-            }
-
-            setInterval(updateClock, 1000);
-
-            updateClock();
-        </script>
+                updateClock();
+            </script>
 
 </x-app-layout>

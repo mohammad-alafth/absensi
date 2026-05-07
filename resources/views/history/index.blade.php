@@ -1,13 +1,13 @@
 <x-app-layout>
 
-    <div class="min-h-screen bg-gray-100 p-4">
+    <div class="min-h-screen bg-gray-100 px-4 pb-28 -mt-4">
 
         @forelse($years as $year)
 
         <!-- HEADER TAHUN -->
-        <div class="mb-4 mt-6">
+        <div class="mb-3 mt-0 relative leading-none">
 
-            <h2 class="text-2xl font-bold text-[#1E40AF]">
+            <h2 class="text-xl md:text-2xl font-bold text-[#1E40AF] m-0 p-0">
 
                 Tahun {{ $year }}
 

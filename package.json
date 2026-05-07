@@ -19,6 +19,7 @@
     },
     "dependencies": {
         "@tensorflow/tfjs": "^4.22.0",
+        "animejs": "^4.4.1",
         "face-api.js": "^0.20.0",
         "net": "^1.0.2"
     },
