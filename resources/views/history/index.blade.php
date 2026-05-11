@@ -1,266 +1,651 @@
 <x-app-layout>
 
-    <div class="min-h-screen bg-gray-100 px-4 pb-28 -mt-4">
+    <div class="min-h-screen bg-[#f8f9ff] px-3 sm:px-5 py-6 pb-28">
 
-        @forelse($years as $year)
+        <div class="w-full max-w-6xl mx-auto">
 
-        <!-- HEADER TAHUN -->
-        <div class="mb-3 mt-0 relative leading-none">
+            <!-- HEADER -->
+            <div class="flex justify-between items-center mb-6">
 
-            <h2 class="text-xl md:text-2xl font-bold text-[#1E40AF] m-0 p-0">
+                <a href="{{ route('dashboard') }}"
+                    class="text-[#1E40AF] font-semibold text-sm">
 
-                Tahun {{ $year }}
+                    ← Kembali
 
-            </h2>
+                </a>
 
-        </div>
+                <div class="bg-[#1E40AF] text-white px-4 py-2 rounded-xl text-sm shadow">
 
-
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-8">
-
-            <!-- ================= CUTI ================= -->
-            <div class="bg-white rounded-2xl shadow overflow-hidden">
-
-                <div class="bg-[#1E40AF] text-white p-4 font-bold">
-
-                    📅 Riwayat Cuti
-
-                </div>
-
-                <div class="overflow-x-auto">
-
-                    <table class="w-full text-sm">
-
-                        <thead class="bg-gray-50">
-
-                            <tr>
-
-                                <th class="p-3 text-left">
-                                    Periode
-                                </th>
-
-                                <th class="p-3 text-left">
-                                    Jenis
-                                </th>
-
-                                <th class="p-3 text-left">
-                                    Hari
-                                </th>
-
-                                <th class="p-3 text-left">
-                                    Status
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                            @forelse($leaves[$year] ?? [] as $leave)
-
-                            <tr class="border-b">
-
-                                <td class="p-3">
-
-                                    {{ $leave->start_date }}
-                                    <br>
-                                    <span class="text-gray-400 text-xs">
-                                        s/d {{ $leave->end_date }}
-                                    </span>
-
-                                </td>
-
-                                <td class="p-3">
-
-                                    {{ $leave->leave_type }}
-
-                                </td>
-
-                                <td class="p-3">
-
-                                    {{ $leave->total_days }} hari
-
-                                </td>
-
-                                <td class="p-3">
-
-                                    @if($leave->status == 'approved')
-
-                                    <span class="text-green-600 font-medium">
-                                        Approved
-                                    </span>
-
-                                    @elseif($leave->status == 'rejected')
-
-                                    <span class="text-red-600 font-medium">
-                                        Rejected
-                                    </span>
-
-                                    @else
-
-                                    <span class="text-yellow-600 font-medium">
-                                        Pending
-                                    </span>
-
-                                    @endif
-
-                                </td>
-
-                            </tr>
-
-                            @empty
-
-                            <tr>
-
-                                <td colspan="4"
-                                    class="p-4 text-center text-gray-400">
-
-                                    Tidak ada data cuti
-
-                                </td>
-
-                            </tr>
-
-                            @endforelse
-
-                        </tbody>
-
-                    </table>
+                    Riwayat Pengajuan
 
                 </div>
 
             </div>
 
+            @forelse($years as $year)
 
-            <!-- ================= IZIN ================= -->
-            <div class="bg-white rounded-2xl shadow overflow-hidden">
+            <!-- TAHUN -->
+            <div class="mb-5">
 
-                <div class="bg-indigo-600 text-white p-4 font-bold">
+                <h2 class="text-2xl font-extrabold text-[#1E40AF]">
 
-                    📝 Riwayat Izin
+                    Tahun {{ $year }}
+
+                </h2>
+
+                <p class="text-sm text-gray-500 mt-1">
+
+                    Riwayat cuti, izin, dan lembur
+
+                </p>
+
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
+
+                <!-- ================= CUTI ================= -->
+                <div class="bg-white rounded-3xl shadow-sm border border-blue-50 overflow-hidden">
+
+                    <!-- HEADER -->
+                    <div class="bg-[#1E40AF] text-white px-5 py-4">
+
+                        <h3 class="font-bold text-lg">
+                            📅 Riwayat Cuti
+                        </h3>
+
+                    </div>
+
+                    <!-- CONTENT -->
+                    <div class="p-4 space-y-4">
+
+                        @forelse($leaves[$year] ?? [] as $leave)
+
+                        <div class="border border-blue-50 rounded-2xl p-4 bg-[#f8f9ff]">
+
+                            <div class="flex justify-between items-start mb-3">
+
+                                <div>
+
+                                    <p class="font-bold text-gray-800">
+                                        {{ $leave->leave_type }}
+                                    </p>
+
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        {{ \Carbon\Carbon::parse($leave->start_date)->format('d M Y') }}
+                                        s/d
+                                        {{ \Carbon\Carbon::parse($leave->end_date)->format('d M Y') }}
+                                    </p>
+
+                                </div>
+
+                                @if($leave->status == 'approved')
+
+                                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Approved
+
+                                </span>
+
+                                @elseif($leave->status == 'rejected')
+
+                                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Rejected
+
+                                </span>
+
+                                @else
+
+                                <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Pending
+
+                                </span>
+
+                                @endif
+
+                            </div>
+
+                            <div class="text-sm text-gray-600 mb-4">
+
+                                Total:
+                                <span class="font-semibold">
+                                    {{ $leave->total_days }} Hari
+                                </span>
+
+                            </div>
+
+                            <button
+                                onclick="openModal('leave-{{ $leave->id }}')"
+                                class="w-full bg-[#1E40AF] hover:bg-[#1e3a8a]
+                                text-white py-2 rounded-xl text-sm font-medium transition">
+
+                                Lihat Detail
+
+                            </button>
+
+                        </div>
+
+                        <!-- MODAL CUTI -->
+                        <div
+                            id="leave-{{ $leave->id }}"
+                            class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+
+                            <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative">
+
+                                <button
+                                    onclick="closeModal('leave-{{ $leave->id }}')"
+                                    class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-xl">
+
+                                    ✕
+
+                                </button>
+
+                                <h2 class="text-2xl font-bold text-[#1E40AF] mb-5">
+
+                                    Detail Cuti
+
+                                </h2>
+
+                                <div class="space-y-4 text-sm">
+
+                                    <div>
+                                        <p class="text-gray-500">Jenis Cuti</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->leave_type }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Periode</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->start_date }} - {{ $leave->end_date }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Tanggal Masuk</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->return_date }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Total Hari</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->total_days }} Hari
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Alasan</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->reason }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Delegasi</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->delegate_name }}
+                                            ({{ $leave->delegate_nik }})
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Kontak Darurat</p>
+                                        <p class="font-semibold">
+                                            {{ $leave->emergency_contact }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Status</p>
+                                        <p class="font-semibold capitalize">
+                                            {{ $leave->status }}
+                                        </p>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        @empty
+
+                        <div class="text-center py-10">
+
+                            <div class="text-4xl mb-3">
+                                📅
+                            </div>
+
+                            <p class="text-sm text-gray-400">
+
+                                Tidak ada data cuti
+
+                            </p>
+
+                        </div>
+
+                        @endforelse
+
+                    </div>
 
                 </div>
 
-                <div class="overflow-x-auto">
+                <!-- ================= IZIN ================= -->
+                <div class="bg-white rounded-3xl shadow-sm border border-blue-50 overflow-hidden">
 
-                    <table class="w-full text-sm">
+                    <!-- HEADER -->
+                    <div class="bg-indigo-600 text-white px-5 py-4">
 
-                        <thead class="bg-gray-50">
+                        <h3 class="font-bold text-lg">
+                            📝 Riwayat Izin
+                        </h3>
 
-                            <tr>
+                    </div>
 
-                                <th class="p-3 text-left">
-                                    Tanggal
-                                </th>
+                    <!-- CONTENT -->
+                    <div class="p-4 space-y-4">
 
-                                <th class="p-3 text-left">
-                                    Jenis
-                                </th>
+                        @forelse($permissions[$year] ?? [] as $permission)
 
-                                <th class="p-3 text-left">
-                                    Jam
-                                </th>
+                        <div class="border border-blue-50 rounded-2xl p-4 bg-[#f8f9ff]">
 
-                                <th class="p-3 text-left">
-                                    Status
-                                </th>
+                            <div class="flex justify-between items-start mb-3">
 
-                            </tr>
+                                <div>
 
-                        </thead>
+                                    <p class="font-bold text-gray-800 capitalize">
+                                        {{ $permission->jenis }}
+                                    </p>
 
-                        <tbody>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        {{ \Carbon\Carbon::parse($permission->tanggal)->format('d M Y') }}
+                                    </p>
 
-                            @forelse($permissions[$year] ?? [] as $permission)
+                                </div>
 
-                            <tr class="border-b">
+                                @if($permission->status == 'approved')
 
-                                <td class="p-3">
+                                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
 
-                                    {{ $permission->tanggal }}
+                                    Approved
 
-                                </td>
+                                </span>
 
-                                <td class="p-3">
+                                @elseif($permission->status == 'rejected')
 
-                                    {{ $permission->jenis }}
+                                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
 
-                                </td>
+                                    Rejected
 
-                                <td class="p-3">
+                                </span>
+
+                                @else
+
+                                <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Pending
+
+                                </span>
+
+                                @endif
+
+                            </div>
+
+                            <div class="text-sm text-gray-600 mb-4">
+
+                                Jam:
+                                <span class="font-semibold">
 
                                     {{ $permission->jam_mulai }}
                                     -
                                     {{ $permission->jam_selesai }}
 
-                                </td>
+                                </span>
 
-                                <td class="p-3">
+                            </div>
 
-                                    @if($permission->status == 'approved')
+                            <button
+                                onclick="openModal('permission-{{ $permission->id }}')"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700
+                                text-white py-2 rounded-xl text-sm font-medium transition">
 
-                                    <span class="text-green-600 font-medium">
-                                        Approved
-                                    </span>
+                                Lihat Detail
 
-                                    @elseif($permission->status == 'rejected')
+                            </button>
 
-                                    <span class="text-red-600 font-medium">
-                                        Rejected
-                                    </span>
+                        </div>
 
-                                    @else
+                        <!-- MODAL IZIN -->
+                        <div
+                            id="permission-{{ $permission->id }}"
+                            class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
 
-                                    <span class="text-yellow-600 font-medium">
-                                        Pending
-                                    </span>
+                            <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative">
 
-                                    @endif
+                                <button
+                                    onclick="closeModal('permission-{{ $permission->id }}')"
+                                    class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-xl">
 
-                                </td>
+                                    ✕
 
-                            </tr>
+                                </button>
 
-                            @empty
+                                <h2 class="text-2xl font-bold text-indigo-600 mb-5">
 
-                            <tr>
+                                    Detail Izin
 
-                                <td colspan="4"
-                                    class="p-4 text-center text-gray-400">
+                                </h2>
 
-                                    Tidak ada data izin
+                                <div class="space-y-4 text-sm">
 
-                                </td>
+                                    <div>
+                                        <p class="text-gray-500">Tanggal</p>
+                                        <p class="font-semibold">
+                                            {{ $permission->tanggal }}
+                                        </p>
+                                    </div>
 
-                            </tr>
+                                    <div>
+                                        <p class="text-gray-500">Jenis</p>
+                                        <p class="font-semibold capitalize">
+                                            {{ $permission->jenis }}
+                                        </p>
+                                    </div>
 
-                            @endforelse
+                                    <div>
+                                        <p class="text-gray-500">Jam</p>
+                                        <p class="font-semibold">
+                                            {{ $permission->jam_mulai }} - {{ $permission->jam_selesai }}
+                                        </p>
+                                    </div>
 
-                        </tbody>
+                                    <div>
+                                        <p class="text-gray-500">Alasan</p>
+                                        <p class="font-semibold">
+                                            {{ $permission->alasan }}
+                                        </p>
+                                    </div>
 
-                    </table>
+                                    <div>
+                                        <p class="text-gray-500">Lampiran</p>
+
+                                        @if($permission->lampiran)
+
+                                        <a href="{{ asset('storage/'.$permission->lampiran) }}"
+                                            target="_blank"
+                                            class="text-indigo-600 underline">
+
+                                            Lihat Lampiran
+
+                                        </a>
+
+                                        @else
+
+                                        <p class="font-semibold">-</p>
+
+                                        @endif
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Status</p>
+                                        <p class="font-semibold capitalize">
+                                            {{ $permission->status }}
+                                        </p>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        @empty
+
+                        <div class="text-center py-10">
+
+                            <div class="text-4xl mb-3">
+                                📝
+                            </div>
+
+                            <p class="text-sm text-gray-400">
+
+                                Tidak ada data izin
+
+                            </p>
+
+                        </div>
+
+                        @endforelse
+
+                    </div>
+
+                </div>
+
+                <!-- ================= LEMBUR ================= -->
+                <div class="bg-white rounded-3xl shadow-sm border border-blue-50 overflow-hidden">
+
+                    <!-- HEADER -->
+                    <div class="bg-cyan-600 text-white px-5 py-4">
+
+                        <h3 class="font-bold text-lg">
+                            ⏰ Riwayat Lembur
+                        </h3>
+
+                    </div>
+
+                    <!-- CONTENT -->
+                    <div class="p-4 space-y-4">
+
+                        @forelse($overtimes[$year] ?? [] as $overtime)
+
+                        <div class="border border-blue-50 rounded-2xl p-4 bg-[#f8f9ff]">
+
+                            <div class="flex justify-between items-start mb-3">
+
+                                <div>
+
+                                    <p class="font-bold text-gray-800">
+                                        {{ \Carbon\Carbon::parse($overtime->overtime_date)->format('d M Y') }}
+                                    </p>
+
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        {{ $overtime->start_time }}
+                                        -
+                                        {{ $overtime->end_time }}
+                                    </p>
+
+                                </div>
+
+                                @if($overtime->status == 'approved')
+
+                                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Approved
+
+                                </span>
+
+                                @elseif($overtime->status == 'rejected')
+
+                                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Rejected
+
+                                </span>
+
+                                @else
+
+                                <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+
+                                    Pending
+
+                                </span>
+
+                                @endif
+
+                            </div>
+
+                            <div class="text-sm text-gray-600 mb-4 line-clamp-2">
+
+                                {{ $overtime->reason }}
+
+                            </div>
+
+                            <button
+                                onclick="openModal('overtime-{{ $overtime->id }}')"
+                                class="w-full bg-cyan-600 hover:bg-cyan-700
+                                text-white py-2 rounded-xl text-sm font-medium transition">
+
+                                Lihat Detail
+
+                            </button>
+
+                        </div>
+
+                        <!-- MODAL LEMBUR -->
+                        <div
+                            id="overtime-{{ $overtime->id }}"
+                            class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+
+                            <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative">
+
+                                <button
+                                    onclick="closeModal('overtime-{{ $overtime->id }}')"
+                                    class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-xl">
+
+                                    ✕
+
+                                </button>
+
+                                <h2 class="text-2xl font-bold text-cyan-600 mb-5">
+
+                                    Detail Lembur
+
+                                </h2>
+
+                                <div class="space-y-4 text-sm">
+
+                                    <div>
+                                        <p class="text-gray-500">Tanggal</p>
+                                        <p class="font-semibold">
+                                            {{ $overtime->overtime_date }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Jam</p>
+                                        <p class="font-semibold">
+                                            {{ $overtime->start_time }} - {{ $overtime->end_time }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Total Jam</p>
+                                        <p class="font-semibold">
+                                            {{ $overtime->total_hours }} Jam
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Uraian</p>
+                                        <p class="font-semibold">
+                                            {{ $overtime->reason }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-500">Status</p>
+                                        <p class="font-semibold capitalize">
+                                            {{ $overtime->status }}
+                                        </p>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        @empty
+
+                        <div class="text-center py-10">
+
+                            <div class="text-4xl mb-3">
+                                ⏰
+                            </div>
+
+                            <p class="text-sm text-gray-400">
+
+                                Tidak ada data lembur
+
+                            </p>
+
+                        </div>
+
+                        @endforelse
+
+                    </div>
 
                 </div>
 
             </div>
 
+            @empty
+
+            <!-- EMPTY -->
+            <div class="bg-white rounded-3xl shadow-sm border border-blue-50 p-10 text-center">
+
+                <div class="text-6xl mb-4">
+                    📂
+                </div>
+
+                <p class="text-gray-500">
+
+                    Belum ada riwayat pengajuan
+
+                </p>
+
+            </div>
+
+            @endforelse
+
         </div>
-
-        @empty
-
-        <div class="bg-white rounded-2xl shadow p-8 text-center">
-
-            <p class="text-gray-500">
-
-                Belum ada riwayat cuti atau izin
-
-            </p>
-
-        </div>
-
-        @endforelse
 
     </div>
+
+    <!-- SCRIPT MODAL -->
+    <script>
+        function openModal(id) {
+
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+
+        }
+
+        function closeModal(id) {
+
+            document.getElementById(id).classList.remove('flex');
+            document.getElementById(id).classList.add('hidden');
+
+        }
+
+        window.onclick = function(event) {
+
+            document.querySelectorAll('[id^="leave-"], [id^="permission-"], [id^="overtime-"]').forEach(modal => {
+
+                if (event.target === modal) {
+
+                    modal.classList.remove('flex');
+                    modal.classList.add('hidden');
+
+                }
+
+            });
+
+        }
+    </script>
 
 </x-app-layout>

@@ -27,47 +27,45 @@
 <body class="font-sans antialiased">
 
     <!-- LOADING SCREEN -->
-    <div
-        id="loading-screen"
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]"> <!-- Glow -->
-        <div class="absolute w-[500px] h-[500px] bg-indigo-500/20 blur-3xl rounded-full"></div>
+    <!-- <div id="loading-screen" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]">  -->
+        <!-- <div class="absolute w-[500px] h-[500px] bg-indigo-500/20 blur-3xl rounded-full"></div> -->
 
-        <div class="relative w-80 h-48 flex items-center justify-center">
+        <!-- <div class="relative w-80 h-48 flex items-center justify-center"> -->
 
             <!-- Triangle -->
-            <div
+            <!-- <div
                 class="triangle absolute left-0 w-0 h-0
                    border-l-[40px] border-r-[40px]
                    border-b-[70px]
                    border-l-transparent
                    border-r-transparent
                    border-b-cyan-400 drop-shadow-[0_0_25px_rgba(34,211,238,0.9)]">
-            </div>
+            </div> -->
 
             <!-- Square -->
-            <div
+            <!-- <div
                 class="square absolute left-0 w-16 h-16 bg-fuchsia-500 rounded-2xl shadow-[0_0_35px_rgba(217,70,239,0.9)]">
-            </div>
+            </div> -->
 
             <!-- Circle -->
-            <div
+            <!-- <div
                 class="circle absolute left-0 w-16 h-16 bg-emerald-400 rounded-full shadow-[0_0_35px_rgba(52,211,153,0.9)]">
-            </div>
+            </div> -->
 
             <!-- Text -->
-            <div class="absolute -bottom-16 text-center">
-                <h1 class="text-3xl font-bold text-white tracking-[6px]">
+            <!-- <div class="absolute -bottom-16 text-center"> -->
+                <!-- <h1 class="text-3xl font-bold text-white tracking-[6px]">
                     PBEC
                 </h1>
 
                 <p class="text-indigo-200 text-sm mt-2 tracking-widest">
                     LOADING....
-                </p>
-            </div>
+                </p> -->
+            <!-- </div> -->
 
-        </div>
+        <!-- </div> -->
 
-    </div>
+    <!-- </div> -->
 
     <!-- Background -->
     <div class="min-h-screen flex flex-col justify-center items-center relative px-4 overflow-hidden">

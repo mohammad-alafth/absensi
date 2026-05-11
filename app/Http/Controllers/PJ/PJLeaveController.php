@@ -7,46 +7,8 @@ use App\Models\Leave;
 
 class PJLeaveController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | LIST
-    |--------------------------------------------------------------------------
-    */
     public function index()
     {
-        $userRole = auth()->user()->role;
-
-        /*
-        |--------------------------------------------------------------------------
-        | HRD
-        |--------------------------------------------------------------------------
-        */
-        if ($userRole == 'hrd') {
-
-            $leaves = Leave::with([
-                'user',
-                'pjApprover'
-            ])
-
-                ->where('pj_status', 'approved')
-
-                ->where('hrd_status', 'pending')
-
-                ->latest()
-
-                ->get();
-
-            return view(
-                'hrd.cuti',
-                compact('leaves')
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PJ
-        |--------------------------------------------------------------------------
-        */
         $divisionRole = $this->getDivisionRole();
 
         $leaves = Leave::with('user')
@@ -68,45 +30,10 @@ class PJLeaveController extends Controller
         );
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | APPROVE
-    |--------------------------------------------------------------------------
-    */
     public function approve($id)
     {
         $leave = Leave::findOrFail($id);
 
-        /*
-        |--------------------------------------------------------------------------
-        | HRD
-        |--------------------------------------------------------------------------
-        */
-        if (auth()->user()->role == 'hrd') {
-
-            $leave->update([
-
-                'hrd_status' => 'approved',
-
-                'hrd_approved_by' => auth()->id(),
-
-                'hrd_approved_at' => now(),
-
-                'status' => 'approved'
-            ]);
-
-            return back()->with(
-                'success',
-                'Cuti berhasil diapprove HRD'
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PJ
-        |--------------------------------------------------------------------------
-        */
         $leave->update([
 
             'pj_status' => 'approved',
@@ -124,45 +51,10 @@ class PJLeaveController extends Controller
         );
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT
-    |--------------------------------------------------------------------------
-    */
     public function reject($id)
     {
         $leave = Leave::findOrFail($id);
 
-        /*
-        |--------------------------------------------------------------------------
-        | HRD
-        |--------------------------------------------------------------------------
-        */
-        if (auth()->user()->role == 'hrd') {
-
-            $leave->update([
-
-                'hrd_status' => 'rejected',
-
-                'hrd_approved_by' => auth()->id(),
-
-                'hrd_approved_at' => now(),
-
-                'status' => 'rejected'
-            ]);
-
-            return back()->with(
-                'success',
-                'Cuti ditolak HRD'
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PJ
-        |--------------------------------------------------------------------------
-        */
         $leave->update([
 
             'pj_status' => 'rejected',
@@ -180,12 +72,6 @@ class PJLeaveController extends Controller
         );
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | DIVISION
-    |--------------------------------------------------------------------------
-    */
     private function getDivisionRole()
     {
         return str_replace(

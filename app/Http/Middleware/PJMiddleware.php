@@ -11,12 +11,13 @@ class PJMiddleware
     {
         $user = auth()->user();
 
+        if (!$user) {
+            abort(403);
+        }
+
         if (
-            !$user ||
-            (
-                !str_starts_with($user->role, 'pj_')
-                && $user->role != 'hrd'
-            )
+            !str_starts_with($user->role, 'pj_') &&
+            $user->role !== 'hrd'
         ) {
             abort(403);
         }

@@ -68,103 +68,236 @@
         }
     </style>
 
-    <!-- CONTENT (tidak berubah) -->
+    <!-- CONTENT -->
     <main class="flex-1 px-6 py-8 flex flex-col items-center min-h-screen text-slate-800 bg-[#f8f9ff]">
 
-        <h2 class="text-2xl font-bold mb-2">Halaman Absensi</h2>
-        <p class="text-sm text-gray-500 mb-6">Posisikan wajah Anda dalam bingkai</p>
+        <!-- NAV -->
+        <div class="w-full max-w-md flex justify-start mb-6">
+
+            <a href="{{ route('dashboard') }}"
+                class="text-[#1E40AF] font-semibold text-sm">
+                ← Kembali
+            </a>
+
+        </div>
+
+        <!-- TITLE -->
+        <h2 class="text-2xl font-bold mb-2">
+            Halaman Absensi
+        </h2>
+
+        <p class="text-sm text-gray-500 mb-6">
+            Posisikan wajah Anda dalam bingkai
+        </p>
 
         <!-- CAMERA -->
         <div class="scan-ring mb-8">
+
             <div class="scan-line"></div>
 
-            <video id="video" autoplay playsinline
+            <video id="video"
+                autoplay
+                playsinline
                 class="w-64 h-64 rounded-full object-cover border-4 border-white shadow-xl">
             </video>
+
         </div>
 
         <!-- STATUS -->
         <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-6">
-            <div id="gpsStatus" class="flex justify-center gap-2 py-3 bg-blue-50 rounded-2xl text-xs">
+
+            <div id="gpsStatus"
+                class="flex justify-center gap-2 py-3 bg-blue-50 rounded-2xl text-xs">
+
                 📍 GPS...
+
             </div>
+
             <div class="flex justify-center gap-2 py-3 bg-blue-50 rounded-2xl text-xs">
+
                 🌐 Stabil
+
             </div>
+
         </div>
 
         <!-- LOCATION -->
-        <div class="w-full bg-white p-4 rounded-3xl mb-6 text-sm shadow">
+        <div class="w-full max-w-md bg-white p-4 rounded-3xl mb-6 text-sm shadow">
+
             <b>Lokasi Anda</b>
-            <div id="locationText">Mengambil lokasi...</div>
+
+            <div id="locationText">
+                Mengambil lokasi...
+            </div>
+
         </div>
 
         <!-- BUTTON -->
         <button onclick="absen()"
-            class="w-full max-w-xs bg-blue-900 text-white py-4 rounded-3xl font-bold shadow-lg">
+            class="w-full max-w-xs bg-[#1E40AF] hover:bg-[#1e3a8a] text-white py-4 rounded-3xl font-bold shadow-lg transition">
+
             Absen Sekarang
+
         </button>
 
     </main>
 
-    <!-- SCRIPT tetap -->
+    <!-- SCRIPT -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
         async function startCamera() {
+
             try {
+
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: "user"
                     }
                 });
+
                 document.getElementById('video').srcObject = stream;
+
             } catch (err) {
-                alert("Camera tidak bisa diakses");
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Camera Error',
+                    text: 'Camera tidak bisa diakses',
+                    confirmButtonColor: '#1E40AF'
+                });
+
             }
+
         }
+
         startCamera();
 
         navigator.geolocation.getCurrentPosition(
+
             (pos) => {
+
                 document.getElementById('gpsStatus').innerHTML =
                     `📍 GPS ${Math.round(pos.coords.accuracy)}m`;
 
                 document.getElementById('locationText').innerHTML =
                     `Lat: ${pos.coords.latitude}<br>Lng: ${pos.coords.longitude}`;
+
             },
+
             () => {
-                document.getElementById('gpsStatus').innerHTML = "❌ GPS gagal";
+
+                document.getElementById('gpsStatus').innerHTML =
+                    "❌ GPS gagal";
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'GPS Error',
+                    text: 'Gagal mendapatkan lokasi',
+                    confirmButtonColor: '#1E40AF'
+                });
+
             }, {
                 enableHighAccuracy: true
             }
         );
 
         function absen() {
+
             const token = localStorage.getItem('token');
 
             if (!token) {
-                alert("Silakan login dulu");
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Login Diperlukan',
+                    text: 'Silakan login terlebih dahulu',
+                    confirmButtonColor: '#1E40AF'
+                });
+
                 return;
             }
 
             navigator.geolocation.getCurrentPosition((pos) => {
 
                 fetch('/api/device/face/scan', {
+
                         method: 'POST',
+
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': 'Bearer ' + token
                         },
+
                         body: JSON.stringify({
                             latitude: pos.coords.latitude,
                             longitude: pos.coords.longitude,
                             accuracy: pos.coords.accuracy
                         })
+
                     })
-                    .then(res => res.json())
-                    .then(data => alert(data.message))
-                    .catch(() => alert("Error koneksi"));
+
+                    .then(async res => {
+
+                        const data = await res.json();
+
+                        // SUCCESS
+                        if (data.success) {
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: data.message,
+                                confirmButtonColor: '#1E40AF'
+                            }).then(() => {
+
+                                if (data.redirect) {
+
+                                    window.location.href = data.redirect;
+
+                                }
+
+                            });
+
+                            return;
+                        }
+
+                        // SUDAH CHECKIN
+                        if (data.type === 'already_checkin') {
+
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Sudah Absen',
+                                text: data.message,
+                                confirmButtonColor: '#1E40AF'
+                            });
+
+                            return;
+                        }
+
+                        // ERROR
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: data.message || 'Terjadi kesalahan',
+                            confirmButtonColor: '#DC2626'
+                        });
+
+                    })
+
+                    .catch(() => {
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Koneksi Gagal',
+                            text: 'Terjadi kesalahan server',
+                            confirmButtonColor: '#DC2626'
+                        });
+
+                    });
 
             });
+
         }
     </script>
 

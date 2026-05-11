@@ -6,94 +6,132 @@
         class="hidden mb-4 bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-xl">
     </div>
 
-    <form id="loginForm">
+    <form id="loginForm" class="space-y-5">
+
         @csrf
 
-        <!-- Email Address -->
+        <!-- Error Alert -->
+        <div
+            id="login-error"
+            class="hidden bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-2xl text-sm">
+        </div>
+
+        <!-- EMAIL -->
         <div>
-            <x-input-label
+
+            <label
                 for="email"
-                :value="__('Email')" />
+                class="block text-sm font-semibold text-slate-700 mb-2">
 
-            <x-text-input
-                id="email"
-                class="block mt-1 w-full"
-                type="email"
-                name="email"
-                :value="old('email')"
-                required
-                autofocus
-                autocomplete="username" />
+                Email
 
-            <x-input-error
-                :messages="$errors->get('email')"
-                class="mt-2" />
+            </label>
+
+            <div class="relative">
+
+                <input
+                    id="email"
+                    type="email"
+                    name="email"
+                    required
+                    autofocus
+                    autocomplete="username"
+                    placeholder="Masukkan email"
+                    class="w-full rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm px-4 py-3 text-sm shadow-sm transition-all duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:outline-none hover:border-indigo-300">
+
+                <div
+                    class="absolute inset-y-0 right-4 flex items-center text-slate-400">
+
+                    ✉️
+
+                </div>
+
+            </div>
+
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label
+        <!-- PASSWORD -->
+        <div>
+
+            <label
                 for="password"
-                :value="__('Password')" />
+                class="block text-sm font-semibold text-slate-700 mb-2">
 
-            <x-text-input
-                id="password"
-                class="block mt-1 w-full"
-                type="password"
-                name="password"
-                required
-                autocomplete="current-password" />
+                Password
 
-            <x-input-error
-                :messages="$errors->get('password')"
-                class="mt-2" />
+            </label>
+
+            <div class="relative">
+
+                <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    required
+                    autocomplete="current-password"
+                    placeholder="Masukkan password"
+                    class="w-full rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm px-4 py-3 text-sm shadow-sm transition-all duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:outline-none hover:border-indigo-300">
+
+                <button
+                    type="button"
+                    onclick="togglePassword()"
+                    class="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-indigo-500 transition">
+
+                    👁️
+
+                </button>
+
+            </div>
+
         </div>
 
-        <!-- Remember Me -->
-        <div class="block mt-4">
+        <!-- REMEMBER -->
+        <div class="flex items-center justify-between">
 
             <label
                 for="remember_me"
-                class="inline-flex items-center">
+                class="inline-flex items-center gap-2 cursor-pointer">
 
                 <input
                     id="remember_me"
                     type="checkbox"
                     name="remember"
-                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                    class="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
 
-                <span class="ms-2 text-sm text-gray-600">
-                    {{ __('Remember me') }}
+                <span class="text-sm text-slate-600">
+                    Remember me
                 </span>
 
             </label>
 
+            @if(Route::has('password.request'))
+
+            <a
+                href="{{ route('password.request') }}"
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition">
+
+                Forgot Password?
+
+            </a>
+
+            @endif
+
         </div>
 
-        <!-- Actions -->
-        <div class="flex items-center justify-between mt-4">
+        <!-- BUTTON -->
+        <button
+            type="submit"
+            class="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-500 px-4 py-3 font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-xl active:scale-[0.99]">
 
-            <div class="flex gap-3">
+            <span class="relative z-10">
+                Log In
+            </span>
 
-                <!-- Forgot Password -->
-                @if(Route::has('password.request'))
-                <a
-                    class="underline text-sm text-gray-600 hover:text-gray-900"
-                    href="{{ route('password.request') }}">
-
-                    Forgot Password?
-
-                </a>
-                @endif
-
+            <div
+                class="absolute inset-0 translate-y-full bg-white/10 transition-transform duration-300 group-hover:translate-y-0">
             </div>
 
-            <!-- Login Button -->
-            <x-primary-button type="submit">
-                {{ __('Log in') }}
-            </x-primary-button>
-
-        </div>
+        </button>
 
     </form>
 
@@ -208,6 +246,20 @@
                 'hidden'
             );
 
+        }
+
+        function togglePassword() {
+
+            const passwordInput =
+                document.getElementById(
+                    'password'
+                );
+
+            passwordInput.type =
+                passwordInput.type ===
+                'password' ?
+                'text' :
+                'password';
         }
     </script>
 

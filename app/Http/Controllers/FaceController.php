@@ -151,36 +151,50 @@ class FaceController extends Controller
                 'user_id' => $user->id,
                 'tanggal' => now(),
                 'jam_masuk' => now(),
-                'status' => now()->format('H:i') > '08:00' ? 'terlambat' : 'hadir'
+                'status' => now()->format('H:i') > '08:00'
+                    ? 'terlambat'
+                    : 'hadir'
             ]);
 
             return response()->json([
-                'message' => 'Absen MASUK: ' . $user->name
+                'success' => true,
+                'type' => 'checkin',
+                'redirect' => url('/dashboard'),
+                'message' => 'Absen MASUK berhasil'
             ]);
         }
 
         // =====================
-        // ✅ ABSEN KELUAR
+        // ✅ SUDAH ABSEN MASUK
         // =====================
-        if (!$attendance->jam_keluar) {
+        if ($attendance && !$attendance->jam_keluar) {
 
+            // BELUM JAM PULANG
             if (now()->format('H:i') < '17:00') {
+
                 return response()->json([
-                    'message' => 'Belum waktunya absen pulang'
+                    'success' => false,
+                    'type' => 'already_checkin',
+                    'message' => 'Anda sudah absen masuk hari ini. Tunggu jam pulang untuk checkout.'
                 ], 403);
             }
 
+            // CHECKOUT
             $attendance->update([
                 'jam_keluar' => now()
             ]);
 
             return response()->json([
-                'message' => 'Absen KELUAR: ' . $user->name
+                'success' => true,
+                'type' => 'checkout',
+                'redirect' => url('/dashboard'),
+                'message' => 'Absen KELUAR berhasil'
             ]);
         }
 
         return response()->json([
-            'message' => 'Sudah absen lengkap'
+            'success' => false,
+            'message' => 'Anda sudah melakukan absensi lengkap hari ini'
         ], 400);
     }
 

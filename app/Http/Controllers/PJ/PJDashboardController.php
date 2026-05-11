@@ -3,8 +3,7 @@
 namespace App\Http\Controllers\PJ;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-
+use App\Models\Overtime;
 use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\User;
@@ -14,91 +13,222 @@ class PJDashboardController extends Controller
     public function index()
     {
         /*
-        |--------------------------------------------------------------------------
-        | Ambil role login
-        |--------------------------------------------------------------------------
-        |
-        | contoh:
-        | pj_nurse
-        | pj_security
-        |
+        |------------------------------------------------------------------
+        | ROLE LOGIN
+        |------------------------------------------------------------------
         */
 
         $pjRole = auth()->user()->role;
 
         /*
-        |--------------------------------------------------------------------------
-        | Ambil divisi target
-        |--------------------------------------------------------------------------
-        |
-        | pj_nurse => nurse
-        |
+        |------------------------------------------------------------------
+        | HRD DASHBOARD
+        |------------------------------------------------------------------
         */
 
-        $divisionRole = str_replace('pj_', '', $pjRole);
+        if ($pjRole == 'hrd') {
+
+            $pendingLeave = Leave::where(
+                'pj_status',
+                'approved'
+            )
+                ->where(
+                    'hrd_status',
+                    'pending'
+                )
+                ->count();
+
+            $pendingPermission = Permission::where(
+                'pj_status',
+                'approved'
+            )
+                ->where(
+                    'hrd_status',
+                    'pending'
+                )
+                ->count();
+
+            $pendingOvertime = Overtime::where(
+                'pj_status',
+                'approved'
+            )
+                ->where(
+                    'hrd_status',
+                    'pending'
+                )
+                ->count();
+
+            /*
+            |------------------------------------------------------------------
+            | DATA LEMBUR HRD
+            |------------------------------------------------------------------
+            */
+
+            $overtimes = Overtime::with([
+                'user',
+                'pjApprover'
+            ])
+                ->where(
+                    'pj_status',
+                    'approved'
+                )
+                ->where(
+                    'hrd_status',
+                    'pending'
+                )
+                ->latest()
+                ->get();
+
+            return view(
+                'hrd.dashboard_hrd',
+                compact(
+                    'pendingLeave',
+                    'pendingPermission',
+                    'pendingOvertime',
+                    'overtimes'
+                )
+            );
+        }
 
         /*
-        |--------------------------------------------------------------------------
-        | Ambil user sesuai divisi
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | PJ DASHBOARD
+        |------------------------------------------------------------------
         */
 
-        $userIds = User::where('role', $divisionRole)
-            ->pluck('id');
+        $divisionRole = str_replace(
+            'pj_',
+            '',
+            $pjRole
+        );
 
         /*
-        |--------------------------------------------------------------------------
-        | Statistik
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | USER DIVISI
+        |------------------------------------------------------------------
         */
 
-        $pendingLeave = Leave::whereIn('user_id', $userIds)
-            ->where('status', 'pending')
-            ->count();
-
-        $approvedLeave = Leave::whereIn('user_id', $userIds)
-            ->where('status', 'approved')
-            ->count();
-
-        $rejectedLeave = Leave::whereIn('user_id', $userIds)
-            ->where('status', 'rejected')
-            ->count();
+        $userIds = User::where(
+            'role',
+            $divisionRole
+        )->pluck('id');
 
         /*
-        |--------------------------------------------------------------------------
-        | Pending izin
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | STATISTIK
+        |------------------------------------------------------------------
         */
 
-        $pendingPermission = Permission::whereIn('user_id', $userIds)
-            ->where('status', 'pending')
+        $pendingLeave = Leave::whereIn(
+            'user_id',
+            $userIds
+        )
+            ->where(
+                'pj_status',
+                'pending'
+            )
+            ->count();
+
+        $approvedLeave = Leave::whereIn(
+            'user_id',
+            $userIds
+        )
+            ->where(
+                'pj_status',
+                'approved'
+            )
+            ->count();
+
+        $rejectedLeave = Leave::whereIn(
+            'user_id',
+            $userIds
+        )
+            ->where(
+                'pj_status',
+                'rejected'
+            )
+            ->count();
+
+        $pendingPermission = Permission::whereIn(
+            'user_id',
+            $userIds
+        )
+            ->where(
+                'pj_status',
+                'pending'
+            )
+            ->count();
+
+        $pendingOvertime = Overtime::whereIn(
+            'user_id',
+            $userIds
+        )
+            ->where(
+                'pj_status',
+                'pending'
+            )
             ->count();
 
         /*
-        |--------------------------------------------------------------------------
-        | Recent leave
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | RECENT LEAVE
+        |------------------------------------------------------------------
         */
 
         $recentLeaves = Leave::with('user')
-            ->whereIn('user_id', $userIds)
+            ->whereIn(
+                'user_id',
+                $userIds
+            )
             ->latest()
             ->take(10)
             ->get();
 
         /*
-        |--------------------------------------------------------------------------
-        | Return view
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | LIST LEMBUR PJ
+        |------------------------------------------------------------------
         */
 
-        return view('pj.dashboard', compact(
-            'divisionRole',
-            'pendingLeave',
-            'approvedLeave',
-            'rejectedLeave',
-            'pendingPermission',
-            'recentLeaves'
-        ));
+        $overtimes = Overtime::with('user')
+
+            ->where(
+                'pj_status',
+                'pending'
+            )
+
+            ->whereHas(
+                'user',
+                function ($q) use ($divisionRole) {
+
+                    $q->where(
+                        'role',
+                        $divisionRole
+                    );
+                }
+            )
+
+            ->latest()
+            ->get();
+
+        /*
+        |------------------------------------------------------------------
+        | RETURN VIEW
+        |------------------------------------------------------------------
+        */
+
+        return view(
+            'pj.dashboard',
+            compact(
+                'divisionRole',
+                'pendingLeave',
+                'approvedLeave',
+                'rejectedLeave',
+                'pendingPermission',
+                'pendingOvertime',
+                'recentLeaves',
+                'overtimes'
+            )
+        );
     }
 }

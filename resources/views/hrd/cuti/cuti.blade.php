@@ -11,11 +11,11 @@
                     <div>
 
                         <h1 class="text-2xl font-bold">
-                            Approval Cuti PJ
+                            Approval HRD
                         </h1>
 
                         <p class="text-sm text-gray-500 mt-1">
-                            Pengajuan cuti berdasarkan divisi PJ
+                            Pengajuan cuti yang telah disetujui PJ
                         </p>
 
                     </div>
@@ -31,6 +31,7 @@
 
                 @forelse($leaves as $leave)
 
+
                 <div
                     x-data="{ showDetail: false }"
                     x-effect="document.body.classList.toggle('overflow-hidden', showDetail)"
@@ -40,7 +41,7 @@
                     <div
                         x-show="showDetail"
                         x-transition
-                        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
                         style="display:none;">
 
                         <div
@@ -50,21 +51,13 @@
                             <!-- HEADER -->
                             <div class="flex justify-between items-center mb-5">
 
-                                <div>
-
-                                    <h2 class="text-2xl font-bold text-indigo-600">
-                                        Detail Pengajuan Cuti
-                                    </h2>
-
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        Informasi lengkap pengajuan cuti
-                                    </p>
-
-                                </div>
+                                <h2 class="text-xl font-bold text-indigo-600">
+                                    Detail Pengajuan Cuti
+                                </h2>
 
                                 <button
                                     @click="showDetail = false"
-                                    class="text-3xl text-gray-400 hover:text-gray-700">
+                                    class="text-2xl text-gray-500">
 
                                     ×
 
@@ -76,132 +69,100 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Nama
-                                    </p>
-
+                                    <p class="text-gray-500">Nama</p>
                                     <p class="font-semibold">
                                         {{ $leave->user->name }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Role
-                                    </p>
-
+                                    <p class="text-gray-500">Role</p>
                                     <p class="font-semibold">
                                         {{ $leave->user->role }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Jenis Cuti
-                                    </p>
-
+                                    <p class="text-gray-500">Jenis Cuti</p>
                                     <p class="font-semibold">
                                         {{ $leave->leave_type }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Total Hari
-                                    </p>
-
-                                    <p class="font-semibold">
-                                        {{ $leave->total_days }} Hari
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <p class="text-gray-500">
-                                        Tanggal Mulai
-                                    </p>
-
+                                    <p class="text-gray-500">Tanggal Mulai</p>
                                     <p class="font-semibold">
                                         {{ $leave->start_date }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Tanggal Selesai
-                                    </p>
-
+                                    <p class="text-gray-500">Tanggal Selesai</p>
                                     <p class="font-semibold">
                                         {{ $leave->end_date }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Tanggal Kembali
-                                    </p>
-
+                                    <p class="text-gray-500">Tanggal Kembali</p>
                                     <p class="font-semibold">
                                         {{ $leave->return_date ?? '-' }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Kontak Darurat
-                                    </p>
-
+                                    <p class="text-gray-500">Total Hari</p>
                                     <p class="font-semibold">
-                                        {{ $leave->emergency_contact ?? '-' }}
+                                        {{ $leave->total_days }} Hari
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        Delegasi
-                                    </p>
-
+                                    <p class="text-gray-500">Delegasi</p>
                                     <p class="font-semibold">
                                         {{ $leave->delegate_name ?? '-' }}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <p class="text-gray-500">
-                                        NIK Delegasi
-                                    </p>
-
+                                    <p class="text-gray-500">NIK Delegasi</p>
                                     <p class="font-semibold">
                                         {{ $leave->delegate_nik ?? '-' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-gray-500">Kontak Darurat</p>
+                                    <p class="font-semibold">
+                                        {{ $leave->emergency_contact ?? '-' }}
                                     </p>
                                 </div>
 
                             </div>
 
                             <!-- ALASAN -->
-                            <div
-                                class="mt-5 bg-slate-50 border rounded-2xl p-4">
+                            <div class="mt-5">
 
-                                <p class="text-sm text-gray-500 mb-2">
+                                <p class="text-gray-500 text-sm mb-2">
                                     Alasan Cuti
                                 </p>
 
-                                <p class="text-sm text-gray-700 leading-relaxed">
+                                <div class="bg-slate-50 rounded-2xl p-4">
                                     {{ $leave->reason }}
-                                </p>
+                                </div>
 
                             </div>
 
-                            <!-- ADDRESS -->
-                            <div
-                                class="mt-4 bg-slate-50 border rounded-2xl p-4">
+                            <!-- ALAMAT -->
+                            <div class="mt-4">
 
-                                <p class="text-sm text-gray-500 mb-2">
+                                <p class="text-gray-500 text-sm mb-2">
                                     Alamat Selama Cuti
                                 </p>
 
-                                <p class="text-sm text-gray-700 leading-relaxed">
+                                <div class="bg-slate-50 rounded-2xl p-4">
                                     {{ $leave->address_during_leave ?? '-' }}
-                                </p>
+                                </div>
 
                             </div>
 
@@ -210,10 +171,9 @@
                     </div>
 
                     <!-- CARD -->
-                    <div class="border rounded-2xl p-5 bg-white">
+                    <div class="border rounded-2xl p-5">
 
-                        <div class="flex justify-between gap-4">
-
+                        <div class="flex justify-between items-start gap-6 w-full">
                             <!-- LEFT -->
                             <div class="flex-1">
 
@@ -271,8 +231,9 @@
                                 </div>
 
                                 <!-- ALASAN -->
-                                <div class="mt-4 bg-slate-50 border rounded-2xl px-6 py-4 w-full">
-                                    <p class="text-xs text-gray-500 mb-2">
+                                <div
+                                    class="mt-4 w-full bg-slate-50 border rounded-2xl p-4">
+                                    <p class="text-xs text-gray-500 mb-1">
                                         Alasan Cuti
                                     </p>
 
@@ -282,11 +243,52 @@
 
                                 </div>
 
+                                <!-- APPROVAL PJ -->
+                                <div
+                                    class="mt-4 w-full bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                                    <div class="flex justify-between items-start gap-4 flex-wrap sm:flex-nowrap">
+                                        <div class="flex-1 w-full min-w-0">
+
+                                            <p class="text-xs text-blue-500">
+                                                Approved PJ
+                                            </p>
+
+                                            <h3 class="font-semibold mt-1">
+                                                {{ $leave->pjApprover->name ?? '-' }}
+                                            </h3>
+
+                                        </div>
+
+                                        <div class="flex-1 text-right">
+
+                                            <p class="text-xs text-blue-500">
+                                                Tanggal
+                                            </p>
+
+                                            <h3 class="font-semibold mt-1">
+
+                                                @if($leave->pj_approved_at)
+
+                                                {{ \Carbon\Carbon::parse($leave->pj_approved_at)->format('d M Y H:i') }}
+
+                                                @else
+                                                -
+                                                @endif
+
+                                            </h3>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
                             </div>
 
                             <!-- ACTION -->
                             <div class="flex flex-col gap-2">
 
+                                <!-- DETAIL -->
                                 <button
                                     @click="showDetail = true"
                                     type="button"
@@ -297,7 +299,7 @@
                                 </button>
 
                                 <form method="POST"
-                                    action="{{ route('pj.cuti.approve', $leave->id) }}">
+                                    action="{{ route('hrd.cuti.approve', $leave->id) }}">
 
                                     @csrf
 
@@ -311,7 +313,7 @@
                                 </form>
 
                                 <form method="POST"
-                                    action="{{ route('pj.cuti.reject', $leave->id) }}">
+                                    action="{{ route('hrd.cuti.reject', $leave->id) }}">
 
                                     @csrf
 
@@ -345,7 +347,7 @@
                     </h2>
 
                     <p class="text-gray-500 mt-2">
-                        Belum ada pengajuan cuti yang menunggu approval PJ
+                        Belum ada pengajuan cuti yang menunggu approval HRD
                     </p>
 
                 </div>
