@@ -3,8 +3,8 @@
     text-white relative rounded-b-[35px] shadow-xl overflow-visible z-50">
 
     <!-- Glow Background -->
-    <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-0 left-0 w-32 h-32 bg-cyan-300/10 rounded-full blur-2xl"></div>
+    <!-- <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 left-0 w-32 h-32 bg-cyan-300/10 rounded-full blur-2xl"></div> -->
 
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 

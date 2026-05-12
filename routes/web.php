@@ -8,6 +8,8 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\OvertimeController;
+use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\HRD\HRDController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,6 +72,7 @@ Route::middleware([
     */
 
     Route::view('/face', 'face')
+        ->middleware('auth')
         ->name('face');
 
     Route::view('/fingerprint', 'fingerprint')
@@ -274,10 +277,22 @@ Route::middleware([
             |--------------------------------------------------------------------------
             */
 
+
             Route::get('/dashboard', [
                 HRDDashboardController::class,
                 'index'
             ])->name('hrd.dashboard');
+
+            /*
+            |--------------------------------------------------------------------------
+            | REKAP 
+            |--------------------------------------------------------------------------
+            */
+
+            Route::get('/rekap', [
+                HRDController::class,
+                'index'
+            ])->name('hrd.rekap');
 
             /*
             |--------------------------------------------------------------------------
@@ -342,6 +357,21 @@ Route::middleware([
                 'reject'
             ])->name('hrd.lembur.reject');
         });
+
+    /*
+        |--------------------------------------------------------------------------
+        | SHIFT
+        |--------------------------------------------------------------------------
+    */
+
+    Route::middleware(['auth'])->group(function () {
+
+        Route::get('/shift', [ShiftController::class, 'index'])
+            ->name('shift.index');
+
+        Route::post('/shift/assign', [ShiftController::class, 'assign'])
+            ->name('shift.assign');
+    });
 });
 
 require __DIR__ . '/auth.php';

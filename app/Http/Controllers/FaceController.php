@@ -2,322 +2,397 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Attendance;
-use App\Models\User;
 use Illuminate\Http\Request;
+use App\Models\Attendance;
+use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class FaceController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | REGISTER FACE (CREATE USER + MULTI DESCRIPTOR)
-    |--------------------------------------------------------------------------
-    */
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'descriptors' => 'required|array|min:3'
-        ]);
-
-        // validasi descriptor (harus 128 length)
-        foreach ($request->descriptors as $desc) {
-            if (!is_array($desc) || count($desc) !== 128) {
-                return response()->json([
-                    'message' => 'Descriptor tidak valid'
-                ], 422);
-            }
-        }
-
-        // 🔥 buat user baru
-        $user = User::create([
-            'name' => $request->name,
-            'email' => uniqid('face_') . '@face.local',
-            'password' => bcrypt(str()->random(10)),
-            'role' => 'user'
-        ]);
-
-        // 🔥 simpan MULTI descriptor
-        $user->face_descriptor = json_encode($request->descriptors);
-        $user->save();
-
-        return response()->json([
-            'message' => 'Face registered (multi-sample)',
-            'user_id' => $user->id
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REGISTER FINGERPRINT (CREATE USER)
-    |--------------------------------------------------------------------------
-    */
-    public function registerFingerprint(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string',
-            'finger_id' => 'required|string|unique:users,finger_id'
-        ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => uniqid('finger_') . '@finger.local',
-            'password' => bcrypt(str()->random(10)),
-            'role' => 'user',
-            'finger_id' => $request->finger_id
-        ]);
-
-        return response()->json([
-            'message' => 'Fingerprint registered',
-            'user_id' => $user->id
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | FACE MATCH + ABSENSI (MASUK / KELUAR)
-    |--------------------------------------------------------------------------
-    */
     public function matchFace(Request $request)
     {
-        // 🔐 WAJIB LOGIN
+        /*
+        |--------------------------------------------------------------------------
+        | AUTH
+        |--------------------------------------------------------------------------
+        */
         $user = auth()->user();
 
         if (!$user) {
+
             return response()->json([
-                'message' => 'Session habis, silakan login ulang'
+
+                'success' => false,
+
+                'message' => 'Unauthorized'
+
             ], 401);
         }
 
-        // 📅 VALIDASI HARI KERJA
-        if ($scheduleError = $this->validateWorkingSchedule()) {
-            return $scheduleError;
-        }
 
-        // 📥 VALIDASI INPUT
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDASI INPUT
+        |--------------------------------------------------------------------------
+        */
         $request->validate([
-            'latitude' => 'required|numeric',
+
+            'latitude'  => 'required|numeric',
+
             'longitude' => 'required|numeric',
-            'accuracy' => 'required|numeric'
+
+            'accuracy'  => 'nullable|numeric',
+
+            'image'     => 'required|string'
         ]);
 
-        // 📍 TOLERANSI GPS (INDOOR FRIENDLY)
-        if ($request->accuracy > 150) {
-            return response()->json([
-                'message' => 'GPS kurang akurat (' . round($request->accuracy) . 'm)'
-            ], 403);
-        }
 
-        // 🏢 KOORDINAT KANTOR (PEKANBARU)
+
+        /*
+        |--------------------------------------------------------------------------
+        | KOORDINAT KANTOR
+        |--------------------------------------------------------------------------
+        */
         $officeLat = 0.4761258;
-        $officeLng = 101.41906;
-        $radius = 100;
+        $officeLng = 101.4190600;
 
-        $jarak = $this->distance(
-            $request->latitude,
-            $request->longitude,
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | HITUNG JARAK USER KE KANTOR
+        |--------------------------------------------------------------------------
+        */
+        $distance = $this->calculateDistance(
+
             $officeLat,
-            $officeLng
+            $officeLng,
+
+            $request->latitude,
+            $request->longitude
         );
 
-        // DEBUG LOG
-        \Log::info('ABSENSI GPS', [
-            'user' => $user->id,
-            'lat' => $request->latitude,
-            'lng' => $request->longitude,
-            'accuracy' => $request->accuracy,
-            'jarak' => $jarak
-        ]);
 
-        // 🚫 DI LUAR AREA
-        if ($jarak > $radius) {
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDASI GPS ACCURACY
+        |--------------------------------------------------------------------------
+        */
+        if (
+
+            $request->accuracy &&
+
+            $request->accuracy > 100
+
+        ) {
+
             return response()->json([
-                'message' => 'Di luar area (' . round($jarak) . ' meter)'
+
+                'success' => false,
+
+                'message' =>
+                'GPS tidak akurat, aktifkan GPS',
+
+                'accuracy' =>
+                round($request->accuracy) . ' meter'
+
             ], 403);
         }
 
-        $today = now()->toDateString();
 
-        $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', $today)
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDASI RADIUS
+        |--------------------------------------------------------------------------
+        */
+        if ($distance > 200) {
+
+            return response()->json([
+
+                'success' => false,
+
+                'message' =>
+                'Anda berada di luar radius kantor',
+
+                'distance' =>
+                round($distance, 2) . ' meter'
+
+            ], 403);
+        }
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | WAKTU SEKARANG
+        |--------------------------------------------------------------------------
+        */
+        $now = Carbon::now();
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDASI JAM KERJA
+        |--------------------------------------------------------------------------
+        */
+        if (
+
+            $now->format('H:i') < '08:00' ||
+
+            $now->format('H:i') > '23:59'
+
+        ) {
+
+            return response()->json([
+
+                'success' => false,
+
+                'message' =>
+                'Absensi hanya bisa pada jam kerja'
+
+            ], 403);
+        }
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIMPAN FOTO
+        |--------------------------------------------------------------------------
+        */
+        $image = $request->image;
+
+        $image = str_replace(
+            'data:image/jpeg;base64,',
+            '',
+            $image
+        );
+
+        $image = str_replace(
+            ' ',
+            '+',
+            $image
+        );
+
+
+
+        $fileName =
+
+            'faces/' .
+            $user->id .
+            '_' .
+            time() .
+            '.jpg';
+
+
+
+        Storage::disk('public')->put(
+
+            $fileName,
+
+            base64_decode($image)
+        );
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIMPAN FACE PERTAMA
+        |--------------------------------------------------------------------------
+        */
+        if (!$user->face_descriptor) {
+
+            $user->update([
+
+                'face_descriptor' => $fileName
+            ]);
+        }
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CEK ABSENSI HARI INI
+        |--------------------------------------------------------------------------
+        */
+        $today = Carbon::today();
+
+
+
+        $attendance = Attendance::where(
+
+            'user_id',
+            $user->id
+
+        )
+
+            ->whereDate(
+                'tanggal',
+                $today
+            )
+
             ->first();
 
-        // =====================
-        // ✅ ABSEN MASUK
-        // =====================
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK IN
+        |--------------------------------------------------------------------------
+        */
         if (!$attendance) {
 
             Attendance::create([
-                'user_id' => $user->id,
-                'tanggal' => now(),
-                'jam_masuk' => now(),
-                'status' => now()->format('H:i') > '08:00'
+
+                'user_id'   => $user->id,
+
+                'tanggal'   => $today,
+
+                'jam_masuk' => $now,
+
+                'latitude'  => $request->latitude,
+
+                'longitude' => $request->longitude,
+
+                'status'    =>
+
+                $now->format('H:i') > '08:00'
                     ? 'terlambat'
                     : 'hadir'
             ]);
 
+
             return response()->json([
+
                 'success' => true,
-                'type' => 'checkin',
-                'redirect' => url('/dashboard'),
-                'message' => 'Absen MASUK berhasil'
+
+                'type'    => 'checkin',
+
+                'message' => 'Check In berhasil',
+
+                'distance' =>
+                round($distance, 2) . ' meter'
             ]);
         }
 
-        // =====================
-        // ✅ SUDAH ABSEN MASUK
-        // =====================
-        if ($attendance && !$attendance->jam_keluar) {
 
-            // BELUM JAM PULANG
-            if (now()->format('H:i') < '17:00') {
 
-                return response()->json([
-                    'success' => false,
-                    'type' => 'already_checkin',
-                    'message' => 'Anda sudah absen masuk hari ini. Tunggu jam pulang untuk checkout.'
-                ], 403);
-            }
-
-            // CHECKOUT
-            $attendance->update([
-                'jam_keluar' => now()
-            ]);
+        /*
+        |--------------------------------------------------------------------------
+        | SUDAH CHECK OUT
+        |--------------------------------------------------------------------------
+        */
+        if ($attendance->jam_keluar) {
 
             return response()->json([
-                'success' => true,
-                'type' => 'checkout',
-                'redirect' => url('/dashboard'),
-                'message' => 'Absen KELUAR berhasil'
+
+                'success' => false,
+
+                'message' =>
+                'Anda sudah check out hari ini'
+
             ]);
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Anda sudah melakukan absensi lengkap hari ini'
-        ], 400);
-    }
 
-    private function validateWorkingSchedule()
-    {
-        $now = now();
 
-        // 1 = Monday, 7 = Sunday
-        $day = $now->dayOfWeekIso;
+        /*
+        |--------------------------------------------------------------------------
+        | CHECKOUT HANYA JAM PULANG
+        |--------------------------------------------------------------------------
+        */
+        if ($now->format('H:i') < '17:00') {
 
-        // hanya Senin-Jumat
-        if ($day > 5) {
             return response()->json([
-                'message' => 'Hari ini bukan hari kerja'
+
+                'success' => false,
+
+                'message' =>
+                'Checkout hanya bisa setelah jam 17:00'
+
             ], 403);
         }
 
-        return null;
-    }
-    /*
-    |--------------------------------------------------------------------------
-    | FINGERPRINT ABSENSI (MASUK / KELUAR)
-    |--------------------------------------------------------------------------
-    */
-    public function fingerprint(Request $request)
-    {
-        if ($request->header('X-API-KEY') !== env('DEVICE_API_KEY')) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 401);
-        }
 
-        $request->validate([
-            'finger_id' => 'required'
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK OUT
+        |--------------------------------------------------------------------------
+        */
+        $attendance->update([
+
+            'jam_keluar' => $now
         ]);
 
-        $user = User::where('finger_id', $request->finger_id)->first();
 
-        if (!$user) {
-            return response()->json([
-                'message' => 'Fingerprint tidak dikenali'
-            ], 404);
-        }
-
-        $today = now()->toDateString();
-
-        $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', $today)
-            ->first();
-
-        // MASUK
-        if (!$attendance) {
-
-            Attendance::create([
-                'user_id' => $user->id,
-                'tanggal' => now(),
-                'jam_masuk' => now(),
-                'status' => 'hadir'
-            ]);
-
-            return response()->json([
-                'message' => 'Fingerprint MASUK: ' . $user->name
-            ]);
-        }
-
-        // KELUAR
-        if (!$attendance->jam_keluar) {
-
-            // checkout hanya setelah jam 17:00
-            if (now()->format('H:i') < '17:00') {
-                return response()->json([
-                    'message' => 'Belum waktunya absen pulang'
-                ], 403);
-            }
-
-            $attendance->update([
-                'jam_keluar' => now()
-            ]);
-
-            return response()->json([
-                'message' => 'Absen KELUAR: ' . $user->name
-            ]);
-        }
 
         return response()->json([
-            'message' => 'Sudah absen lengkap'
-        ], 400);
+
+            'success' => true,
+
+            'type'    => 'checkout',
+
+            'message' => 'Check Out berhasil',
+
+            'distance' =>
+            round($distance, 2) . ' meter'
+        ]);
     }
+
+
 
     /*
     |--------------------------------------------------------------------------
-    | HELPER: FACE DISTANCE
+    | HITUNG JARAK (HAVERSINE)
     |--------------------------------------------------------------------------
     */
-    private function compare($a, $b)
-    {
-        $sum = 0;
+    private function calculateDistance(
+        $lat1,
+        $lon1,
+        $lat2,
+        $lon2
+    ) {
 
-        for ($i = 0; $i < count($a); $i++) {
-            $sum += pow($a[$i] - $b[$i], 2);
-        }
+        $earthRadius = 6371000;
 
-        return sqrt($sum);
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HELPER: GEO DISTANCE (METER)
-    |--------------------------------------------------------------------------
-    */
-    private function distance($lat1, $lon1, $lat2, $lon2)
-    {
-        $earthRadius = 6371000; // meter
 
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
+        $dLat =
+            deg2rad($lat2 - $lat1);
 
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-            sin($dLon / 2) * sin($dLon / 2);
+        $dLon =
+            deg2rad($lon2 - $lon1);
 
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-        return $earthRadius * $c;
+
+        $a =
+
+            sin($dLat / 2) *
+            sin($dLat / 2) +
+
+            cos(deg2rad($lat1)) *
+            cos(deg2rad($lat2)) *
+
+            sin($dLon / 2) *
+            sin($dLon / 2);
+
+
+
+        $c =
+            2 *
+            atan2(
+                sqrt($a),
+                sqrt(1 - $a)
+            );
+
+
+
+        return
+            $earthRadius * $c;
     }
 }

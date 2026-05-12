@@ -2,23 +2,33 @@
 
     <div class="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-cyan-50 pb-28">
 
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 -mt-5">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+
+            <!-- BACK BUTTON (selalu tampil) -->
+            <div class="flex items-center justify-between mb-6">
+
+                <a href="{{ route('cuti') }}"
+                    class="inline-flex items-center gap-2
+                    text-[#1E40AF] font-semibold text-sm
+                    hover:translate-x-1 transition">
+
+                    ← Kembali
+
+                </a>
+
+                <div
+                    class="bg-gradient-to-r from-[#1E40AF] to-blue-500
+                    text-white px-5 py-2 rounded-2xl shadow-lg text-sm font-semibold">
+
+                    Riwayat Pengajuan Cuti
+
+                </div>
+
+            </div>
 
             @if($leaves->count() > 0)
 
             <div class="space-y-4">
-
-                <!-- BACK -->
-                <div class="flex justify-between items-center mb-6">
-
-                    <a href="{{ route('cuti') }}"
-                        class="text-[#1E40AF] font-semibold text-sm">
-
-                        ← Kembali
-
-                    </a>
-
-                </div>
 
                 @foreach($leaves as $leave)
 
@@ -323,7 +333,7 @@
 
             <!-- EMPTY -->
             <div
-                class="bg-white rounded-3xl shadow-xl p-10 text-center mt-4">
+                class="bg-white rounded-3xl shadow-xl p-10 text-center">
 
                 <div class="text-6xl mb-4">
                     📅

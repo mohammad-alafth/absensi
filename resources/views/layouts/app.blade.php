@@ -24,7 +24,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="font-sans antialiased bg-gray-100 overflow-x-hidden">
+<body class="font-sans antialiased bg-white overflow-x-hidden">
 
     <!-- LOADING SCREEN -->
     <div
@@ -69,14 +69,14 @@
 
     </div>
 
-   <div class="min-h-screen w-full overflow-x-hidden">
+    <div class="min-h-screen w-full overflow-x-hidden">
 
         <!-- Navigation -->
         @include('layouts.navigation')
 
         <!-- Header -->
         @isset($header)
-        <header class="bg-white shadow">
+        <header class="bg-white border-b border-gray-100">
             <div class="max-w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">
                 {{ $header }}
             </div>
@@ -84,7 +84,7 @@
         @endisset
 
         <!-- Content -->
-        <main class="mt-6 z-10 pb-0">
+        <main class="mt-6 z-10 pb-0 bg-white min-h-screen">
             {{ $slot }}
         </main>
 

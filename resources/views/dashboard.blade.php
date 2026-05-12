@@ -23,10 +23,55 @@
                 </p>
 
                 <p class="text-xl font-bold mt-1">
+
                     {{ $schedule }}
+
                 </p>
 
             </div>
+
+            <!-- SHIFT CARD -->
+            @if($todayShift)
+
+            <div class="mt-5 bg-white rounded-3xl p-5 shadow-xl border border-blue-100">
+
+                <div class="flex justify-between items-center">
+
+                    <div>
+
+                        <p class="text-sm text-gray-500">
+                            Shift Hari Ini
+                        </p>
+
+                        <h2 class="text-2xl font-bold text-[#1E40AF] mt-1">
+
+                            {{ $todayShift->shift->name }}
+
+                        </h2>
+
+                    </div>
+
+                    <div class="text-right">
+
+                        <p class="text-sm text-gray-500">
+                            Jam Kerja
+                        </p>
+
+                        <p class="font-bold text-lg text-gray-800">
+
+                            {{ \Carbon\Carbon::parse($todayShift->shift->start_time)->format('H:i') }}
+                            -
+                            {{ \Carbon\Carbon::parse($todayShift->shift->end_time)->format('H:i') }}
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            @endif
 
             <!-- BANNER -->
             <div class="mt-5 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-500 rounded-3xl p-5 text-white shadow-2xl">
@@ -259,18 +304,18 @@
                     <!-- LEMBUR -->
                     <a href="/lembur"
                         class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-    min-h-[110px]
-    flex flex-col items-center justify-center
-    shadow-lg hover:shadow-2xl hover:-translate-y-1
-    transition duration-300 active:scale-95">
+                        min-h-[110px]
+                        flex flex-col items-center justify-center
+                        shadow-lg hover:shadow-2xl hover:-translate-y-1
+                        transition duration-300 active:scale-95">
 
-                        @if(isset($pendingOvertimeCount) && $pendingOvertimeCount > 0)
+                        @if($pendingOvertimeCount > 0)
 
                         <span
                             class="absolute top-3 right-3 min-w-[24px] h-[24px]
-        flex items-center justify-center
-        bg-gradient-to-r from-pink-500 to-red-500
-        text-white text-xs font-bold rounded-full shadow-lg">
+                            flex items-center justify-center
+                            bg-gradient-to-r from-pink-500 to-red-500
+                            text-white text-xs font-bold rounded-full shadow-lg">
 
                             {{ $pendingOvertimeCount }}
 
@@ -328,19 +373,12 @@
 
                     </a>
 
-                    <!-- APPROVAL -->
-                    @if(
-                    str_starts_with(auth()->user()->role, 'pj_') ||
-                    auth()->user()->role === 'hrd'
-                    )
+                    <!-- APPROVAL PJ -->
+                    @if(str_starts_with(auth()->user()->role, 'pj_'))
 
-                    <a href="{{ auth()->user()->role === 'hrd'
-        ? route('hrd.dashboard')
-        : route('pj.dashboard') }}"
+                    <a href="{{ route('pj.dashboard') }}"
                         class="relative 
-    {{ auth()->user()->role === 'hrd' 
-        ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500' 
-        : 'bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400' }}
+    bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400
     rounded-3xl
     min-h-[110px]
     flex flex-col items-center justify-center
@@ -350,13 +388,80 @@
                         <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
 
                         <div class="relative text-4xl drop-shadow-lg">
-                            {{ auth()->user()->role === 'hrd' ? '🏢' : '🧑‍💼' }}
+                            🧑‍💼
                         </div>
 
                         <p class="relative text-sm sm:text-base mt-2 font-bold">
-                            {{ auth()->user()->role === 'hrd'
-            ? 'Approval HRD'
-            : 'Approval PJ' }}
+                            Approval PJ
+                        </p>
+
+                    </a>
+                    <!-- SHIFT -->
+
+                    <a href="{{ route('shift.index') }}"
+                        class="relative bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600
+    rounded-3xl
+    min-h-[110px]
+    flex flex-col items-center justify-center
+    shadow-xl hover:shadow-2xl hover:-translate-y-1
+    transition duration-300 active:scale-95 text-white overflow-hidden">
+
+                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
+
+                        <div class="relative text-4xl drop-shadow-lg">
+                            📅
+                        </div>
+
+                        <p class="relative text-sm sm:text-base mt-2 font-bold">
+                            Jadwal Shift
+                        </p>
+
+                    </a>
+
+                    @endif
+
+
+                    <!-- HRD MENU -->
+                    @if(auth()->user()->role === 'hrd')
+
+                    <!-- APPROVAL HRD -->
+                    <a href="{{ route('hrd.dashboard') }}"
+                        class="relative 
+    bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500
+    rounded-3xl
+    min-h-[110px]
+    flex flex-col items-center justify-center
+    shadow-xl hover:shadow-2xl hover:-translate-y-1
+    transition duration-300 active:scale-95 text-white overflow-hidden">
+
+                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
+
+                        <div class="relative text-4xl drop-shadow-lg">
+                            🏢
+                        </div>
+
+                        <p class="relative text-sm sm:text-base mt-2 font-bold">
+                            Approval HRD
+                        </p>
+
+                    </a>
+
+                    <!-- REKAP HRD -->
+                    <a href="{{ route('hrd.rekap') }}"
+                        class="relative bg-gradient-to-r from-slate-500 via-blue-500 to-indigo-600
+    rounded-3xl min-h-[110px]
+    flex flex-col items-center justify-center
+    shadow-xl hover:shadow-2xl hover:-translate-y-1
+    transition duration-300 active:scale-95 text-white overflow-hidden">
+
+                        <div class="absolute inset-0 opacity-15 bg-white blur-2xl"></div>
+
+                        <div class="relative text-4xl drop-shadow-lg">
+                            📊
+                        </div>
+
+                        <p class="relative text-sm sm:text-base mt-2 font-bold">
+                            Rekap HRD
                         </p>
 
                     </a>

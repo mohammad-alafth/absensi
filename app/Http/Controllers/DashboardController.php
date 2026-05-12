@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\Permission;
 use App\Models\Leave;
+use App\Models\Overtime;
+use App\Models\EmployeeShift;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -18,6 +20,7 @@ class DashboardController extends Controller
         | Attendance Today
         |--------------------------------------------------------------------------
         */
+
         $todayAttendance = Attendance::where(
             'user_id',
             $user->id
@@ -30,6 +33,7 @@ class DashboardController extends Controller
         | Attendance History
         |--------------------------------------------------------------------------
         */
+
         $histories = Attendance::where(
             'user_id',
             $user->id
@@ -40,22 +44,48 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Schedule
+        | SHIFT HARI INI
         |--------------------------------------------------------------------------
         */
-        $dayNumber = Carbon::now()->dayOfWeekIso;
 
-        $isWorkingDay = $dayNumber <= 5;
+        $todayShift = EmployeeShift::with('shift')
+            ->where('user_id', $user->id)
+            ->where('shift_date', now()->format('Y-m-d'))
+            ->first();
 
-        $schedule = $isWorkingDay
-            ? '08:00 - 17:00 WIB'
-            : 'Hari Libur';
+        /*
+        |--------------------------------------------------------------------------
+        | JADWAL
+        |--------------------------------------------------------------------------
+        */
+
+        if ($todayShift && $todayShift->shift) {
+
+            $schedule =
+                $todayShift->shift->name .
+                ' • ' .
+                Carbon::parse($todayShift->shift->start_time)->format('H:i')
+                . ' - ' .
+                Carbon::parse($todayShift->shift->end_time)->format('H:i');
+
+            $isWorkingDay = true;
+        } else {
+
+            $dayNumber = Carbon::now()->dayOfWeekIso;
+
+            $isWorkingDay = $dayNumber <= 5;
+
+            $schedule = $isWorkingDay
+                ? '08:00 - 17:00 WIB'
+                : 'Hari Libur';
+        }
 
         /*
         |--------------------------------------------------------------------------
         | Permission (Izin)
         |--------------------------------------------------------------------------
         */
+
         $latestPermission = Permission::where(
             'user_id',
             $user->id
@@ -75,6 +105,7 @@ class DashboardController extends Controller
         | Leave (Cuti)
         |--------------------------------------------------------------------------
         */
+
         $latestLeave = Leave::where(
             'user_id',
             $user->id
@@ -89,6 +120,25 @@ class DashboardController extends Controller
             ->where('status', 'pending')
             ->count();
 
+        /*
+        |--------------------------------------------------------------------------
+        | OVERTIME
+        |--------------------------------------------------------------------------
+        */
+
+        $pendingOvertimeCount = Overtime::where(
+            'user_id',
+            $user->id
+        )
+            ->where('status', 'pending')
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | RETURN
+        |--------------------------------------------------------------------------
+        */
+
         return view('dashboard', compact(
             'user',
             'todayAttendance',
@@ -98,7 +148,9 @@ class DashboardController extends Controller
             'latestPermission',
             'pendingPermissionCount',
             'latestLeave',
-            'pendingLeaveCount'
+            'pendingLeaveCount',
+            'pendingOvertimeCount',
+            'todayShift'
         ));
     }
 }

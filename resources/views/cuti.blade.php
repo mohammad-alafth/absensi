@@ -12,7 +12,8 @@
                 </a>
 
                 <a href="{{ route('cuti.history') }}"
-                    class="bg-[#1E40AF] text-white px-4 py-2 rounded-xl text-sm shadow">
+                    class="bg-gradient-to-r from-[#1E40AF] to-blue-500
+                    text-white px-5 py-2 rounded-2xl shadow-lg text-sm font-semibold">
                     Riwayat
                 </a>
             </div>
