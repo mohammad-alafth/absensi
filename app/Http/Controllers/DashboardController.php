@@ -8,6 +8,7 @@ use App\Models\Leave;
 use App\Models\Overtime;
 use App\Models\EmployeeShift;
 use Carbon\Carbon;
+use App\Services\ScheduleService;
 
 class DashboardController extends Controller
 {
@@ -16,9 +17,9 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         /*
-        |--------------------------------------------------------------------------
-        | Attendance Today
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | ATTENDANCE TODAY
+        |------------------------------------------------------------------
         */
 
         $todayAttendance = Attendance::where(
@@ -29,9 +30,9 @@ class DashboardController extends Controller
             ->first();
 
         /*
-        |--------------------------------------------------------------------------
-        | Attendance History
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | ATTENDANCE HISTORY
+        |------------------------------------------------------------------
         */
 
         $histories = Attendance::where(
@@ -43,47 +44,34 @@ class DashboardController extends Controller
             ->get();
 
         /*
-        |--------------------------------------------------------------------------
-        | SHIFT HARI INI
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | SCHEDULE TODAY
+        |------------------------------------------------------------------
         */
 
-        $todayShift = EmployeeShift::with('shift')
-            ->where('user_id', $user->id)
-            ->where('shift_date', now()->format('Y-m-d'))
-            ->first();
+        $scheduleData = ScheduleService::getTodaySchedule($user);
 
-        /*
-        |--------------------------------------------------------------------------
-        | JADWAL
-        |--------------------------------------------------------------------------
-        */
-
-        if ($todayShift && $todayShift->shift) {
+        if ($scheduleData) {
 
             $schedule =
-                $todayShift->shift->name .
-                ' • ' .
-                Carbon::parse($todayShift->shift->start_time)->format('H:i')
+                $scheduleData['shift_name']
+                . ' • ' .
+                Carbon::parse($scheduleData['start_time'])->format('H:i')
                 . ' - ' .
-                Carbon::parse($todayShift->shift->end_time)->format('H:i');
+                Carbon::parse($scheduleData['end_time'])->format('H:i');
 
             $isWorkingDay = true;
         } else {
 
-            $dayNumber = Carbon::now()->dayOfWeekIso;
+            $schedule = 'Hari Libur';
 
-            $isWorkingDay = $dayNumber <= 5;
-
-            $schedule = $isWorkingDay
-                ? '08:00 - 17:00 WIB'
-                : 'Hari Libur';
+            $isWorkingDay = false;
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Permission (Izin)
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | PERMISSION
+        |------------------------------------------------------------------
         */
 
         $latestPermission = Permission::where(
@@ -101,9 +89,9 @@ class DashboardController extends Controller
             ->count();
 
         /*
-        |--------------------------------------------------------------------------
-        | Leave (Cuti)
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | LEAVE
+        |------------------------------------------------------------------
         */
 
         $latestLeave = Leave::where(
@@ -121,9 +109,9 @@ class DashboardController extends Controller
             ->count();
 
         /*
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
         | OVERTIME
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
         */
 
         $pendingOvertimeCount = Overtime::where(
@@ -134,9 +122,114 @@ class DashboardController extends Controller
             ->count();
 
         /*
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
+        | REMINDER SHIFT UNTUK PJ
+        |------------------------------------------------------------------
+        */
+
+        $showShiftReminder = false;
+
+        $shiftReminderMessage = null;
+
+        if (str_starts_with($user->role, 'pj_')) {
+
+            $today = Carbon::today();
+
+            /*
+            |------------------------------------------------------------------
+            | PERIODE SEKARANG
+            |------------------------------------------------------------------
+            */
+
+            $period = $this->getShiftPeriod($today);
+
+            $periodStart = Carbon::parse(
+                $period['start_date']
+            );
+
+            $periodEnd = Carbon::parse(
+                $period['end_date']
+            );
+
+            /*
+            |------------------------------------------------------------------
+            | H-2 SEBELUM SHIFT HABIS
+            |------------------------------------------------------------------
+            */
+
+            $reminderStart = $periodEnd
+                ->copy()
+                ->subDays(2);
+
+            /*
+            |------------------------------------------------------------------
+            | NEXT PERIOD
+            |------------------------------------------------------------------
+            */
+
+            $nextPeriod = $this->getShiftPeriod(
+                $periodEnd->copy()->addDay()
+            );
+
+            /*
+            |------------------------------------------------------------------
+            | CEK SHIFT PERIODE BERIKUTNYA
+            |------------------------------------------------------------------
+            */
+
+            $nextShiftExist = EmployeeShift::whereDate(
+                'start_date',
+                $nextPeriod['start_date']
+            )
+                ->whereDate(
+                    'end_date',
+                    $nextPeriod['end_date']
+                )
+                ->exists();
+
+            /*
+            |------------------------------------------------------------------
+            | TAMPILKAN POPUP
+            |------------------------------------------------------------------
+            */
+
+            if (
+                $today->gte($reminderStart)
+                &&
+                !$nextShiftExist
+            ) {
+
+                $showShiftReminder = true;
+
+                $shiftReminderMessage =
+                    'Periode shift akan berakhir pada '
+                    . $periodEnd->translatedFormat('d F Y')
+                    . '. Silakan atur ulang jadwal shift untuk periode berikutnya.';
+            }
+
+            /*
+            |------------------------------------------------------------------
+            | JIKA SUDAH LEWAT PERIODE
+            |------------------------------------------------------------------
+            */
+
+            if (
+                $today->gt($periodEnd)
+                &&
+                !$nextShiftExist
+            ) {
+
+                $showShiftReminder = true;
+
+                $shiftReminderMessage =
+                    'Periode shift telah habis. Segera atur ulang jadwal shift pegawai.';
+            }
+        }
+
+        /*
+        |------------------------------------------------------------------
         | RETURN
-        |--------------------------------------------------------------------------
+        |------------------------------------------------------------------
         */
 
         return view('dashboard', compact(
@@ -144,13 +237,72 @@ class DashboardController extends Controller
             'todayAttendance',
             'histories',
             'schedule',
+            'scheduleData',
             'isWorkingDay',
             'latestPermission',
             'pendingPermissionCount',
             'latestLeave',
             'pendingLeaveCount',
             'pendingOvertimeCount',
-            'todayShift'
+            'showShiftReminder',
+            'shiftReminderMessage'
         ));
+    }
+
+    /*
+    |------------------------------------------------------------------
+    | GET SHIFT PERIOD
+    |------------------------------------------------------------------
+    */
+
+    private function getShiftPeriod($date)
+    {
+        $date = Carbon::parse($date);
+
+        $payrollDay = 26;
+
+        /*
+        |------------------------------------------------------------------
+        | JIKA >= 26
+        |------------------------------------------------------------------
+        */
+
+        if ($date->day >= $payrollDay) {
+
+            $startDate = $date
+                ->copy()
+                ->day($payrollDay);
+
+            $endDate = $startDate
+                ->copy()
+                ->addMonth()
+                ->subDay();
+        } else {
+
+            /*
+            |------------------------------------------------------------------
+            | JIKA < 26
+            |------------------------------------------------------------------
+            */
+
+            $startDate = $date
+                ->copy()
+                ->subMonth()
+                ->day($payrollDay);
+
+            $endDate = $startDate
+                ->copy()
+                ->addMonth()
+                ->subDay();
+        }
+
+        return [
+
+            'start_date' => $startDate
+                ->format('Y-m-d'),
+
+            'end_date' => $endDate
+                ->format('Y-m-d'),
+        ];
     }
 }

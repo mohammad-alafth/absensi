@@ -371,6 +371,8 @@ Route::middleware([
 
         Route::post('/shift/assign', [ShiftController::class, 'assign'])
             ->name('shift.assign');
+        Route::get('/shift/data', [ShiftController::class, 'data'])
+            ->name('shift.data');
     });
 });
 

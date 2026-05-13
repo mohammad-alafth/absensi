@@ -51,7 +51,7 @@
             <!-- =======================================================
                 DESKTOP
             ======================================================== -->
-            <div class="hidden xl:grid grid-cols-4 gap-5">
+            <div class="hidden xl:grid grid-cols-5 gap-5">
 
                 <!-- ================= UNASSIGNED ================= -->
                 <div
@@ -204,9 +204,41 @@
 
                                 <div>
 
-                                    <p class="font-bold text-gray-800">
-                                        {{ $item->user->name }}
-                                    </p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+
+                                        <p class="font-bold text-gray-800">
+                                            {{ $item->user->name }}
+                                        </p>
+
+                                        {{-- IZIN --}}
+                                        @if(isset($approvedPermissions[$item->user->id]))
+
+                                        <span
+                                            class="text-[10px]
+        bg-yellow-100 text-yellow-700
+        px-2 py-1 rounded-full font-semibold">
+
+                                            IZIN
+
+                                        </span>
+
+                                        @endif
+
+                                        {{-- CUTI --}}
+                                        @if(isset($approvedLeaves[$item->user->id]))
+
+                                        <span
+                                            class="text-[10px]
+        bg-red-100 text-red-700
+        px-2 py-1 rounded-full font-semibold">
+
+                                            CUTI
+
+                                        </span>
+
+                                        @endif
+
+                                    </div>
 
                                     <p class="text-xs text-gray-500 mt-1">
                                         Shift {{ $shift->name }}
@@ -406,9 +438,41 @@
 
                                 <div>
 
-                                    <p class="font-bold text-gray-800">
-                                        {{ $item->user->name }}
-                                    </p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+
+                                        <p class="font-bold text-gray-800">
+                                            {{ $item->user->name }}
+                                        </p>
+
+                                        {{-- IZIN --}}
+                                        @if(isset($approvedPermissions[$item->user->id]))
+
+                                        <span
+                                            class="text-[10px]
+        bg-yellow-100 text-yellow-700
+        px-2 py-1 rounded-full font-semibold">
+
+                                            IZIN
+
+                                        </span>
+
+                                        @endif
+
+                                        {{-- CUTI --}}
+                                        @if(isset($approvedLeaves[$item->user->id]))
+
+                                        <span
+                                            class="text-[10px]
+        bg-red-100 text-red-700
+        px-2 py-1 rounded-full font-semibold">
+
+                                            CUTI
+
+                                        </span>
+
+                                        @endif
+
+                                    </div>
 
                                     <div class="flex items-center gap-2 mt-2">
 
@@ -475,85 +539,297 @@
 
     </div>
 
-    <!-- SORTABLE -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <script>
-        const containers = document.querySelectorAll(
-            '.shift-column, #unassigned, #unassigned-mobile'
-        );
+        /*
+    |--------------------------------------------------------------------------
+    | LOAD SHIFT DATA
+    |--------------------------------------------------------------------------
+    */
 
-        containers.forEach(container => {
+        async function loadShiftData() {
 
-            new Sortable(container, {
+            try {
 
-                group: 'shared',
+                const response = await fetch(
+                    "{{ route('shift.data') }}?date={{ $date }}"
+                );
 
-                animation: 180,
+                const data = await response.json();
 
-                ghostClass: 'opacity-50',
+                /*
+                |--------------------------------------------------------------------------
+                | CLEAR COLUMN
+                |--------------------------------------------------------------------------
+                */
 
-                onAdd: function(evt) {
+                document.querySelectorAll('.shift-column')
+                    .forEach(column => {
+
+                        column.innerHTML = '';
+
+                    });
+
+                /*
+                |--------------------------------------------------------------------------
+                | LOOP DATA
+                |--------------------------------------------------------------------------
+                */
+
+                data.employeeShifts.forEach(item => {
+
+                    let badge = '';
 
                     /*
                     |--------------------------------------------------------------------------
-                    | PINDAH KE UNASSIGNED
+                    | IZIN
                     |--------------------------------------------------------------------------
                     */
 
-                    if (
-                        evt.to.id === 'unassigned' ||
-                        evt.to.id === 'unassigned-mobile'
-                    ) {
-                        return;
+                    if (data.permissions[item.user_id]) {
+
+                        badge = `
+                        <span
+                            class="text-[10px]
+                            bg-yellow-100 text-yellow-700
+                            px-2 py-1 rounded-full font-semibold">
+
+                            IZIN
+
+                        </span>
+                    `;
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | DATA
+                    | CUTI
                     |--------------------------------------------------------------------------
                     */
 
-                    let userId = evt.item.dataset.user;
+                    if (data.leaves[item.user_id]) {
 
-                    let shiftId = evt.to.dataset.shift;
+                        badge = `
+                        <span
+                            class="text-[10px]
+                            bg-red-100 text-red-700
+                            px-2 py-1 rounded-full font-semibold">
+
+                            CUTI
+
+                        </span>
+                    `;
+                    }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | AJAX
+                    | CARD
                     |--------------------------------------------------------------------------
                     */
 
-                    fetch("{{ route('shift.assign') }}", {
+                    const card = `
+                    <div
+                        class="employee-card group
+                        bg-white border border-blue-100 rounded-3xl
+                        p-4 cursor-move shadow-sm
+                        hover:shadow-xl hover:-translate-y-1
+                        transition duration-300"
+                        data-user="${item.user.id}">
 
-                            method: "POST",
+                        <div class="flex items-center justify-between">
 
-                            headers: {
-                                "Content-Type": "application/json",
-                                "X-CSRF-TOKEN": "{{ csrf_token() }}"
-                            },
+                            <div>
 
-                            body: JSON.stringify({
+                                <div class="flex items-center gap-2 flex-wrap">
 
-                                user_id: userId,
-                                shift_id: shiftId,
-                                shift_date: "{{ $date }}"
+                                    <p class="font-bold text-gray-800">
+                                        ${item.user.name}
+                                    </p>
 
-                            })
+                                    ${badge}
 
-                        })
-                        .then(res => res.json())
-                        .then(data => {
+                                </div>
 
-                            console.log(data);
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Shift ${item.shift.name}
+                                </p>
 
-                        });
+                            </div>
 
+                            <div
+                                class="w-11 h-11 rounded-2xl
+                                bg-blue-50 flex items-center justify-center
+                                text-xl group-hover:scale-110 transition">
+
+                                ↕️
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                `;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | APPEND
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const column = document.querySelector(
+                        `.shift-column[data-shift="${item.shift_id}"]`
+                    );
+
+                    if (column) {
+
+                        column.innerHTML += card;
+
+                    }
+
+                });
+
+                /*
+                |--------------------------------------------------------------------------
+                | RE-INIT SORTABLE
+                |--------------------------------------------------------------------------
+                */
+
+                initSortable();
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | INIT SORTABLE
+        |--------------------------------------------------------------------------
+        */
+
+        function initSortable() {
+
+            const containers = document.querySelectorAll(
+                '.shift-column, #unassigned, #unassigned-mobile'
+            );
+
+            containers.forEach(container => {
+
+                /*
+                |--------------------------------------------------------------------------
+                | AVOID DUPLICATE
+                |--------------------------------------------------------------------------
+                */
+
+                if (container.sortableInitialized) {
+                    return;
                 }
+
+                container.sortableInitialized = true;
+
+                new Sortable(container, {
+
+                    group: 'shared',
+
+                    animation: 180,
+
+                    ghostClass: 'opacity-50',
+
+                    onAdd: async function(evt) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | UNASSIGNED
+                        |--------------------------------------------------------------------------
+                        */
+
+                        if (
+                            evt.to.id === 'unassigned' ||
+                            evt.to.id === 'unassigned-mobile'
+                        ) {
+                            return;
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | DATA
+                        |--------------------------------------------------------------------------
+                        */
+
+                        let userId = evt.item.dataset.user;
+
+                        let shiftId = evt.to.dataset.shift;
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | SAVE
+                        |--------------------------------------------------------------------------
+                        */
+
+                        try {
+
+                            const response = await fetch(
+                                "{{ route('shift.assign') }}", {
+
+                                    method: "POST",
+
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "X-CSRF-TOKEN": "{{ csrf_token() }}"
+                                    },
+
+                                    body: JSON.stringify({
+
+                                        user_id: userId,
+
+                                        shift_id: shiftId,
+
+                                        shift_date: "{{ $date }}"
+
+                                    })
+
+                                }
+                            );
+
+                            const result = await response.json();
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | RELOAD REALTIME
+                            |--------------------------------------------------------------------------
+                            */
+
+                            if (result.success) {
+
+                                loadShiftData();
+
+                            }
+
+                        } catch (error) {
+
+                            console.error(error);
+
+                            alert('Gagal menyimpan shift');
+
+                        }
+
+                    }
+
+                });
 
             });
 
-        });
-    </script>
+        }
 
+        /*
+        |--------------------------------------------------------------------------
+        | FIRST INIT
+        |--------------------------------------------------------------------------
+        */
+
+        initSortable();
+    </script>
 </x-app-layout>

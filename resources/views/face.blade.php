@@ -539,7 +539,7 @@
                             'Accept': 'application/json'
                         },
 
-                        credentials: 'same-origin',
+                        credentials: 'include',
 
                         body: JSON.stringify({
 
@@ -558,30 +558,16 @@
                     await response.json();
 
 
-
-                /*
-                |--------------------------------------------------------------------------
-                | RESPONSE
-                |--------------------------------------------------------------------------
-                */
-
                 Swal.fire({
 
                     icon: data.success ?
-                        'success' :
-                        'error',
+                        'success' : 'error',
 
                     title: data.message,
 
                     text: data.distance ?? ''
 
                 }).then(() => {
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REDIRECT SETELAH CHECKIN
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (
                         data.success &&
@@ -606,12 +592,6 @@
                 console.log(error);
 
             } finally {
-
-                /*
-                |--------------------------------------------------------------------------
-                | ENABLE BUTTON
-                |--------------------------------------------------------------------------
-                */
 
                 btn.disabled = false;
 

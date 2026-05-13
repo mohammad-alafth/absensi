@@ -86,7 +86,7 @@ Route::middleware([
 */
 
 Route::prefix('device')
-    ->middleware(['auth:sanctum', 'throttle:10,1'])
+    ->middleware(['web', 'auth', 'throttle:10,1'])
     ->group(function () {
 
         Route::post('/face/register', [

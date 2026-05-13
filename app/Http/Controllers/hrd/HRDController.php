@@ -33,7 +33,6 @@ class HRDController extends Controller
 
         $employees = User::whereNotIn('role', [
             'admin',
-            'hrd'
         ])->get();
 
         /*

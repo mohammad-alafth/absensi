@@ -31,7 +31,7 @@
             </div>
 
             <!-- SHIFT CARD -->
-            @if($todayShift)
+            @if($scheduleData)
 
             <div class="mt-5 bg-white rounded-3xl p-5 shadow-xl border border-blue-100">
 
@@ -40,12 +40,12 @@
                     <div>
 
                         <p class="text-sm text-gray-500">
-                            Shift Hari Ini
+                            Jadwal Hari Ini
                         </p>
 
                         <h2 class="text-2xl font-bold text-[#1E40AF] mt-1">
 
-                            {{ $todayShift->shift->name }}
+                            {{ $scheduleData['shift_name'] }}
 
                         </h2>
 
@@ -59,9 +59,9 @@
 
                         <p class="font-bold text-lg text-gray-800">
 
-                            {{ \Carbon\Carbon::parse($todayShift->shift->start_time)->format('H:i') }}
+                            {{ \Carbon\Carbon::parse($scheduleData['start_time'])->format('H:i') }}
                             -
-                            {{ \Carbon\Carbon::parse($todayShift->shift->end_time)->format('H:i') }}
+                            {{ \Carbon\Carbon::parse($scheduleData['end_time'])->format('H:i') }}
 
                         </p>
 
@@ -482,38 +482,27 @@
     <script>
         // AUTO HIDE ALERT
         setTimeout(() => {
-
             const alertBox = document.getElementById('success-alert');
-
             if (alertBox) {
                 alertBox.style.display = 'none';
             }
-
         }, 3000);
 
         // CLOCK
         function updateClock() {
-
             const now = new Date();
-
             const clock = document.getElementById("clock");
 
             if (clock) {
-
-                clock.innerHTML =
-                    now.toLocaleTimeString('id-ID') + " WIB";
-
+                clock.innerHTML = now.toLocaleTimeString('id-ID') + " WIB";
             }
-
         }
 
         setInterval(updateClock, 1000);
-
         updateClock();
 
         // ALERT ABSEN
         function alreadyCheckinAlert() {
-
             Swal.fire({
                 icon: 'info',
                 title: 'Sudah Absen Masuk',
@@ -522,6 +511,37 @@
                 confirmButtonText: 'OK',
                 background: '#fff',
                 borderRadius: '20px'
+            });
+        }
+
+        // ==============================
+        // SHIFT REMINDER (TAMBAHAN BARU)
+        // ==============================
+
+        const showShiftReminder = @json($showShiftReminder);
+        const shiftReminderMessage = @json($shiftReminderMessage);
+
+        if (showShiftReminder) {
+
+            window.addEventListener('load', function() {
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Jadwal Shift Akan Berakhir',
+                    html: `<div style="font-size:15px; line-height:1.7">${shiftReminderMessage}</div>`,
+                    confirmButtonText: 'Atur Shift Sekarang',
+                    confirmButtonColor: '#2563EB',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    background: '#ffffff'
+                }).then((result) => {
+
+                    if (result.isConfirmed) {
+                        window.location.href = "{{ route('shift.index') }}";
+                    }
+
+                });
+
             });
 
         }

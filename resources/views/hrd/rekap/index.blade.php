@@ -233,34 +233,34 @@
 
                     <!-- DOKTER -->
                     <button
-                        onclick="filterRole('dokter', this)"
+                        onclick="filterRole('cs', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Dokter
+                        Customer Service
 
                     </button>
 
                     <!-- ADMIN -->
                     <button
-                        onclick="filterRole('admin', this)"
+                        onclick="filterRole('administrasi', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Admin
+                        Administrasi
 
                     </button>
 
                     <!-- STAFF -->
                     <button
-                        onclick="filterRole('staff', this)"
+                        onclick="filterRole('ro', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Staff
+                        Reverse Osmosis
 
                     </button>
 
@@ -277,34 +277,44 @@
 
                     <!-- FARMASI -->
                     <button
-                        onclick="filterRole('farmasi', this)"
+                        onclick="filterRole('finance', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Farmasi
+                        Keuangan
 
                     </button>
 
                     <!-- LAB -->
                     <button
-                        onclick="filterRole('lab', this)"
+                        onclick="filterRole('pharmacist', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Lab
+                        Apoteker
 
                     </button>
 
                     <!-- RADIOLOGI -->
                     <button
-                        onclick="filterRole('radiologi', this)"
+                        onclick="filterRole('casemix', this)"
                         class="role-btn
                         px-5 py-2 rounded-2xl text-sm font-bold
                         bg-slate-100 text-slate-700">
 
-                        Radiologi
+                        K3
+
+                    </button>
+
+                    <button
+                        onclick="filterRole('ipsrs', this)"
+                        class="role-btn
+                        px-5 py-2 rounded-2xl text-sm font-bold
+                        bg-slate-100 text-slate-700">
+
+                        IPSRS
 
                     </button>
 

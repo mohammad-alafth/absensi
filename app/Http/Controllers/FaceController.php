@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Attendance;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Services\ScheduleService;
 
 class FaceController extends Controller
 {
@@ -19,17 +20,11 @@ class FaceController extends Controller
         $user = auth()->user();
 
         if (!$user) {
-
             return response()->json([
-
                 'success' => false,
-
                 'message' => 'Unauthorized'
-
             ], 401);
         }
-
-
 
         /*
         |--------------------------------------------------------------------------
@@ -37,17 +32,11 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         */
         $request->validate([
-
             'latitude'  => 'required|numeric',
-
             'longitude' => 'required|numeric',
-
             'accuracy'  => 'nullable|numeric',
-
             'image'     => 'required|string'
         ]);
-
-
 
         /*
         |--------------------------------------------------------------------------
@@ -57,51 +46,30 @@ class FaceController extends Controller
         $officeLat = 0.4761258;
         $officeLng = 101.4190600;
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | HITUNG JARAK USER KE KANTOR
+        | HITUNG JARAK
         |--------------------------------------------------------------------------
         */
         $distance = $this->calculateDistance(
-
             $officeLat,
             $officeLng,
-
             $request->latitude,
             $request->longitude
         );
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | VALIDASI GPS ACCURACY
+        | VALIDASI GPS
         |--------------------------------------------------------------------------
         */
-        if (
-
-            $request->accuracy &&
-
-            $request->accuracy > 100
-
-        ) {
-
+        if ($request->accuracy && $request->accuracy > 100) {
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                'GPS tidak akurat, aktifkan GPS',
-
-                'accuracy' =>
-                round($request->accuracy) . ' meter'
-
+                'message' => 'GPS tidak akurat, aktifkan GPS',
+                'accuracy' => round($request->accuracy) . ' meter'
             ], 403);
         }
-
-
 
         /*
         |--------------------------------------------------------------------------
@@ -109,135 +77,89 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($distance > 200) {
-
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                'Anda berada di luar radius kantor',
-
-                'distance' =>
-                round($distance, 2) . ' meter'
-
+                'message' => 'Anda berada di luar radius kantor',
+                'distance' => round($distance, 2) . ' meter'
             ], 403);
         }
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | WAKTU SEKARANG
+        | TIME
         |--------------------------------------------------------------------------
         */
         $now = Carbon::now();
-
-
+        $today = Carbon::today();
 
         /*
         |--------------------------------------------------------------------------
-        | VALIDASI JAM KERJA
+        | AMBIL SCHEDULE
         |--------------------------------------------------------------------------
         */
-        if (
+        $schedule = ScheduleService::getTodaySchedule($user);
 
-            $now->format('H:i') < '08:00' ||
-
-            $now->format('H:i') > '23:59'
-
-        ) {
-
+        if (!$schedule) {
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                'Absensi hanya bisa pada jam kerja'
-
+                'message' => 'Anda tidak memiliki jadwal hari ini'
             ], 403);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | SHIFT TIME
+        |--------------------------------------------------------------------------
+        */
+        $shiftStart = Carbon::parse($schedule['start_time']);
+        $shiftEnd   = Carbon::parse($schedule['end_time']);
 
+        if (!empty($schedule['is_overnight']) && $schedule['is_overnight']) {
+            $shiftEnd->addDay();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GRACE PERIOD (15 MENIT)
+        |--------------------------------------------------------------------------
+        */
+        $graceMinutes = 15;
+        $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECKIN WINDOW
+        |--------------------------------------------------------------------------
+        */
+        $checkinStart = $shiftStart->copy()->subHours(2);
+        $checkinEnd   = $shiftStart->copy()->addHours(2);
 
         /*
         |--------------------------------------------------------------------------
         | SIMPAN FOTO
         |--------------------------------------------------------------------------
         */
-        $image = $request->image;
+        $image = str_replace('data:image/jpeg;base64,', '', $request->image);
+        $image = str_replace(' ', '+', $image);
 
-        $image = str_replace(
-            'data:image/jpeg;base64,',
-            '',
-            $image
-        );
+        $fileName = 'faces/' . $user->id . '_' . time() . '.jpg';
 
-        $image = str_replace(
-            ' ',
-            '+',
-            $image
-        );
+        Storage::disk('public')->put($fileName, base64_decode($image));
 
-
-
-        $fileName =
-
-            'faces/' .
-            $user->id .
-            '_' .
-            time() .
-            '.jpg';
-
-
-
-        Storage::disk('public')->put(
-
-            $fileName,
-
-            base64_decode($image)
-        );
-
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | SIMPAN FACE PERTAMA
-        |--------------------------------------------------------------------------
-        */
         if (!$user->face_descriptor) {
-
             $user->update([
-
                 'face_descriptor' => $fileName
             ]);
         }
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | CEK ABSENSI HARI INI
+        | CEK ABSENSI
         |--------------------------------------------------------------------------
         */
-        $today = Carbon::today();
-
-
-
-        $attendance = Attendance::where(
-
-            'user_id',
-            $user->id
-
-        )
-
-            ->whereDate(
-                'tanggal',
-                $today
-            )
-
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereDate('tanggal', $today)
             ->first();
-
-
 
         /*
         |--------------------------------------------------------------------------
@@ -246,153 +168,116 @@ class FaceController extends Controller
         */
         if (!$attendance) {
 
+            /*
+            |--------------------------------------------------------------
+            | VALIDASI JAM MASUK
+            |--------------------------------------------------------------
+            */
+
+            if ($now->lt($checkinStart)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Belum masuk jam absensi'
+                ], 403);
+            }
+
+            /*
+            |--------------------------------------------------------------
+            | TERLAMBAT > GRACE PERIOD
+            |--------------------------------------------------------------
+            */
+            if ($now->gt($lateLimit)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda terlambat lebih dari 15 menit, tidak bisa melakukan absen'
+                ], 403);
+            }
+
+            /*
+            |--------------------------------------------------------------
+            | CREATE ATTENDANCE
+            |--------------------------------------------------------------
+            */
             Attendance::create([
-
                 'user_id'   => $user->id,
-
                 'tanggal'   => $today,
-
                 'jam_masuk' => $now,
-
                 'latitude'  => $request->latitude,
-
                 'longitude' => $request->longitude,
-
-                'status'    =>
-
-                $now->format('H:i') > '08:00'
-                    ? 'terlambat'
-                    : 'hadir'
+                'status'    => $now->gt($shiftStart) ? 'terlambat' : 'hadir'
             ]);
 
-
             return response()->json([
-
                 'success' => true,
-
                 'type'    => 'checkin',
-
                 'message' => 'Check In berhasil',
-
-                'distance' =>
-                round($distance, 2) . ' meter'
+                'distance' => round($distance, 2) . ' meter'
             ]);
         }
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | SUDAH CHECK OUT
+        | SUDAH CHECKOUT
         |--------------------------------------------------------------------------
         */
         if ($attendance->jam_keluar) {
-
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                'Anda sudah check out hari ini'
-
+                'message' => 'Anda sudah check out hari ini'
             ]);
         }
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | CHECKOUT HANYA JAM PULANG
+        | VALIDASI CHECKOUT
         |--------------------------------------------------------------------------
         */
-        if ($now->format('H:i') < '17:00') {
+        $checkoutTime = $shiftEnd->copy()->subMinutes(30);
 
+        if ($now->lt($checkoutTime)) {
             return response()->json([
-
                 'success' => false,
-
-                'message' =>
-                'Checkout hanya bisa setelah jam 17:00'
-
+                'message' => 'Checkout hanya bisa mendekati jam pulang'
             ], 403);
         }
 
-
-
         /*
         |--------------------------------------------------------------------------
-        | CHECK OUT
+        | CHECKOUT
         |--------------------------------------------------------------------------
         */
         $attendance->update([
-
             'jam_keluar' => $now
         ]);
 
-
-
         return response()->json([
-
             'success' => true,
-
             'type'    => 'checkout',
-
             'message' => 'Check Out berhasil',
-
-            'distance' =>
-            round($distance, 2) . ' meter'
+            'distance' => round($distance, 2) . ' meter'
         ]);
     }
 
-
-
     /*
     |--------------------------------------------------------------------------
-    | HITUNG JARAK (HAVERSINE)
+    | HITUNG JARAK
     |--------------------------------------------------------------------------
     */
-    private function calculateDistance(
-        $lat1,
-        $lon1,
-        $lat2,
-        $lon2
-    ) {
-
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
         $earthRadius = 6371000;
 
-
-
-        $dLat =
-            deg2rad($lat2 - $lat1);
-
-        $dLon =
-            deg2rad($lon2 - $lon1);
-
-
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
 
         $a =
-
-            sin($dLat / 2) *
-            sin($dLat / 2) +
-
+            sin($dLat / 2) * sin($dLat / 2) +
             cos(deg2rad($lat1)) *
             cos(deg2rad($lat2)) *
+            sin($dLon / 2) * sin($dLon / 2);
 
-            sin($dLon / 2) *
-            sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
-
-
-        $c =
-            2 *
-            atan2(
-                sqrt($a),
-                sqrt(1 - $a)
-            );
-
-
-
-        return
-            $earthRadius * $c;
+        return $earthRadius * $c;
     }
 }

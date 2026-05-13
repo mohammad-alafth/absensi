@@ -91,19 +91,24 @@
     </div>
 
     <!-- AUTO LOGOUT -->
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
         let timeout;
 
         function resetTimer() {
-
             clearTimeout(timeout);
 
             timeout = setTimeout(() => {
-
-                alert("Session habis, login ulang");
-
-                window.location.href = "/login";
-
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Session habis',
+                    text: 'Login ulang untuk melanjutkan',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = "/login";
+                });
             }, 1800000); // 30 menit
         }
 

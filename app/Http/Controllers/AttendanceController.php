@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Attendance;
 use Carbon\Carbon;
+use App\Services\ScheduleService;
 
 class AttendanceController extends Controller
 {
@@ -24,26 +25,18 @@ class AttendanceController extends Controller
         $now = Carbon::now();
 
 
-        $employeeShift = EmployeeShift::with('shift')
+        $schedule = ScheduleService::getTodaySchedule($user);
 
-            ->where('user_id', $user->id)
-
-            ->whereDate('shift_date', today())
-
-            ->first();
-
-        if (!$employeeShift) {
+        if (!$schedule) {
 
             return response()->json([
 
                 'success' => false,
 
-                'message' => 'Anda belum memiliki jadwal shift hari ini'
+                'message' => 'Hari ini anda libur'
 
             ], 403);
         }
-
-        $shift = $employeeShift->shift;
 
         /*
         |--------------------------------------------------------------------------
@@ -54,13 +47,13 @@ class AttendanceController extends Controller
         $shiftStart = Carbon::parse(
 
             today()->format('Y-m-d') . ' ' .
-                $shift->start_time
+                $schedule['start_time']
         );
 
         $shiftEnd = Carbon::parse(
 
             today()->format('Y-m-d') . ' ' .
-                $shift->end_time
+                $schedule->end_time
         );
 
         /*
@@ -69,7 +62,7 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if ($shift->is_overnight) {
+        if ($schedule->is_overnight) {
 
             $shiftEnd->addDay();
         }
@@ -83,7 +76,7 @@ class AttendanceController extends Controller
         $lateLimit = $shiftStart
             ->copy()
             ->addMinutes(
-                $shift->grace_minutes
+                $schedule->grace_minutes
             );
 
         /*
