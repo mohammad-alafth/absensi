@@ -27,6 +27,10 @@ class Leave extends Model
         'delegate_nik',
 
         'emergency_contact',
+        'employee_signature',
+        'pdf_file',
+        'pj_signature',
+        'hrd_signature',
 
         /*
         |--------------------------------------------------------------------------
@@ -90,5 +94,13 @@ class Leave extends Model
             User::class,
             'hrd_approved_by'
         );
+    }
+    public function directorApprover()
+    {
+        return $this->belongsTo(User::class, 'director_approved_by');
+    }
+    public function headApprover()
+    {
+        return $this->belongsTo(User::class, 'head_approved_by');
     }
 }

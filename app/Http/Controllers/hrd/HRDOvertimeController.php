@@ -4,6 +4,9 @@ namespace App\Http\Controllers\HRD;
 
 use App\Http\Controllers\Controller;
 use App\Models\Overtime;
+use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Storage;
 
 class HRDOvertimeController extends Controller
 {
@@ -14,25 +17,21 @@ class HRDOvertimeController extends Controller
     */
     public function index()
     {
-        $overtimes = Overtime::with([
-            'user',
-            'pjApprover'
-        ])
-            ->where(
-                'pj_status',
-                'approved'
-            )
-            ->where(
-                'hrd_status',
-                'pending'
-            )
-            ->latest()
-            ->get();
+        $role = auth()->user()->role;
 
-        return view(
-            'hrd.lembur.lembur',
-            compact('overtimes')
-        );
+        if ($role === 'hrd') {
+            $overtimes = Overtime::where('status', 'waiting_hrd')->get();
+        }
+
+        if ($role === 'head_pegawai') {
+            $overtimes = Overtime::where('status', 'waiting_head')->get();
+        }
+
+        if ($role === 'director') {
+            $overtimes = Overtime::where('status', 'waiting_director')->get();
+        }
+
+        return view('hrd.lembur.lembur', compact('overtimes'));
     }
 
     /*
@@ -40,25 +39,63 @@ class HRDOvertimeController extends Controller
     | APPROVE HRD
     |--------------------------------------------------------------------------
     */
-    public function approve($id)
+    public function approve(Request $request, $id)
     {
         $overtime = Overtime::findOrFail($id);
 
-        $overtime->update([
+        $role = auth()->user()->role;
 
-            'status' => 'approved',
+        if ($role === 'head_pegawai') {
+            $overtime->update(['status' => 'waiting_director']);
+        }
 
-            'hrd_status' => 'approved',
+        if ($role === 'director') {
+            $overtime->update([
+                'status' => 'approved',
+                'hrd_status' => 'approved', // Opsional: set agar PDF terbaca final
+                'hrd_approved_at' => now(), // Catat waktu persetujuan final
+            ]);
+            $this->regeneratePdf($overtime);
 
-            'hrd_approved_by' => auth()->id(),
+            return back()->with('success', 'Disetujui Final oleh Direktur');
+        }
 
-            'hrd_approved_at' => now(),
-        ]);
+        if ($role === 'hrd') {
+            $overtime->update([
+                'status' => 'approved',
+                'hrd_status' => 'approved',
+            ]);
 
-        return back()->with(
-            'success',
-            'Lembur berhasil diapprove HRD'
+            $this->regeneratePdf($overtime);
+        }
+
+        return back()->with('success', 'Disetujui oleh HRD');
+    }
+
+    private function regeneratePdf($overtime)
+    {
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'pdf.overtime-letter',
+            [
+                'overtime' => $overtime->fresh([
+                    'user',
+                    'pjApprover',
+                    'hrdApprover'
+                ])
+            ]
         );
+
+        $fileName =
+            "overtime/overtime_{$overtime->id}.pdf";
+
+        Storage::disk('public')->put(
+            $fileName,
+            $pdf->output()
+        );
+
+        $overtime->update([
+            'pdf_file' => $fileName
+        ]);
     }
 
     /*
@@ -66,8 +103,12 @@ class HRDOvertimeController extends Controller
     | REJECT HRD
     |--------------------------------------------------------------------------
     */
-    public function reject($id)
+    public function reject(Request $request, $id)
     {
+        $request->validate([
+            'note' => 'required|min:5'
+        ]);
+
         $overtime = Overtime::findOrFail($id);
 
         $overtime->update([
@@ -76,10 +117,14 @@ class HRDOvertimeController extends Controller
 
             'hrd_status' => 'rejected',
 
+            'hrd_note' => $request->note,
+
             'hrd_approved_by' => auth()->id(),
 
             'hrd_approved_at' => now(),
         ]);
+
+        $this->regeneratePdf($overtime);
 
         return back()->with(
             'success',

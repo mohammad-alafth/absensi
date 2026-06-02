@@ -17,9 +17,14 @@ class Overtime extends Model
         'end_time',
 
         'total_hours',
+        'employee_signature',
+        'pj_signature',
+        'hrd_signature',
+        'pdf_file',
 
         'reason',
-
+        'department',
+        'day_type',
         'status',
 
         'pj_status',
@@ -29,6 +34,8 @@ class Overtime extends Model
         'hrd_status',
         'hrd_approved_by',
         'hrd_approved_at',
+        'pj_note',
+        'hrd_note',
     ];
 
     /*
@@ -59,11 +66,20 @@ class Overtime extends Model
     | HRD APPROVER
     |--------------------------------------------------------------------------
     */
+    // App\Models\Overtime.php
+
+    public function directorApprover()
+    {
+        return $this->belongsTo(User::class, 'director_approved_by');
+    }
+
+    public function headApprover()
+    {
+        return $this->belongsTo(User::class, 'head_approved_by');
+    }
+
     public function hrdApprover()
     {
-        return $this->belongsTo(
-            User::class,
-            'hrd_approved_by'
-        );
+        return $this->belongsTo(User::class, 'hrd_approved_by');
     }
 }

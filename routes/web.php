@@ -10,6 +10,7 @@ use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\HRD\HRDController;
+use App\Http\Controllers\HRD\HRDUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +33,7 @@ use App\Http\Controllers\HRD\HRDDashboardController;
 use App\Http\Controllers\HRD\HRDLeaveController;
 use App\Http\Controllers\HRD\HRDPermissionController;
 use App\Http\Controllers\HRD\HRDOvertimeController;
+use App\Http\Controllers\HRD\ShiftManagementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -258,17 +260,33 @@ Route::middleware([
             ])->name('pj.lembur.reject');
         });
 
+    Route::middleware(['auth'])->group(function () {
+
+        // Rute Unduh Cetak Dokumen PDF Resmi
+        Route::get('/leaves/{id}/download-pdf', [LeaveController::class, 'downloadPdf'])->name('leaves.download-pdf');
+        Route::get('/permissions/{id}/download-pdf', [PermissionController::class, 'downloadPdf'])->name('permissions.download-pdf');
+        Route::get('/overtimes/{id}/download-pdf', [OvertimeController::class, 'downloadPdf'])->name('overtimes.download-pdf');
+
+        // Tambahkan rute history index Anda jika belum ada
+        // Route::get('/history', [HistoryController::class, 'index'])->name('history.index');
+    });
     /*
     |--------------------------------------------------------------------------
     | HRD AREA
     |--------------------------------------------------------------------------
     */
 
+    Route::prefix('hrd')->middleware(['auth', 'verified'])->group(function () {
+        Route::get('/users/approval', [HRDUserController::class, 'index'])->name('hrd.users.approval');
+        Route::post('/users/{id}/approve', [HRDUserController::class, 'approve'])->name('hrd.users.approve');
+        Route::post('/users/{id}/reset-password', [HRDUserController::class, 'resetPassword'])->name('hrd.users.reset-password');
+    });
     Route::prefix('hrd')
         ->middleware([
             'auth',
-            'role:hrd'
+            'role:hrd,head_pegawai,director'
         ])
+        ->name('hrd.')
         ->group(function () {
 
             /*
@@ -276,12 +294,10 @@ Route::middleware([
             | DASHBOARD
             |--------------------------------------------------------------------------
             */
+            Route::get('/export-excel', [HRDController::class, 'exportExcel'])->name('export.excel');
 
-
-            Route::get('/dashboard', [
-                HRDDashboardController::class,
-                'index'
-            ])->name('hrd.dashboard');
+            Route::get('/dashboard', [HRDDashboardController::class, 'index'])
+                ->name('dashboard');
 
             /*
             |--------------------------------------------------------------------------
@@ -292,7 +308,7 @@ Route::middleware([
             Route::get('/rekap', [
                 HRDController::class,
                 'index'
-            ])->name('hrd.rekap');
+            ])->name('rekap');
 
             /*
             |--------------------------------------------------------------------------
@@ -303,38 +319,40 @@ Route::middleware([
             Route::get('/cuti', [
                 HRDLeaveController::class,
                 'index'
-            ])->name('hrd.cuti');
+            ])->name('cuti');
 
             Route::post('/cuti/{id}/approve', [
                 HRDLeaveController::class,
                 'approve'
-            ])->name('hrd.cuti.approve');
+            ])->name('cuti.approve');
 
             Route::post('/cuti/{id}/reject', [
                 HRDLeaveController::class,
                 'reject'
-            ])->name('hrd.cuti.reject');
+            ])->name('cuti.reject');
+            Route::post('/update-leave-quota/{user}', [HRDController::class, 'updateLeaveQuota'])
+                ->name('update.leave.quota');
 
             /*
             |--------------------------------------------------------------------------
             | IZIN
             |--------------------------------------------------------------------------
             */
-
+            Route::get('/rekap', [HRDController::class, 'index'])->name('rekap');
             Route::get('/izin', [
                 HRDPermissionController::class,
                 'index'
-            ])->name('hrd.izin');
+            ])->name('izin');
 
             Route::post('/izin/{id}/approve', [
                 HRDPermissionController::class,
                 'approve'
-            ])->name('hrd.izin.approve');
+            ])->name('izin.approve');
 
             Route::post('/izin/{id}/reject', [
                 HRDPermissionController::class,
                 'reject'
-            ])->name('hrd.izin.reject');
+            ])->name('izin.reject');
 
             /*
             |--------------------------------------------------------------------------
@@ -345,18 +363,31 @@ Route::middleware([
             Route::get('/lembur', [
                 HRDOvertimeController::class,
                 'index'
-            ])->name('hrd.lembur');
+            ])->name('lembur');
 
             Route::post('/lembur/{id}/approve', [
                 HRDOvertimeController::class,
                 'approve'
-            ])->name('hrd.lembur.approve');
+            ])->name('lembur.approve');
 
             Route::post('/lembur/{id}/reject', [
                 HRDOvertimeController::class,
                 'reject'
-            ])->name('hrd.lembur.reject');
+            ])->name('lembur.reject');
+
+            Route::prefix('reports')->name('reports.')->group(function () {
+                Route::get('/attendance/daily', [HRDController::class, 'reportAttendanceDaily'])->name('attendance.daily');
+                Route::get('/absent/daily', [HRDController::class, 'reportAbsentDaily'])->name('absent.daily');
+                Route::get('/leave', [HRDController::class, 'reportLeave'])->name('leave');
+                Route::get('/permission', [HRDController::class, 'reportPermission'])->name('permission');
+                Route::get('/overtime', [HRDController::class, 'reportOvertime'])->name('overtime');
+                Route::get('/attendance/monthly', [HRDController::class, 'index'])->name('attendance.monthly');
+                Route::get('/export', [HRDController::class, 'exportReport'])->name('export');
+            });
+
+            Route::get('/tracking', [HRDController::class, 'tracking'])->name('tracking');
         });
+
 
     /*
         |--------------------------------------------------------------------------
@@ -365,14 +396,19 @@ Route::middleware([
     */
 
     Route::middleware(['auth'])->group(function () {
+        // Rute Shift Umum (Bisa diakses user)
+        Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
+        Route::post('/shift/assign', [ShiftController::class, 'assign'])->name('shift.assign');
+        Route::get('/shift/data', [ShiftController::class, 'data'])->name('shift.data');
 
-        Route::get('/shift', [ShiftController::class, 'index'])
-            ->name('shift.index');
-
-        Route::post('/shift/assign', [ShiftController::class, 'assign'])
-            ->name('shift.assign');
-        Route::get('/shift/data', [ShiftController::class, 'data'])
-            ->name('shift.data');
+        // Rute Shift Management (Khusus HRD)
+        Route::prefix('hrd')->name('hrd.')->group(function () {
+            Route::get('/shifts', [ShiftManagementController::class, 'index'])->name('shifts.index');
+            // Ubah POST menjadi PUT agar sinkron dengan @method('PUT') di Blade
+            Route::put('/shifts/update/{id}', [ShiftManagementController::class, 'update'])->name('shifts.update');
+            // Store tetap menggunakan POST
+            Route::post('/shifts/store', [ShiftManagementController::class, 'store'])->name('shifts.store');
+        });
     });
 });
 

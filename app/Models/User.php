@@ -25,7 +25,11 @@ class User extends Authenticatable
         'password',
         'role',
         'face_descriptor',
-        'finger_id'
+        'finger_id',
+        'leave_quota',
+        'is_approved',
+        'password_reset_request',
+        'work_type',
     ];
 
     /**
@@ -59,5 +63,44 @@ class User extends Authenticatable
     public function employeeShifts()
     {
         return $this->hasMany(EmployeeShift::class);
+    }
+
+    public function getRoleLabelAttribute()
+    {
+        $roles = [
+
+            'admin' => 'ADMIN',
+
+            'hrd' => 'HRD',
+
+            'it' => 'IT',
+
+            'marketing' => 'MARKETING',
+
+            'creator' => 'KONTEN CREATOR',
+
+            'head_pegawai' => 'KEPALA BAGIAN UMUM DAN KEPEGAWAIAN',
+
+            'director' => 'DIREKTUR',
+
+            'medical_service' => 'MEDICAL SERVICE',
+
+            'pipp' => 'PIPP',
+
+            'pj_security' => 'PENANGGUNG JAWAB SECURITY',
+
+            'pj_marketing' => 'PENANGGUNG JAWAB MARKETING',
+
+            'pj_ipsrs' => 'PENANGGUNG JAWAB IPSRS',
+
+            'pj_casemix' => 'PENANGGUNG JAWAB CASEMIX',
+
+            'nurse' => 'PERAWAT',
+
+            'finance' => 'KEUANGAN',
+        ];
+
+        return $roles[$this->role]
+            ?? strtoupper(str_replace('_', ' ', $this->role));
     }
 }

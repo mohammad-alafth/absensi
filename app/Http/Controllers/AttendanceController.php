@@ -14,27 +14,30 @@ class AttendanceController extends Controller
         $user = auth()->user();
 
         if (!$user) {
-
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized'
             ], 401);
         }
 
-
         $now = Carbon::now();
 
-
+        /*
+        |--------------------------------------------------------------------------
+        | SCHEDULE
+        |--------------------------------------------------------------------------
+        */
         $schedule = ScheduleService::getTodaySchedule($user);
-
-        if (!$schedule) {
-
+        if (!empty($schedule['invalid_window'])) {
             return response()->json([
-
                 'success' => false,
-
+                'message' => 'Diluar jam absensi'
+            ], 403);
+        }
+        if (!$schedule) {
+            return response()->json([
+                'success' => false,
                 'message' => 'Hari ini anda libur'
-
             ], 403);
         }
 
@@ -43,60 +46,28 @@ class AttendanceController extends Controller
         | BUILD SHIFT DATETIME
         |--------------------------------------------------------------------------
         */
-
-        $shiftStart = Carbon::parse(
-
-            today()->format('Y-m-d') . ' ' .
-                $schedule['start_time']
-        );
-
-        $shiftEnd = Carbon::parse(
-
-            today()->format('Y-m-d') . ' ' .
-                $schedule->end_time
-        );
+        $shiftStart = $schedule['shift_start'];
+        $shiftEnd = $schedule['shift_end'];
 
         /*
         |--------------------------------------------------------------------------
-        | SHIFT MALAM
+        | GRACE PERIOD
         |--------------------------------------------------------------------------
         */
-
-        if ($schedule->is_overnight) {
-
-            $shiftEnd->addDay();
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOLERANSI
-        |--------------------------------------------------------------------------
-        */
-
-        $lateLimit = $shiftStart
-            ->copy()
-            ->addMinutes(
-                $schedule->grace_minutes
-            );
+        $graceMinutes = $schedule['grace_minutes'] ?? 15;
+        $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
 
         /*
         |--------------------------------------------------------------------------
         | ATTENDANCE TODAY
         |--------------------------------------------------------------------------
         */
-
-        $attendance = Attendance::where(
-
-            'user_id',
-            $user->id
-
-        )
-
-            ->whereDate(
-                'tanggal',
-                today()
-            )
-
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereBetween('jam_masuk', [
+                $shiftStart,
+                $shiftEnd
+            ])
+            ->orderByDesc('jam_masuk')
             ->first();
 
         /*
@@ -104,51 +75,56 @@ class AttendanceController extends Controller
         | CHECK IN
         |--------------------------------------------------------------------------
         */
-
         if (!$attendance) {
-
             $status = 'hadir';
-
             $lateMinutes = 0;
 
+            /*
+            |--------------------------------------------------------------------------
+            | CEK KETERLAMBATAN
+            |--------------------------------------------------------------------------
+            */
             if ($now->gt($lateLimit)) {
-
                 $status = 'terlambat';
 
-                $lateMinutes =
-                    $lateLimit->diffInMinutes($now);
+                /*
+                |--------------------------------------------------------------------------
+                | HITUNG TELAT SETELAH BATAS TOLERANSI
+                |--------------------------------------------------------------------------
+                */
+                $lateMinutes = $lateLimit->diffInMinutes($now);
+            }
+
+            $checkinStart = $shiftStart->copy()->subHours(2);
+            $checkinEnd = $shiftStart->copy()->addHours(2);
+
+            if (!$now->between($checkinStart, $checkinEnd)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Diluar jam checkin'
+                ], 403);
             }
 
             Attendance::create([
-
                 'user_id' => $user->id,
-
-                'shift_id' => $shift->id,
-
-                'tanggal' => today(),
-
+                'tanggal' => $shiftStart->copy()->format('Y-m-d'),
                 'jam_masuk' => $now,
-
                 'latitude' => $request->latitude,
-
                 'longitude' => $request->longitude,
-
                 'status' => $status,
-
                 'late_minutes' => $lateMinutes,
-
                 'scheduled_checkin' => $shiftStart,
-
                 'scheduled_checkout' => $shiftEnd
             ]);
 
             return response()->json([
-
                 'success' => true,
-
                 'type' => 'checkin',
-
-                'message' => 'Check in berhasil'
+                'status' => $status,
+                'late_minutes' => $lateMinutes,
+                'message' => $status === 'terlambat'
+                    ? 'Check in berhasil (Terlambat ' . $lateMinutes . ' menit)'
+                    : 'Check in berhasil'
             ]);
         }
 
@@ -157,67 +133,54 @@ class AttendanceController extends Controller
         | SUDAH CHECKOUT
         |--------------------------------------------------------------------------
         */
-
         if ($attendance->jam_keluar) {
-
             return response()->json([
-
                 'success' => false,
-
                 'message' => 'Anda sudah checkout'
             ]);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | BELUM WAKTU PULANG
+        | BELUM WAKTU PULANG (Toleransi checkout awal 30 menit sebelum shift berakhir)
         |--------------------------------------------------------------------------
         */
+        $checkoutLimit = $shiftEnd->copy()->subMinutes(30);
 
-        if ($now->lt($shiftEnd)) {
-
+        if ($now->lt($checkoutLimit)) {
             return response()->json([
-
                 'success' => false,
-
-                'message' => 'Belum jam pulang'
+                'message' => 'Belum waktu checkout'
             ]);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | OVERTIME
+        | REALITAS OVERTIME MURNI PRESENSI
         |--------------------------------------------------------------------------
+        | Dihitung murni sejak menit pertama kelebihan setelah jadwal pulang shift selesai.
         */
-
-        $overtime = 0;
+        $overtimeMinutes = 0;
 
         if ($now->gt($shiftEnd)) {
-
-            $overtime =
-                $shiftEnd->diffInMinutes($now);
+            $overtimeMinutes = $shiftEnd->diffInMinutes($now);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | CHECKOUT
+        | PROCESS CHECKOUT
         |--------------------------------------------------------------------------
         */
-
         $attendance->update([
-
             'jam_keluar' => $now,
-
-            'overtime_minutes' => $overtime
+            'overtime_minutes' => $overtimeMinutes
         ]);
 
         return response()->json([
-
             'success' => true,
-
             'type' => 'checkout',
-
-            'message' => 'Checkout berhasil'
+            'message' => 'Checkout berhasil',
+            'overtime_minutes' => $overtimeMinutes
         ]);
     }
 }

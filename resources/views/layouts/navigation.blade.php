@@ -85,7 +85,11 @@
                         <x-dropdown-link :href="route('profile.edit')">
                             Profile
                         </x-dropdown-link>
-
+                        @if(auth()->user()->role === 'hrd')
+                        <x-dropdown-link :href="route('hrd.users.approval')">
+                            Approval Akun
+                        </x-dropdown-link>
+                        @endif
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
 

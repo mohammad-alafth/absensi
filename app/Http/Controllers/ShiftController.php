@@ -20,6 +20,13 @@ class ShiftController extends Controller
 
     public function index(Request $request)
     {
+        $user = auth()->user();
+        if (
+            !str_starts_with($user->role, 'pj_') ||
+            $user->work_type !== 'shift'
+        ) {
+            abort(403, 'Anda tidak memiliki otoritas untuk mengakses halaman ini.');
+        }
         $date = $request->date ?? now()->format('Y-m-d');
 
         /*
@@ -51,7 +58,7 @@ class ShiftController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $shifts = Shift::all();
+        $shifts = Shift::whereJsonContains('allowed_roles', $role)->get();
 
         /*
         |--------------------------------------------------------------------------
@@ -79,6 +86,9 @@ class ShiftController extends Controller
                 'end_date',
                 $period['end_date']
             )
+            ->whereHas('user', function ($query) use ($targetRole) {
+                $query->where('role', $targetRole);
+            })
             ->get();
 
         /*
@@ -212,47 +222,47 @@ class ShiftController extends Controller
 
     public function assign(Request $request)
     {
+        // 1. Ubah validasi: shift_id dibuat nullable agar bisa menerima perintah hapus
         $request->validate([
-
             'user_id' => 'required',
-            'shift_id' => 'required',
+            'shift_id' => 'nullable|exists:shifts,id',
             'shift_date' => 'required|date'
-
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | PERIODE SHIFT
-        |--------------------------------------------------------------------------
-        */
-
-        $period = $this->getShiftPeriod(
-            $request->shift_date
-        );
-
+        $period = $this->getShiftPeriod($request->shift_date);
         $startDate = $period['start_date'];
-
         $endDate = $period['end_date'];
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE / CREATE
-        |--------------------------------------------------------------------------
-        */
+        // 2. LOGIKA BARU: Jika shift_id tidak ada, maka lakukan penghapusan (Unassign)
+        if (!$request->shift_id) {
+            EmployeeShift::where('user_id', $request->user_id)
+                ->where('start_date', $startDate)
+                ->where('end_date', $endDate)
+                ->delete();
 
-        EmployeeShift::updateOrCreate(
+            return response()->json(['success' => true]);
+        }
 
+        // 3. LOGIKA LAMA (Tetap dipertahankan): Update atau Create jadwal
+        $shift = Shift::findOrFail($request->shift_id);
+
+        $employeeShift = EmployeeShift::updateOrCreate(
             [
                 'user_id' => $request->user_id,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ],
-
             [
                 'shift_id' => $request->shift_id,
                 'shift_date' => $request->shift_date,
+                'assigned_by' => auth()->id(),
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+                'is_overnight' => $shift->is_overnight,
             ]
         );
+
+        $employeeShift->touch();
 
         return response()->json([
             'success' => true
@@ -267,8 +277,19 @@ class ShiftController extends Controller
 
     public function data(Request $request)
     {
-        $date = $request->date ?? now()->format('Y-m-d');
+        $user = auth()->user();
 
+        if (
+            !str_starts_with($user->role, 'pj_') ||
+            $user->work_type !== 'shift'
+        ) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+        $date = $request->date ?? now()->format('Y-m-d');
+        $userRole = auth()->user()->role;
+        $targetRole = str_replace('pj_', '', $userRole);
         $period = $this->getShiftPeriod($date);
 
         $employeeShifts = EmployeeShift::with([
@@ -283,6 +304,9 @@ class ShiftController extends Controller
                 'end_date',
                 $period['end_date']
             )
+            ->whereHas('user', function ($query) use ($targetRole) {
+                $query->where('role', $targetRole);
+            })
             ->get();
 
         /*

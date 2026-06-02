@@ -3,13 +3,14 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f9ff;
+            background-color: #f0f2f9;
+            /* Selaras dengan halaman rekap & dashboard */
         }
 
         .scan-ring {
             position: relative;
-            width: 280px;
-            height: 280px;
+            width: 240px;
+            height: 240px;
             border-radius: 50%;
             border: 4px solid rgba(30, 64, 175, 0.1);
             display: flex;
@@ -20,7 +21,7 @@
         .scan-ring::after {
             content: '';
             position: absolute;
-            inset: -8px;
+            inset: -6px;
             border-radius: 50%;
             border: 2px solid #1E40AF;
             opacity: .3;
@@ -28,13 +29,12 @@
         }
 
         @keyframes pulse {
-
             0% {
                 transform: scale(1);
             }
 
             50% {
-                transform: scale(1.05);
+                transform: scale(1.04);
             }
 
             100% {
@@ -46,559 +46,225 @@
             position: absolute;
             width: 100%;
             height: 2px;
-
-            background: linear-gradient(90deg,
-                    transparent,
-                    #1E40AF,
-                    transparent);
-
-            animation: scan 3s infinite;
+            background: linear-gradient(90deg, transparent, #1E40AF, transparent);
+            animation: scan 2.5s infinite ease-in-out;
+            z-index: 10;
         }
 
         @keyframes scan {
-
             0% {
-                top: 20%;
+                top: 15%;
             }
 
             50% {
-                top: 80%;
+                top: 85%;
             }
 
             100% {
-                top: 20%;
+                top: 15%;
             }
         }
     </style>
 
+    <div class="min-h-screen bg-[#f0f2f9] px-3 sm:px-5 py-6 pb-24 flex items-center justify-center">
 
-    <main class="flex-1 px-6 py-8 flex flex-col items-center min-h-screen bg-[#f8f9ff]">
+        <div class="w-full max-w-md">
 
-        <!-- BACK -->
-        <div class="w-full max-w-md mb-6">
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-100/70 border border-white p-5 sm:p-6 flex flex-col items-center">
 
-            <a href="{{ route('dashboard') }}"
-                class="text-[#1E40AF] font-semibold text-sm">
+                <div class="w-full flex items-center justify-between pb-4 mb-5 border-b border-gray-100">
+                    <a href="{{ route('dashboard') }}" class="text-[#1E40AF] text-xs font-bold hover:underline transition">
+                        ← Kembali
+                    </a>
+                    <span class="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md font-bold">
+                        Face Scan & GPS
+                    </span>
+                </div>
 
-                ← Kembali
+                <div class="text-center mb-5">
+                    <h2 class="text-lg font-black text-gray-800 tracking-wide">Halaman Absensi Digital</h2>
+                    <p class="text-[11px] text-gray-400 mt-0.5">Posisikan wajah Anda tepat di dalam bingkai lingkaran</p>
+                </div>
 
-            </a>
+                <div class="scan-ring mb-5 bg-slate-50 shadow-inner">
+                    <div class="scan-line"></div>
+                    <video id="video" autoplay playsinline class="w-52 h-52 rounded-full object-cover border-4 border-white shadow-md z-0"></video>
+                </div>
 
-        </div>
+                <div class="grid grid-cols-2 gap-2 w-full max-w-xs mb-3">
+                    <div id="gpsStatus" class="flex justify-center items-center gap-1.5 py-2.5 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/60 rounded-xl text-[11px] font-bold text-gray-600 shadow-3xs">
+                        📍 Mencari GPS...
+                    </div>
+                    <div id="distanceStatus" class="flex justify-center items-center gap-1.5 py-2.5 bg-gradient-to-br from-blue-50 to-indigo-50/60 border border-blue-100 rounded-xl text-[11px] font-bold text-[#1E40AF] shadow-3xs">
+                        📏 Menghitung...
+                    </div>
+                </div>
 
+                <div class="w-full max-w-xs bg-slate-50/80 border border-slate-200/60 p-3 rounded-xl mb-5 text-[11px] text-gray-500 shadow-inner leading-relaxed">
+                    <b class="text-gray-700 block mb-0.5">Informasi Radius Anda:</b>
+                    <div id="locationText">Mengambil koordinat satelit...</div>
+                </div>
 
-        <!-- TITLE -->
-        <h2 class="text-2xl font-bold mb-2">
-
-            Halaman Absensi
-
-        </h2>
-
-        <p class="text-sm text-gray-500 mb-6">
-
-            Posisikan wajah Anda dalam bingkai
-
-        </p>
-
-
-        <!-- CAMERA -->
-        <div class="scan-ring mb-8">
-
-            <div class="scan-line"></div>
-
-            <video
-                id="video"
-                autoplay
-                playsinline
-                class="w-64 h-64 rounded-full object-cover border-4 border-white shadow-xl">
-            </video>
-
-        </div>
-
-
-        <!-- GPS INFO -->
-        <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-6">
-
-            <div
-                id="gpsStatus"
-                class="flex justify-center items-center gap-2 py-3 bg-blue-50 rounded-2xl text-xs">
-
-                📍 GPS...
+                <button id="absenBtn" onclick="absen()" class="w-full max-w-xs bg-gradient-to-r from-[#1E40AF] to-blue-600 hover:opacity-90 transition text-white py-3 rounded-xl text-xs font-bold tracking-wide shadow-md">
+                    Absen Sekarang
+                </button>
 
             </div>
-
-            <div
-                id="distanceStatus"
-                class="flex justify-center items-center gap-2 py-3 bg-blue-50 rounded-2xl text-xs">
-
-                📏 Menghitung...
-
-            </div>
-
         </div>
-
-
-        <!-- LOCATION -->
-        <div
-            class="w-full max-w-md bg-white p-4 rounded-3xl mb-6 text-sm shadow">
-
-            <b>Lokasi Anda</b>
-
-            <div id="locationText">
-
-                Mengambil lokasi...
-
-            </div>
-
-        </div>
-
-
-        <!-- BUTTON -->
-        <button
-            id="absenBtn"
-            onclick="absen()"
-            class="w-full max-w-xs bg-[#1E40AF] hover:bg-blue-800 transition text-white py-4 rounded-3xl font-bold shadow">
-
-            Absen Sekarang
-
-        </button>
-
-    </main>
-
-
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <script>
-        /*
-        |--------------------------------------------------------------------------
-        | KOORDINAT KANTOR
-        |--------------------------------------------------------------------------
-        */
-
         const officeLat = 0.4761258;
         const officeLng = 101.4190600;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | GLOBAL VARIABLE
-        |--------------------------------------------------------------------------
-        */
 
         let currentLat = null;
         let currentLng = null;
         let currentAccuracy = null;
         let currentDistance = null;
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | START CAMERA
-        |--------------------------------------------------------------------------
-        */
-
         async function startCamera() {
-
             try {
-
-                const stream =
-                    await navigator.mediaDevices.getUserMedia({
-
-                        video: {
-                            facingMode: 'user'
-                        }
-
-                    });
-
-                document
-                    .getElementById('video')
-                    .srcObject = stream;
-
-            } catch (error) {
-
-                Swal.fire({
-
-                    icon: 'error',
-
-                    title: 'Camera tidak diizinkan'
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user'
+                    }
                 });
-
-                console.log(error);
+                document.getElementById('video').srcObject = stream;
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Akses Kamera Ditolak',
+                    text: 'Mohon izinkan akses kamera pada browser Anda untuk melakukan scan wajah.'
+                });
+                console.error(error);
             }
         }
-
         startCamera();
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | HITUNG JARAK
-        |--------------------------------------------------------------------------
-        */
-
-        function calculateDistance(
-            lat1,
-            lon1,
-            lat2,
-            lon2
-        ) {
-
+        function calculateDistance(lat1, lon1, lat2, lon2) {
             const earthRadius = 6371000;
-
-            const dLat =
-                (lat2 - lat1) * Math.PI / 180;
-
-            const dLon =
-                (lon2 - lon1) * Math.PI / 180;
-
-            const a =
-
-                Math.sin(dLat / 2) *
-                Math.sin(dLat / 2) +
-
-                Math.cos(lat1 * Math.PI / 180) *
-                Math.cos(lat2 * Math.PI / 180) *
-
-                Math.sin(dLon / 2) *
-                Math.sin(dLon / 2);
-
-            const c =
-
-                2 *
-                Math.atan2(
-                    Math.sqrt(a),
-                    Math.sqrt(1 - a)
-                );
-
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return earthRadius * c;
         }
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | GPS REALTIME
-        |--------------------------------------------------------------------------
-        */
-
         navigator.geolocation.watchPosition(
-
             (pos) => {
+                currentLat = pos.coords.latitude;
+                currentLng = pos.coords.longitude;
+                currentAccuracy = pos.coords.accuracy;
 
-                currentLat =
-                    pos.coords.latitude;
+                currentDistance = calculateDistance(officeLat, officeLng, currentLat, currentLng);
 
-                currentLng =
-                    pos.coords.longitude;
-
-                currentAccuracy =
-                    pos.coords.accuracy;
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | HITUNG JARAK
-                |--------------------------------------------------------------------------
-                */
-
-                currentDistance =
-                    calculateDistance(
-
-                        officeLat,
-                        officeLng,
-
-                        currentLat,
-                        currentLng
-                    );
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | GPS STATUS
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .getElementById('gpsStatus')
-                    .innerHTML =
-
-                    `📍 ${Math.round(currentAccuracy)}m`;
-
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | DISTANCE STATUS
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .getElementById('distanceStatus')
-                    .innerHTML =
-
-                    `📏 ${Math.round(currentDistance)}m`;
-
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | LOCATION INFO
-                |--------------------------------------------------------------------------
-                */
-
-                document
-                    .getElementById('locationText')
-                    .innerHTML =
-
-                    `
-                    Accuracy: ${Math.round(currentAccuracy)} meter<br>
-                    Jarak ke kantor: ${Math.round(currentDistance)} meter
-                    `;
-
+                document.getElementById('gpsStatus').innerHTML = `📍 Akurasi: ${Math.round(currentAccuracy)}m`;
+                document.getElementById('distanceStatus').innerHTML = `📏 Jarak: ${Math.round(currentDistance)}m`;
+                document.getElementById('locationText').innerHTML = `
+                    Akurasi GPS: ${Math.round(currentAccuracy)} meter<br>
+                    Jarak ke RS Mata PEK Eye Center: ${Math.round(currentDistance)} meter
+                `;
             },
-
             (err) => {
-
                 Swal.fire({
-
                     icon: 'error',
-
-                    title: 'GPS tidak aktif'
+                    title: 'GPS Tidak Aktif',
+                    text: 'Nyalakan GPS lokasi pada perangkat Anda.'
                 });
-
-                console.log(err);
-
-            },
-
-            {
+                console.error(err);
+            }, {
                 enableHighAccuracy: true,
                 maximumAge: 0,
                 timeout: 10000
             }
         );
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | CAPTURE IMAGE
-        |--------------------------------------------------------------------------
-        */
-
         function captureImage() {
-
-            const video =
-                document.getElementById('video');
-
-            const canvas =
-                document.createElement('canvas');
-
-            canvas.width =
-                video.videoWidth;
-
-            canvas.height =
-                video.videoHeight;
-
-            const ctx =
-                canvas.getContext('2d');
-
-            ctx.drawImage(
-                video,
-                0,
-                0
-            );
-
-            return canvas.toDataURL(
-                'image/jpeg'
-            );
+            const video = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            return canvas.toDataURL('image/jpeg');
         }
 
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | ABSEN
-        |--------------------------------------------------------------------------
-        */
-
         async function absen() {
-
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDASI LOKASI
-            |--------------------------------------------------------------------------
-            */
-
             if (!currentLat || !currentLng) {
-
                 Swal.fire({
-
                     icon: 'error',
-
-                    title: 'Lokasi belum ditemukan'
+                    title: 'Lokasi Belum Siap',
+                    text: 'Tunggu hingga modul GPS mengunci koordinat Anda.'
                 });
-
                 return;
             }
 
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDASI GPS
-            |--------------------------------------------------------------------------
-            */
-
-            if (currentAccuracy > 100) {
-
+            if (currentAccuracy > 200) {
                 Swal.fire({
-
                     icon: 'warning',
-
-                    title: 'GPS kurang akurat',
-
-                    text: 'Pindah ke area terbuka atau aktifkan GPS'
+                    title: 'GPS Kurang Akurat',
+                    text: 'Pindahlah ke area terbuka agar akurasi GPS meningkat.'
                 });
-
                 return;
             }
-
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | VALIDASI RADIUS
-            |--------------------------------------------------------------------------
-            */
 
             if (currentDistance > 200) {
-
                 Swal.fire({
-
                     icon: 'error',
-
-                    title: 'Di luar radius kantor',
-
-                    text: `${Math.round(currentDistance)} meter`
+                    title: 'Di Luar Radius Kantor',
+                    text: `Anda berada ${Math.round(currentDistance)} meter di luar area operasional rumah sakit.`
                 });
-
                 return;
             }
 
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | LOADING BUTTON
-            |--------------------------------------------------------------------------
-            */
-
-            const btn =
-                document.getElementById('absenBtn');
-
+            const btn = document.getElementById('absenBtn');
             btn.disabled = true;
+            btn.innerHTML = 'Memproses Scan...';
 
-            btn.innerHTML =
-                'Memproses...';
-
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | CAPTURE FOTO
-            |--------------------------------------------------------------------------
-            */
-
-            const image =
-                captureImage();
-
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | REQUEST
-            |--------------------------------------------------------------------------
-            */
+            const image = captureImage();
 
             try {
+                const response = await fetch('/api/device/face/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        latitude: currentLat,
+                        longitude: currentLng,
+                        accuracy: currentAccuracy,
+                        image: image
+                    })
+                });
 
-                const response =
-                    await fetch('/api/device/face/scan', {
-
-                        method: 'POST',
-
-                        headers: {
-
-                            'Content-Type': 'application/json',
-
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-
-                            'Accept': 'application/json'
-                        },
-
-                        credentials: 'include',
-
-                        body: JSON.stringify({
-
-                            latitude: currentLat,
-
-                            longitude: currentLng,
-
-                            accuracy: currentAccuracy,
-
-                            image: image
-                        })
-                    });
-
-
-                const data =
-                    await response.json();
-
+                const data = await response.json();
 
                 Swal.fire({
-
-                    icon: data.success ?
-                        'success' : 'error',
-
+                    icon: data.success ? 'success' : 'error',
                     title: data.message,
-
-                    text: data.distance ?? ''
-
+                    text: data.late_minutes ? `Terlambat masuk ${Math.round(data.late_minutes)} menit` : (data.distance ?? '')
                 }).then(() => {
-
-                    if (
-                        data.success &&
-                        data.type === 'checkin'
-                    ) {
-
-                        window.location.href =
-                            '/dashboard';
+                    if (data.success && data.type === 'checkin') {
+                        window.location.href = '/dashboard';
                     }
-
                 });
-
             } catch (error) {
-
                 Swal.fire({
-
                     icon: 'error',
-
-                    title: 'Terjadi kesalahan server'
+                    title: 'Server Error',
+                    text: 'Gagal menghubungi sistem absensi pusat.'
                 });
-
-                console.log(error);
-
+                console.error(error);
             } finally {
-
                 btn.disabled = false;
-
-                btn.innerHTML =
-                    'Absen Sekarang';
+                btn.innerHTML = 'Absen Sekarang';
             }
         }
     </script>
-
 </x-app-layout>

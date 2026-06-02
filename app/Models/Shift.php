@@ -22,9 +22,14 @@ class Shift extends Model
 
         'category',
 
-        'is_overnight'
+        'is_overnight',
+
+        'allowed_roles'
     ];
 
+    protected $casts = [
+        'allowed_roles' => 'array',
+    ];
     public function employeeShifts()
     {
         return $this->hasMany(EmployeeShift::class);

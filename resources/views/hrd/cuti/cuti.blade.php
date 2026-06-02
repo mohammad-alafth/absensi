@@ -286,7 +286,7 @@
                             </div>
 
                             <!-- ACTION -->
-                            <div class="flex flex-col gap-2">
+                            <div class="flex flex-col gap-3">
 
                                 <!-- DETAIL -->
                                 <button
@@ -297,34 +297,120 @@
                                     Detail
 
                                 </button>
+                                @if($leave->pdf_file)
+                                <a href="{{ asset('storage/' . $leave->pdf_file) }}"
+                                    target="_blank"
+                                    class="mt-2 inline-block bg-red-500 text-white px-4 py-2 rounded-xl">
+                                    Lihat PDF
+                                </a>
+                                @endif
 
-                                <form method="POST"
-                                    action="{{ route('hrd.cuti.approve', $leave->id) }}">
+                                    <div x-data="{ approveModal:false }">
 
-                                    @csrf
+                                        <button
+                                            type="button"
+                                            onclick="openHRDSignatureModal({{ $leave->id }})"
+                                            class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl w-full">
 
+                                            Approve
+
+                                        </button>
+
+                                        <form
+                                            id="hrdApproveForm{{ $leave->id }}"
+                                            method="POST"
+                                            action="{{ route('hrd.cuti.approve', $leave->id) }}"
+                                            class="hidden">
+
+                                            @csrf
+
+                                            <input
+                                                type="hidden"
+                                                name="signature"
+                                                id="hrdSignatureInput{{ $leave->id }}">
+
+                                        </form>
+
+                                    </div>
+
+                                <div x-data="{ rejectModal:false }">
+
+                                    <!-- BUTTON REJECT -->
                                     <button
-                                        class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl w-full">
-
-                                        Approve
-
-                                    </button>
-
-                                </form>
-
-                                <form method="POST"
-                                    action="{{ route('hrd.cuti.reject', $leave->id) }}">
-
-                                    @csrf
-
-                                    <button
+                                        @click="rejectModal = true"
+                                        type="button"
                                         class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-xl w-full">
 
                                         Reject
 
                                     </button>
 
-                                </form>
+                                    <!-- MODAL REJECT -->
+                                    <div
+                                        x-show="rejectModal"
+                                        x-transition
+                                        class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4"
+                                        style="display:none;">
+
+                                        <div
+                                            @click.away="rejectModal = false"
+                                            class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+
+                                            <h2 class="text-xl font-bold text-red-500 mb-2">
+                                                Reject Pengajuan
+                                            </h2>
+
+                                            <p class="text-sm text-gray-500 mb-4">
+                                                Berikan alasan penolakan dari HRD
+                                            </p>
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route('hrd.cuti.reject', $leave->id) }}">
+
+                                                @csrf
+
+                                                <textarea
+                                                    name="note"
+                                                    rows="4"
+                                                    required
+                                                    class="w-full border rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                                    placeholder="Contoh: Pengajuan tidak sesuai ketentuan..."></textarea>
+
+                                                @error('note')
+                                                <p class="text-red-500 text-xs mt-2">
+                                                    {{ $message }}
+                                                </p>
+                                                @enderror
+
+                                                <div class="grid grid-cols-2 gap-3 mt-5">
+
+                                                    <button
+                                                        type="button"
+                                                        @click="rejectModal = false"
+                                                        class="bg-gray-100 hover:bg-gray-200 py-3 rounded-2xl">
+
+                                                        Batal
+
+                                                    </button>
+
+                                                    <button
+                                                        type="submit"
+                                                        class="bg-red-500 hover:bg-red-600 text-white py-3 rounded-2xl">
+
+                                                        Submit Reject
+
+                                                    </button>
+
+                                                </div>
+
+                                            </form>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
 
                             </div>
 
@@ -353,11 +439,125 @@
                 </div>
 
                 @endforelse
+                <div
+                    id="hrdSignatureModal"
+                    class="hidden fixed inset-0 bg-black/50 z-[999] flex items-center justify-center">
+
+                    <div class="bg-white rounded-3xl p-6 w-full max-w-md">
+
+                        <h2 class="font-bold text-xl mb-4 text-center">
+                            Tanda Tangan HRD
+                        </h2>
+
+                        <canvas
+                            id="hrd-signature-pad"
+                            width="350"
+                            height="180"
+                            class="border rounded-xl w-full">
+                        </canvas>
+
+                        <div class="grid grid-cols-2 gap-3 mt-4">
+
+                            <button
+                                type="button"
+                                onclick="clearHRDSignature()"
+                                class="bg-gray-200 py-2 rounded-xl">
+
+                                Clear
+
+                            </button>
+
+                            <button
+                                type="button"
+                                onclick="saveHRDSignature()"
+                                class="bg-blue-500 text-white py-2 rounded-xl">
+
+                                Simpan
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
 
             </div>
 
         </div>
 
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
 
+    <script>
+        let currentHRDLeaveId = null;
+
+        const hrdCanvas =
+            document.getElementById(
+                'hrd-signature-pad'
+            );
+
+        const hrdPad =
+            new SignaturePad(hrdCanvas);
+
+        function openHRDSignatureModal(leaveId) {
+
+            currentHRDLeaveId = leaveId;
+
+            hrdPad.clear();
+
+            document
+                .getElementById(
+                    'hrdSignatureModal'
+                )
+                .classList.remove('hidden');
+
+        }
+
+        function clearHRDSignature() {
+
+            hrdPad.clear();
+
+        }
+
+        function saveHRDSignature() {
+
+            if (hrdPad.isEmpty()) {
+
+                alert(
+                    'Tanda tangan masih kosong'
+                );
+
+                return;
+
+            }
+
+            const signature =
+                hrdPad.toDataURL(
+                    'image/png'
+                );
+
+            document
+                .getElementById(
+                    'hrdSignatureInput' +
+                    currentHRDLeaveId
+                ).value = signature;
+
+            document
+                .getElementById(
+                    'hrdSignatureModal'
+                )
+                .classList.add(
+                    'hidden'
+                );
+
+            document
+                .getElementById(
+                    'hrdApproveForm' +
+                    currentHRDLeaveId
+                )
+                .submit();
+
+        }
+    </script>
 </x-app-layout>

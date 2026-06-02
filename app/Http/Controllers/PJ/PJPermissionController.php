@@ -4,111 +4,114 @@ namespace App\Http\Controllers\PJ;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use Illuminate\Http\Request;
+use App\Services\ApprovalFlowService;
+use Illuminate\Support\Facades\Storage;
 
 class PJPermissionController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | LIST PJ
-    |--------------------------------------------------------------------------
-    */
     public function index()
     {
         $divisionRole = $this->getDivisionRole();
 
         $permissions = Permission::with('user')
-
-            ->where(
-                'pj_status',
-                'pending'
-            )
-
-            ->whereHas(
-                'user',
-                function ($q) use ($divisionRole) {
-
-                    $q->where(
-                        'role',
-                        $divisionRole
-                    );
-                }
-            )
-
+            ->where('pj_status', 'pending')
+            ->whereHas('user', function ($q) use ($divisionRole) {
+                $q->where('role', $divisionRole);
+            })
             ->latest()
-
             ->get();
 
-        return view(
-            'pj.permission.index',
-            compact('permissions')
-        );
+        return view('pj.permission.index', compact('permissions'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | APPROVE PJ
-    |--------------------------------------------------------------------------
-    */
-    public function approve($id)
+    public function approve(Request $request, $id)
     {
-        $permission = Permission::findOrFail($id);
+        $request->validate([
+            'signature' => 'required|string'
+        ]);
+
+        $permission = Permission::with('user')->findOrFail($id);
+
+        if ($permission->pj_status !== 'pending') {
+            return back()->with('error', 'Izin sudah diproses PJ');
+        }
+
+        /*
+        |----------------------------------------------------------
+        | FLOW DARI SERVICE (SINGLE SOURCE OF TRUTH)
+        |----------------------------------------------------------
+        */
+        $flow = ApprovalFlowService::handle($permission->user->role);
 
         $permission->update([
-
             'pj_status' => 'approved',
-
+            'pj_signature' => $request->signature,
             'pj_approved_by' => auth()->id(),
-
             'pj_approved_at' => now(),
-
-            'status' => 'waiting_hrd'
-
+            'status' => $flow['status'],
+            'hrd_status' => $flow['hrd_status'],
         ]);
 
-        return back()->with(
-            'success',
-            'Izin diteruskan ke HRD'
-        );
+        $this->regeneratePdf($permission);
+
+        return back()->with('success', 'Izin diteruskan sesuai flow');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT PJ
-    |--------------------------------------------------------------------------
-    */
-    public function reject($id)
+    public function reject(Request $request, $id)
     {
+        $request->validate([
+            'note' => 'required|min:2'
+        ]);
+
         $permission = Permission::findOrFail($id);
 
+        if ($permission->pj_status !== 'pending') {
+            return back()->with('error', 'Izin sudah diproses PJ');
+        }
+
         $permission->update([
-
             'pj_status' => 'rejected',
-
+            'pj_note' => $request->note,
             'pj_approved_by' => auth()->id(),
-
             'pj_approved_at' => now(),
-
-            'status' => 'rejected'
-
+            'status' => 'rejected',
         ]);
 
-        return back()->with(
-            'success',
-            'Izin ditolak PJ'
-        );
+        return back()->with('success', 'Izin ditolak PJ');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DIVISION
-    |--------------------------------------------------------------------------
-    */
     private function getDivisionRole()
     {
-        return str_replace(
-            'pj_',
-            '',
-            auth()->user()->role
+        $role = auth()->user()->role;
+
+        return str_starts_with($role, 'pj_')
+            ? str_replace('pj_', '', $role)
+            : $role;
+    }
+
+    private function regeneratePdf($permission)
+    {
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'pdf.permission-letter',
+            [
+                'permission' => $permission->fresh([
+                    'user',
+                    'pjApprover',
+                    'hrdApprover'
+                ])
+            ]
         );
+
+        $fileName = "permission/permission_{$permission->id}.pdf";
+
+        Storage::disk('public')->put(
+            $fileName,
+            $pdf->output()
+        );
+
+        $permission->update([
+            'pdf_file' => $fileName
+        ]);
     }
 }

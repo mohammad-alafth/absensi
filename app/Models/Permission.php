@@ -18,6 +18,10 @@ class Permission extends Model
 
         'alasan',
         'lampiran',
+        'employee_signature',
+        'pj_signature',
+        'hrd_signature',
+        'pdf_file',
 
         'status',
 
@@ -26,21 +30,20 @@ class Permission extends Model
         'pj_note',
         'pj_approved_by',
         'pj_approved_at',
-
+        'pj_note',
         // HRD
         'hrd_status',
         'hrd_note',
         'hrd_approved_by',
         'hrd_approved_at',
-    ];
 
+        'hrd_note',
+    ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-
-
     public function pjApprover()
     {
         return $this->belongsTo(
@@ -48,13 +51,19 @@ class Permission extends Model
             'pj_approved_by'
         );
     }
-
-
     public function hrdApprover()
     {
         return $this->belongsTo(
             User::class,
             'hrd_approved_by'
         );
+    }
+    public function directorApprover()
+    {
+        return $this->belongsTo(User::class, 'director_approved_by');
+    }
+    public function headApprover()
+    {
+        return $this->belongsTo(User::class, 'head_approved_by');
     }
 }

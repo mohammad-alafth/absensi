@@ -63,7 +63,7 @@ class FaceController extends Controller
         | VALIDASI GPS
         |--------------------------------------------------------------------------
         */
-        if ($request->accuracy && $request->accuracy > 100) {
+        if ($request->accuracy && $request->accuracy > 200) {
             return response()->json([
                 'success' => false,
                 'message' => 'GPS tidak akurat, aktifkan GPS',
@@ -111,8 +111,18 @@ class FaceController extends Controller
         | SHIFT TIME
         |--------------------------------------------------------------------------
         */
-        $shiftStart = Carbon::parse($schedule['start_time']);
-        $shiftEnd   = Carbon::parse($schedule['end_time']);
+        $startTime = $schedule['start_time'] ?? null;
+        $endTime   = $schedule['end_time'] ?? null;
+
+        if (!$startTime || !$endTime) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal shift tidak valid'
+            ], 403);
+        }
+
+        $shiftStart = Carbon::today()->setTimeFromTimeString($startTime);
+        $shiftEnd   = Carbon::today()->setTimeFromTimeString($endTime);
 
         if (!empty($schedule['is_overnight']) && $schedule['is_overnight']) {
             $shiftEnd->addDay();
@@ -123,7 +133,8 @@ class FaceController extends Controller
         | GRACE PERIOD (15 MENIT)
         |--------------------------------------------------------------------------
         */
-        $graceMinutes = 15;
+        $graceMinutes =  $schedule['grace_minutes'] ?? 15;
+
         $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
 
         /*
@@ -166,15 +177,21 @@ class FaceController extends Controller
         | CHECK IN
         |--------------------------------------------------------------------------
         */
+        /*
+|--------------------------------------------------------------------------
+| CHECK IN
+|--------------------------------------------------------------------------
+*/
         if (!$attendance) {
 
             /*
-            |--------------------------------------------------------------
-            | VALIDASI JAM MASUK
-            |--------------------------------------------------------------
-            */
+    |--------------------------------------------------------------
+    | VALIDASI JAM MASUK
+    |--------------------------------------------------------------
+    */
 
             if ($now->lt($checkinStart)) {
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Belum masuk jam absensi'
@@ -182,36 +199,74 @@ class FaceController extends Controller
             }
 
             /*
-            |--------------------------------------------------------------
-            | TERLAMBAT > GRACE PERIOD
-            |--------------------------------------------------------------
-            */
+    |--------------------------------------------------------------
+    | STATUS ABSENSI
+    |--------------------------------------------------------------
+    */
+
+            $status = 'hadir';
+
+            $lateMinutes = 0;
+
+            /*
+    |--------------------------------------------------------------
+    | CEK KETERLAMBATAN
+    |--------------------------------------------------------------
+    */
+
             if ($now->gt($lateLimit)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anda terlambat lebih dari 15 menit, tidak bisa melakukan absen'
-                ], 403);
+
+                $status = 'terlambat';
+
+                /*
+        |----------------------------------------------------------
+        | HITUNG KETERLAMBATAN
+        |----------------------------------------------------------
+        */
+
+                $lateMinutes = (int) round($lateLimit->diffInMinutes($now));
             }
 
             /*
-            |--------------------------------------------------------------
-            | CREATE ATTENDANCE
-            |--------------------------------------------------------------
-            */
+    |--------------------------------------------------------------
+    | CREATE ATTENDANCE
+    |--------------------------------------------------------------
+    */
+
             Attendance::create([
-                'user_id'   => $user->id,
-                'tanggal'   => $today,
-                'jam_masuk' => $now,
-                'latitude'  => $request->latitude,
-                'longitude' => $request->longitude,
-                'status'    => $now->gt($shiftStart) ? 'terlambat' : 'hadir'
+
+                'user_id'      => $user->id,
+
+                'tanggal'      => $today,
+
+                'jam_masuk'    => $now,
+
+                'latitude'     => $request->latitude,
+
+                'longitude'    => $request->longitude,
+
+                'status'       => $status,
+
+                'late_minutes' => $lateMinutes
+
             ]);
 
             return response()->json([
+
                 'success' => true,
-                'type'    => 'checkin',
-                'message' => 'Check In berhasil',
+
+                'type' => 'checkin',
+
+                'message' => $status === 'terlambat'
+                    ? 'Check In berhasil (Terlambat ' . $lateMinutes . ' menit)'
+                    : 'Check In berhasil',
+
+                'status' => $status,
+
+                'late_minutes' => (int) round($lateMinutes),
+
                 'distance' => round($distance, 2) . ' meter'
+
             ]);
         }
 
@@ -241,20 +296,46 @@ class FaceController extends Controller
             ], 403);
         }
 
+
+        /*
+|--------------------------------------------------------------------------
+| HITUNG OVERTIME
+|--------------------------------------------------------------------------
+*/
+        $overtimeMinutes = 0;
+
+        if ($now->gt($shiftEnd)) {
+
+            $overtimeMinutes = $shiftEnd->diffInMinutes($now);
+        }
+
         /*
         |--------------------------------------------------------------------------
         | CHECKOUT
         |--------------------------------------------------------------------------
         */
         $attendance->update([
-            'jam_keluar' => $now
+
+            'jam_keluar'       => $now,
+
+            'overtime_minutes' => $overtimeMinutes
+
         ]);
 
         return response()->json([
+
             'success' => true,
+
             'type'    => 'checkout',
-            'message' => 'Check Out berhasil',
+
+            'message' => $overtimeMinutes > 0
+                ? 'Check Out berhasil (Lembur ' . $overtimeMinutes . ' menit)'
+                : 'Check Out berhasil',
+
+            'overtime_minutes' => $overtimeMinutes,
+
             'distance' => round($distance, 2) . ' meter'
+
         ]);
     }
 
@@ -265,7 +346,7 @@ class FaceController extends Controller
     */
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        $earthRadius = 6371000;
+        $earthRadius = 637200;
 
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
@@ -279,5 +360,15 @@ class FaceController extends Controller
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
         return $earthRadius * $c;
+    }
+
+    public function showFacePage()
+    {
+        // Cek apakah hari ini libur
+        if ($this->isHoliday(Carbon::today())) {
+            return redirect()->back()->with('error', 'Tidak bisa absen di hari libur!');
+        }
+
+        return view('face.scan');
     }
 }

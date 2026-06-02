@@ -4,6 +4,9 @@ namespace App\Http\Controllers\HRD;
 
 use App\Http\Controllers\Controller;
 use App\Models\Leave;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class HRDLeaveController extends Controller
 {
@@ -14,19 +17,21 @@ class HRDLeaveController extends Controller
     */
     public function index()
     {
-        $leaves = Leave::with([
-            'user',
-            'pjApprover'
-        ])
-            ->where('pj_status', 'approved')
-            ->where('hrd_status', 'pending')
-            ->latest()
-            ->get();
+        $role = auth()->user()->role;
 
-        return view(
-            'hrd.cuti.cuti',
-            compact('leaves')
-        );
+        if ($role === 'hrd') {
+            $leaves = Leave::where('status', 'waiting_hrd')->get();
+        }
+
+        if ($role === 'head_pegawai') {
+            $leaves = Leave::where('status', 'waiting_head')->get();
+        }
+
+        if ($role === 'director') {
+            $leaves = Leave::where('status', 'waiting_director')->get();
+        }
+
+        return view('hrd.cuti.cuti', compact('leaves'));
     }
 
     /*
@@ -34,25 +39,40 @@ class HRDLeaveController extends Controller
     | APPROVE HRD
     |--------------------------------------------------------------------------
     */
-    public function approve($id)
+    public function approve(Request $request, $id)
     {
         $leave = Leave::findOrFail($id);
 
-        $leave->update([
+        $role = auth()->user()->role;
 
-            'hrd_status' => 'approved',
+        if ($role === 'head_pegawai') {
+            $leave->update([
+                'status' => 'waiting_director',
+            ]);
+        }
 
-            'hrd_approved_by' => auth()->id(),
+        if ($role === 'director') {
+            $leave->update([
+                'status' => 'approved',
+                'hrd_status' => 'approved', // Opsional: set agar PDF terbaca final
+                'hrd_approved_at' => now(), // Catat waktu persetujuan final
+            ]);
+            $this->regenerateLeavePdf($leave);
 
-            'hrd_approved_at' => now(),
+            return back()->with('success', 'Disetujui Final oleh Direktur');
+        }
 
-            'status' => 'approved'
-        ]);
+        if ($role === 'hrd') {
+            $leave->update([
+                'status' => 'approved',
+                'hrd_status' => 'approved',
+                'hrd_approved_by' => auth()->id(),
+                'hrd_approved_at' => now(),
+            ]);
+            $this->regenerateLeavePdf($leave);
+        }
 
-        return back()->with(
-            'success',
-            'Cuti berhasil diapprove HRD'
-        );
+        return back()->with('success', 'Disetujui oleh HRD');
     }
 
     /*
@@ -60,13 +80,26 @@ class HRDLeaveController extends Controller
     | REJECT HRD
     |--------------------------------------------------------------------------
     */
-    public function reject($id)
+    public function reject(Request $request, $id)
     {
+        $request->validate([
+            'note' => 'required|string|min:2|max:500'
+        ]);
+
         $leave = Leave::findOrFail($id);
+        if ($leave->hrd_status != 'pending') {
+
+            return back()->with(
+                'error',
+                'Cuti sudah diproses HRD'
+            );
+        }
 
         $leave->update([
 
             'hrd_status' => 'rejected',
+
+            'hrd_note' => $request->note,
 
             'hrd_approved_by' => auth()->id(),
 
@@ -74,10 +107,35 @@ class HRDLeaveController extends Controller
 
             'status' => 'rejected'
         ]);
+        $this->regenerateLeavePdf($leave);
 
         return back()->with(
             'success',
             'Cuti ditolak HRD'
         );
+    }
+    private function regenerateLeavePdf($leave)
+    {
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'pdf.leave-letter',
+            [
+                'leave' => $leave->fresh([
+                    'user',
+                    'pjApprover',
+                    'hrdApprover'
+                ])
+            ]
+        );
+
+        $fileName = "leaves/leave_{$leave->id}.pdf";
+
+        Storage::disk('public')->put(
+            $fileName,
+            $pdf->output()
+        );
+
+        $leave->update([
+            'pdf_file' => $fileName
+        ]);
     }
 }

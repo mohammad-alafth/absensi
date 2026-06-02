@@ -11,79 +11,84 @@ class HRDDashboardController extends Controller
 {
     public function index()
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Pending Leave
-        |--------------------------------------------------------------------------
-        */
-
-        $pendingLeave = Leave::where(
-            'pj_status',
-            'approved'
-        )
-            ->where(
-                'hrd_status',
-                'pending'
-            )
-            ->count();
+        $role = auth()->user()->role;
 
         /*
-        |--------------------------------------------------------------------------
-        | Pending Permission
-        |--------------------------------------------------------------------------
-        */
-
-        $pendingPermission = Permission::where(
-            'pj_status',
-            'approved'
-        )
-            ->where(
-                'hrd_status',
-                'pending'
-            )
-            ->count();
+    |--------------------------------------------------------------------------
+    | BASE QUERY
+    |--------------------------------------------------------------------------
+    */
+        $leaves = Leave::query();
+        $permissions = Permission::query();
+        $overtimes = Overtime::query();
 
         /*
-        |--------------------------------------------------------------------------
-        | Pending Overtime
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | FILTER BERDASARKAN ROLE
+    |--------------------------------------------------------------------------
+    */
 
-        $pendingOvertime = Overtime::where(
-            'pj_status',
-            'approved'
-        )
-            ->where(
-                'hrd_status',
-                'pending'
-            )
-            ->count();
+        if ($role === 'hrd') {
+
+            $leaves->where('status', 'waiting_hrd');
+            $permissions->where('status', 'waiting_hrd');
+            $overtimes->where('status', 'waiting_hrd');
+        }
+
+        if ($role === 'head_pegawai') {
+
+            $leaves->where('status', 'waiting_head');
+            $permissions->where('status', 'waiting_head');
+            $overtimes->where('status', 'waiting_head');
+        }
+
+        if ($role === 'director') {
+
+            $leaves->where('status', 'waiting_director');
+            $permissions->where('status', 'waiting_director');
+            $overtimes->where('status', 'waiting_director');
+        }
 
         /*
-        |--------------------------------------------------------------------------
-        | Recent Leave
-        |--------------------------------------------------------------------------
-        */
-
-        $recentLeaves = Leave::with('user')
-            ->latest()
-            ->take(10)
-            ->get();
+    |--------------------------------------------------------------------------
+    | COUNTS
+    |--------------------------------------------------------------------------
+    */
+        $pendingLeave = $leaves->count();
+        $pendingPermission = $permissions->count();
+        $pendingOvertime = $overtimes->count();
 
         /*
-        |--------------------------------------------------------------------------
-        | Return View
-        |--------------------------------------------------------------------------
-        */
+    |--------------------------------------------------------------------------
+    | RECENT (ROLE FILTERED)
+    |--------------------------------------------------------------------------
+    */
+        $leaves = $leaves->with('user')->latest()->take(5)->get()->map(function ($item) {
+            $item->type = 'Cuti';
+            return $item;
+        });
 
-        return view(
-            'hrd.dashboard_hrd',
-            compact(
-                'pendingLeave',
-                'pendingPermission',
-                'pendingOvertime',
-                'recentLeaves'
-            )
-        );
+        $permissions = $permissions->with('user')->latest()->take(5)->get()->map(function ($item) {
+            $item->type = 'Izin';
+            return $item;
+        });
+
+        $overtimes = $overtimes->with('user')->latest()->take(5)->get()->map(function ($item) {
+            $item->type = 'Lembur';
+            return $item;
+        });
+
+        $recentSubmissions = $leaves
+            ->concat($permissions)
+            ->concat($overtimes)
+            ->sortByDesc('created_at')
+            ->take(10);
+
+        return view('hrd.dashboard_hrd', compact(
+            'pendingLeave',
+            'pendingPermission',
+            'pendingOvertime',
+            'recentSubmissions'
+        ));
     }
 }

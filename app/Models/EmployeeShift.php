@@ -18,7 +18,10 @@ class EmployeeShift extends Model
 
         'end_date',
 
-        'assigned_by'
+        'assigned_by',
+        'start_time',
+        'end_time',
+        'is_overnight'
     ];
 
     public function user()

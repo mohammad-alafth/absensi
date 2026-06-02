@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Leave;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Storage;
+use App\Services\ApprovalFlowService;
 
 class LeaveController extends Controller
 {
@@ -22,7 +25,9 @@ class LeaveController extends Controller
             ->where('status', 'approved')
             ->sum('total_days');
 
-        $remainingLeave = 4 - $usedLeave;
+        $quota = auth()->user()->leave_quota;
+
+        $remainingLeave = $quota - $usedLeave;
 
         if ($remainingLeave < 0) {
             $remainingLeave = 0;
@@ -52,16 +57,17 @@ class LeaveController extends Controller
 
             'return_date' => 'nullable|date',
 
-            'leave_type' =>
-            'required|in:Tahunan,Sakit,Melahirkan,Menikah,Keluarga,Khusus',
+            'leave_type' => 'required|string',
 
-            'reason' => 'required|string|min:5',
+            'reason' => 'required|string|min:2',
 
             'delegate_name' => 'nullable|string|max:100',
 
             'delegate_nik' => 'nullable|string|max:30',
 
             'emergency_contact' => 'nullable|string|max:30',
+            
+            'employee_signature' => 'required|string',
 
         ]);
 
@@ -105,57 +111,52 @@ class LeaveController extends Controller
             $startDate->diffInDays(
                 $endDate
             ) + 1;
+        /*
+|--------------------------------------------------------------------------
+| VALIDASI QUOTA CUTI
+|--------------------------------------------------------------------------
+*/
+        $usedLeave = Leave::where(
+            'user_id',
+            auth()->id()
+        )
+            ->where('status', 'approved')
+            ->sum('total_days');
 
+        $remainingLeave =
+            auth()->user()->leave_quota - $usedLeave;
+
+        if ($totalDays > $remainingLeave) {
+
+            return back()
+                ->withErrors([
+                    'start_date' =>
+                    'Sisa cuti tidak mencukupi'
+                ])
+                ->withInput();
+        }
 
         /*
-        |--------------------------------------------------------------------------
-        | FLOW ROLE
-        |--------------------------------------------------------------------------
-        */
+|--------------------------------------------------------------------------
+| FLOW ROLE
+|--------------------------------------------------------------------------
+*/
         $userRole = auth()->user()->role;
 
-        // default user biasa
-        $status = 'pending';
+        $flow = ApprovalFlowService::handle($userRole);
 
-        $pjStatus = 'pending';
+        $status = $flow['status'];
 
-        $hrdStatus = 'pending';
+        $pjStatus = $flow['pj_status'];
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | PJ
-        |--------------------------------------------------------------------------
-        */
-        if (str_starts_with($userRole, 'pj_')) {
-
-            $status = 'waiting_hrd';
-
-            $pjStatus = 'approved';
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | HRD
-        |--------------------------------------------------------------------------
-        */
-        if ($userRole == 'hrd') {
-
-            $status = 'approved';
-
-            $pjStatus = 'approved';
-
-            $hrdStatus = 'approved';
-        }
-
+        $hrdStatus = $flow['hrd_status'];
 
         /*
         |--------------------------------------------------------------------------
         | Simpan
         |--------------------------------------------------------------------------
         */
-        Leave::create([
+        $leave = Leave::create([
 
             'user_id' => auth()->id(),
 
@@ -179,28 +180,38 @@ class LeaveController extends Controller
 
             'emergency_contact' => $request->emergency_contact,
 
-            /*
-            |--------------------------------------------------------------------------
-            | STATUS
-            |--------------------------------------------------------------------------
-            */
+            'employee_signature' => $request->employee_signature,
+
             'status' => $status,
 
-            /*
-            |--------------------------------------------------------------------------
-            | PJ
-            |--------------------------------------------------------------------------
-            */
             'pj_status' => $pjStatus,
 
-            /*
-            |--------------------------------------------------------------------------
-            | HRD
-            |--------------------------------------------------------------------------
-            */
             'hrd_status' => $hrdStatus,
         ]);
+        /*
+    |--------------------------------------------------------------------------
+    | GENERATE PDF
+    |--------------------------------------------------------------------------
+    */
+        $pdf = Pdf::loadView(
+            'pdf.leave-letter',
+            [
+                'leave'          => $leave->load('user'),
+                'remainingLeave' => $remainingLeave, // Ambil data sisa jatah sebelum cuti ini disetujui
+                'usedLeave'      => $usedLeave       // Ambil data total cuti terpakai sebelumnya
+            ]
+        );
 
+        $fileName = 'leave-pdf/' . $leave->id . '.pdf';
+
+        Storage::disk('public')->put(
+            $fileName,
+            $pdf->output()
+        );
+
+        $leave->update([
+            'pdf_file' => $fileName
+        ]);
 
         return redirect('/dashboard')
             ->with(
@@ -212,28 +223,36 @@ class LeaveController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | APPROVE / REJECT
+    | DOWNLOAD PDF FORM CUTI
     |--------------------------------------------------------------------------
     */
-    public function approve(Request $request, $id)
+    public function downloadPdf($id)
     {
         $leave = Leave::findOrFail($id);
 
-        $request->validate([
-            'status' => 'required|in:approved,rejected'
+        // Validasi Keamanan: Memastikan pegawai hanya bisa mengunduh berkas miliknya sendiri
+        if ($leave->user_id !== auth()->id() && auth()->user()->role !== 'hrd' && auth()->user()->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $filePath = 'storage/' . $leave->pdf_file;
+
+        if ($leave->pdf_file && file_exists(public_path($filePath))) {
+            return response()->download(public_path($filePath), 'Surat_Cuti_' . $leave->id . '.pdf');
+        }
+
+        // Jika file biner fisik hilang di storage, generate ulang secara instan
+        $usedLeave = Leave::where('user_id', $leave->user_id)->where('status', 'approved')->where('id', '<', $leave->id)->sum('total_days');
+        $remainingLeave = $leave->user->leave_quota - $usedLeave;
+
+        $pdf = Pdf::loadView('pdf.leave-letter', [
+            'leave' => $leave->load('user'),
+            'remainingLeave' => $remainingLeave,
+            'usedLeave' => $usedLeave
         ]);
 
-        $leave->update([
-            'status' => $request->status
-        ]);
-
-        return back()->with(
-            'success',
-            'Status cuti berhasil diperbarui'
-        );
+        return $pdf->stream('Surat_Cuti_' . $leave->id . '.pdf');
     }
-
-
     /*
     |--------------------------------------------------------------------------
     | DATA CUTI USER LOGIN

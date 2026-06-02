@@ -24,17 +24,36 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request)
     {
+        // 1. Authenticate user (cek email & password)
         $request->authenticate();
 
-        $request->session()->regenerate();
-
-        // 🔥 ambil user
+        // 2. Ambil user yang baru saja login
         $user = Auth::user();
 
-        // 🔥 buat token sanctum
+        // 3. CEK STATUS APPROVAL
+        if (!$user->is_approved) {
+            // Logout paksa jika belum di-approve
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            // Lempar error kembali ke login page
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Akun Anda belum disetujui oleh HRD. Mohon tunggu konfirmasi.'
+                ], 403);
+            }
+
+            throw ValidationException::withMessages([
+                'email' => 'Akun Anda belum disetujui oleh HRD. Mohon tunggu konfirmasi.',
+            ]);
+        }
+
+        // 4. Jika sudah di-approve, lanjutkan proses normal
+        $request->session()->regenerate();
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // 🔥 kalau request dari API (fetch / ajax)
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Login berhasil',
