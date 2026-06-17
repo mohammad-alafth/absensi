@@ -64,7 +64,7 @@
 
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-100/70 border border-white p-5 sm:p-7 space-y-5">
 
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-gray-100">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-1 border-b border-gray-100">
 
                     <div>
                         <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 text-[#1E40AF] text-xs font-bold hover:underline transition">
@@ -80,7 +80,7 @@
                     </div>
 
 
-                    <div class="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+                    <div class="flex flex-col sm:flex-row items-center gap-1 w-full lg:w-auto">
 
                         <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center w-full sm:w-52 h-[38px]">
                             <input type="text" id="searchInput" placeholder="Cari nama atau role..."
