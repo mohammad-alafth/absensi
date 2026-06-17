@@ -394,12 +394,16 @@ Route::middleware([
         | SHIFT
         |--------------------------------------------------------------------------
     */
-
+        Route::get(
+            '/hrd/employee-shifts/{user}',
+            [HRDController::class, 'employeeShifts']
+        )->name('hrd.employee.shifts');
     Route::middleware(['auth'])->group(function () {
         // Rute Shift Umum (Bisa diakses user)
         Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
         Route::post('/shift/assign', [ShiftController::class, 'assign'])->name('shift.assign');
         Route::get('/shift/data', [ShiftController::class, 'data'])->name('shift.data');
+        Route::get('/shifts/calendar-events', [ShiftController::class, 'calendarEvents'])->name('shift.calendar');
 
         // Rute Shift Management (Khusus HRD)
         Route::prefix('hrd')->name('hrd.')->group(function () {
@@ -409,6 +413,7 @@ Route::middleware([
             // Store tetap menggunakan POST
             Route::post('/shifts/store', [ShiftManagementController::class, 'store'])->name('shifts.store');
         });
+
     });
 });
 

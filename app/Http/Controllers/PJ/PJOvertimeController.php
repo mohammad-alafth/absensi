@@ -98,7 +98,9 @@ class PJOvertimeController extends Controller
                 'overtime' => $overtime->fresh([
                     'user',
                     'pjApprover',
-                    'hrdApprover'
+                    'hrdApprover',
+                    'headApprover',
+                    'directorApprover'
                 ])
             ]
         );

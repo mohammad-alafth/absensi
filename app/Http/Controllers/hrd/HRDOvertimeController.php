@@ -41,24 +41,35 @@ class HRDOvertimeController extends Controller
     */
     public function approve(Request $request, $id)
     {
+        $request->validate(['signature' => 'required']);
         $overtime = Overtime::findOrFail($id);
-
         $role = auth()->user()->role;
 
         if ($role === 'head_pegawai') {
-            $overtime->update(['status' => 'waiting_director']);
+            $overtime->update([
+                'status' => 'waiting_director',
+                'head_status' => 'approved',
+                'head_signature' => $request->signature,
+                'head_approved_by' => auth()->id(),
+                'head_approved_at' => now(),
+            ]);
+            $this->regeneratePdf($overtime);
+            return back()->with('success', 'Disetujui Head, diteruskan ke Direktur');
         }
 
         if ($role === 'director') {
             $overtime->update([
                 'status' => 'approved',
-                'hrd_status' => 'approved', // Opsional: set agar PDF terbaca final
-                'hrd_approved_at' => now(), // Catat waktu persetujuan final
+                'director_status' => 'approved',
+                'director_signature' => $request->signature,
+                'director_approved_by' => auth()->id(),
+                'director_approved_at' => now(),
             ]);
             $this->regeneratePdf($overtime);
-
-            return back()->with('success', 'Disetujui Final oleh Direktur');
+            return back()->with('success', 'Disetujui sesuai alur');
         }
+
+
 
         if ($role === 'hrd') {
             $overtime->update([
@@ -80,7 +91,9 @@ class HRDOvertimeController extends Controller
                 'overtime' => $overtime->fresh([
                     'user',
                     'pjApprover',
-                    'hrdApprover'
+                    'hrdApprover',
+                    'headApprover',
+                    'directorApprover'
                 ])
             ]
         );

@@ -147,7 +147,9 @@ class OvertimeController extends Controller
     {
         $overtimes = Overtime::with([
             'pjApprover',
-            'hrdApprover'
+            'hrdApprover',
+            'headApprover',
+            'directorApprover'
         ])
             ->where('user_id', auth()->id())
             ->latest()

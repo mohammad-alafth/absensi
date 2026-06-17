@@ -100,7 +100,9 @@ class PJLeaveController extends Controller
                 'leave' => $leave->fresh([
                     'user',
                     'pjApprover',
-                    'hrdApprover'
+                    'hrdApprover',
+                    'headApprover',
+                    'directorApprover'
                 ])
             ]
         );

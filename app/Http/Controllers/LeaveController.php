@@ -66,7 +66,7 @@ class LeaveController extends Controller
             'delegate_nik' => 'nullable|string|max:30',
 
             'emergency_contact' => 'nullable|string|max:30',
-            
+
             'employee_signature' => 'required|string',
 
         ]);
@@ -291,7 +291,9 @@ class LeaveController extends Controller
     {
         $leaves = Leave::with([
             'pjApprover',
-            'hrdApprover'
+            'hrdApprover',
+            'headApprover',
+            'directorApprover'
         ])
             ->where('user_id', auth()->id())
             ->latest()

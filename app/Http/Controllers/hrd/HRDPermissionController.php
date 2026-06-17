@@ -14,17 +14,26 @@ class HRDPermissionController extends Controller
     {
         $role = auth()->user()->role;
 
-        if ($role === 'hrd') {
-            $permissions = Permission::where('status', 'waiting_hrd')->get();
+        // 1. Definisikan mapping status yang dicari berdasarkan role
+        // Ini menggantikan banyak 'if'
+        $statusMapping = [
+            'hrd'          => 'waiting_hrd',
+            'head_pegawai' => 'waiting_head',
+            'director'     => 'waiting_director',
+        ];
+
+        // 2. Ambil status yang sesuai, jika role tidak ada di mapping, gunakan array kosong
+        $targetStatus = $statusMapping[$role] ?? null;
+
+        if (!$targetStatus) {
+            return back()->with('error', 'Role tidak memiliki akses ke halaman ini.');
         }
 
-        if ($role === 'head_pegawai') {
-            $permissions = Permission::where('status', 'waiting_head')->get();
-        }
-
-        if ($role === 'director') {
-            $permissions = Permission::where('status', 'waiting_director')->get();
-        }
+        // 3. Query dinamis
+        $permissions = Permission::with('user')
+            ->where('status', $targetStatus)
+            ->latest()
+            ->get();
 
         return view('hrd.permission.izin', compact('permissions'));
     }
@@ -54,17 +63,22 @@ class HRDPermissionController extends Controller
 
             $permission->update([
                 'status' => 'waiting_director',
+                'head_status' => 'approved',
+                'head_signature' => $request->signature,
+                'head_approved_by' => auth()->id(),
+                'head_approved_at' => now(),
             ]);
-
+            $this->regeneratePdf($permission);
             return back()->with('success', 'Diteruskan ke Direktur');
         }
 
         if ($role === 'director') {
-
             $permission->update([
                 'status' => 'approved',
-                'hrd_status' => 'approved', // Opsional: set agar PDF terbaca final
-                'hrd_approved_at' => now(), // Catat waktu persetujuan final
+                'director_status' => 'approved',
+                'director_signature' => $request->signature,
+                'director_approved_by' => auth()->id(),
+                'director_approved_at' => now(),
             ]);
             $this->regeneratePdf($permission);
 
@@ -133,7 +147,9 @@ class HRDPermissionController extends Controller
                 'permission' => $permission->fresh([
                     'user',
                     'pjApprover',
-                    'hrdApprover'
+                    'hrdApprover',
+                    'headApprover',
+                    'directorApprover'
                 ])
             ]
         );

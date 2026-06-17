@@ -49,7 +49,7 @@ class PJPermissionController extends Controller
             'pj_signature' => $request->signature,
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
-            'status' => $flow['status'],
+            'status' => 'waiting_hrd',
             'hrd_status' => $flow['hrd_status'],
         ]);
 
@@ -92,26 +92,23 @@ class PJPermissionController extends Controller
 
     private function regeneratePdf($permission)
     {
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
-            'pdf.permission-letter',
-            [
-                'permission' => $permission->fresh([
-                    'user',
-                    'pjApprover',
-                    'hrdApprover'
-                ])
-            ]
-        );
+        // Tambahkan 'headApprover' dan 'directorApprover' di sini agar tidak error saat dipanggil di view
+        $permission = $permission->fresh([
+            'user',
+            'pjApprover',
+            'hrdApprover',
+            'headApprover',
+            'directorApprover'
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.permission-letter', [
+            'permission' => $permission
+        ]);
 
         $fileName = "permission/permission_{$permission->id}.pdf";
 
-        Storage::disk('public')->put(
-            $fileName,
-            $pdf->output()
-        );
+        \Storage::disk('public')->put($fileName, $pdf->output());
 
-        $permission->update([
-            'pdf_file' => $fileName
-        ]);
+        $permission->update(['pdf_file' => $fileName]);
     }
 }

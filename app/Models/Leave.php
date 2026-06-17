@@ -58,6 +58,17 @@ class Leave extends Model
         'hrd_note',
         'hrd_approved_by',
         'hrd_approved_at',
+        // Tambahkan kolom baru di bawah ini:
+        'head_status',
+        'director_status',
+        'head_note',
+        'director_note',
+        'head_signature',
+        'director_signature',
+        'head_approved_by',
+        'director_approved_by',
+        'head_approved_at',
+        'director_approved_at',
     ];
 
     /*

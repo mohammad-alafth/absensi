@@ -7,17 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class EmployeeShift extends Model
 {
     protected $fillable = [
-
         'user_id',
-
-        'shift_id',
-
         'shift_date',
-
+        'shift_id',
         'start_date',
-
         'end_date',
-
         'assigned_by',
         'start_time',
         'end_time',

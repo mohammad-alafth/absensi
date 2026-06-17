@@ -48,14 +48,20 @@ class HRDLeaveController extends Controller
         if ($role === 'head_pegawai') {
             $leave->update([
                 'status' => 'waiting_director',
+                'head_status' => 'approved',
+                'head_signature' => $request->signature, // Menyimpan TTD Head
+                'head_approved_by' => auth()->id(),
+                'head_approved_at' => now(),
             ]);
         }
 
         if ($role === 'director') {
             $leave->update([
                 'status' => 'approved',
-                'hrd_status' => 'approved', // Opsional: set agar PDF terbaca final
-                'hrd_approved_at' => now(), // Catat waktu persetujuan final
+                'director_status' => 'approved',
+                'director_signature' => $request->signature, // Menyimpan TTD Direktur
+                'director_approved_by' => auth()->id(),
+                'director_approved_at' => now(),
             ]);
             $this->regenerateLeavePdf($leave);
 
@@ -122,7 +128,9 @@ class HRDLeaveController extends Controller
                 'leave' => $leave->fresh([
                     'user',
                     'pjApprover',
-                    'hrdApprover'
+                    'hrdApprover',
+                    'headApprover',
+                    'directorApprover'
                 ])
             ]
         );

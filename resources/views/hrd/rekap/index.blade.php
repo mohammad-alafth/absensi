@@ -6,6 +6,56 @@
             background-color: #f0f2f9;
             /* Membuat warna latar belakang luar lebih gelap agar elemen putih menonjol */
         }
+
+        /* HEADER */
+        .fc .fc-toolbar-title {
+            color: #0f172a;
+            font-weight: 800;
+        }
+
+        .fc .fc-button-primary {
+            background: #1E40AF !important;
+            border: none !important;
+        }
+
+        .fc .fc-button-primary:hover {
+            background: #1d4ed8 !important;
+        }
+
+        .fc .fc-button-primary:disabled {
+            background: #94a3b8 !important;
+        }
+
+        /* GRID */
+        .fc-theme-standard td,
+        .fc-theme-standard th {
+            border-color: #e2e8f0;
+        }
+
+        /* HARI */
+        .fc-col-header-cell {
+            background: #f8fafc;
+        }
+
+        /* EVENT */
+        .fc-event {
+            border-radius: 8px !important;
+            border: none !important;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 4px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
+        }
+
+        /* TODAY */
+        .fc .fc-day-today {
+            background: #eff6ff !important;
+        }
+
+        /* TIME SLOT */
+        .fc-timegrid-slot {
+            background: #fff;
+        }
     </style>
 
     <div class="min-h-screen bg-[#f0f2f9] px-3 sm:px-5 py-6 pb-28">
@@ -48,18 +98,22 @@
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 w-full sm:w-auto flex items-center h-[38px]">
                             <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex gap-1 items-center m-0 w-full">
                                 <input type="hidden" name="month" value="{{ $month }}">
-                                <select name="role" class="rounded-lg border-gray-200 bg-white text-xs py-1 px-2 focus:border-indigo-500 focus:ring-0 text-gray-600 font-medium h-[30px]">
+                                <select name="role"
+                                    class="rounded-lg border-gray-200 bg-white text-xs py-1 px-2">
+
                                     <option value="all">Semua Unit</option>
-                                    <option value="nurse">Nurse / Perawat</option>
-                                    <option value="security">Security</option>
-                                    <option value="cs">Customer Service</option>
-                                    <option value="administrasi">Administrasi</option>
-                                    <option value="ro">Reverse Osmosis</option>
-                                    <option value="kasir">Kasir</option>
-                                    <option value="finance">Finance / Keuangan</option>
-                                    <option value="pharmacist">Apoteker</option>
-                                    <option value="casemix">K3</option>
-                                    <option value="ipsrs">IPSRS</option>
+
+                                    @foreach($roles as $role)
+
+                                    @php
+                                    $baseRole = str_replace('pj_', '', strtolower($role));
+                                    @endphp
+
+                                    <option value="{{ $baseRole }}">
+                                        {{ $roleLabels[$baseRole] ?? strtoupper(str_replace('_', ' ', $baseRole)) }}
+                                    </option>
+
+                                    @endforeach
                                 </select>
 
                                 <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 h-[30px] rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1 shadow-2xs">
@@ -106,11 +160,18 @@
 
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
 
-                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50/60 border border-blue-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px]">
+                    <div id="openShiftModal"
+                        class="bg-gradient-to-br from-blue-50 to-indigo-50/60 border border-blue-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px] cursor-pointer hover:scale-[1.02] transition">
+
                         <div>
-                            <p class="text-[11px] text-blue-800 font-semibold tracking-wide">Total Kontrol Pegawai</p>
-                            <h2 class="text-xl font-black text-blue-950 mt-0.5">{{ count($recaps) }} Orang</h2>
+                            <p class="text-[11px] text-blue-800 font-semibold tracking-wide">
+                                Total Kontrol Pegawai
+                            </p>
+                            <h2 class="text-xl font-black text-blue-950 mt-0.5">
+                                {{ count($recaps) }} Orang
+                            </h2>
                         </div>
+
                         <div class="text-2xl">👥</div>
                     </div>
 
@@ -122,106 +183,163 @@
                         <div class="text-2xl">✅</div>
                     </div>
 
-                    <div class="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px] col-span-2 lg:col-span-1">
+                    <div
+                        onclick="showLateRanking()"
+                        class="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px] col-span-2 lg:col-span-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition">
+
                         <div>
-                            <p class="text-[11px] text-amber-800 font-semibold tracking-wide">Total Kasus Keterlambatan</p>
-                            <h2 class="text-xl font-black text-amber-950 mt-0.5">{{ collect($recaps)->sum('telat') }} Insiden</h2>
+                            <p class="text-[11px] text-amber-800 font-semibold tracking-wide">
+                                Total Kasus Keterlambatan
+                            </p>
+
+                            <h2 class="text-xl font-black text-amber-950 mt-0.5">
+                                {{ collect($recaps)->sum('telat') }} Insiden
+                            </h2>
                         </div>
+
                         <div class="text-2xl">⏰</div>
+
                     </div>
 
                 </div>
 
                 <div class="bg-slate-50/50 rounded-2xl p-2.5 border border-slate-200/60 flex flex-wrap gap-1.5">
-                    <button onclick="filterRole('all', this)" class="role-btn active-role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-2xs transition">Semua</button>
-                    <button onclick="filterRole('perawat', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Perawat</button>
-                    <button onclick="filterRole('security', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Security</button>
-                    <button onclick="filterRole('customer service', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">CS</button>
-                    <button onclick="filterRole('administrasi', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Administrasi</button>
-                    <button onclick="filterRole('reverse osmosis', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">RO</button>
-                    <button onclick="filterRole('kasir', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Kasir</button>
-                    <button onclick="filterRole('keuangan', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Keuangan</button>
-                    <button onclick="filterRole('apoteker', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Apoteker</button>
-                    <button onclick="filterRole('k3', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">K3</button>
-                    <button onclick="filterRole('ipsrs', this)" class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">IPSRS</button>
+
+                    <button onclick="filterRole('all', this)"
+                        class="role-btn active-role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
+                        Semua
+                    </button>
+
+                    @foreach($roles as $role)
+                    <button
+                        onclick="filterRole('{{ strtolower($roleLabels[$role] ?? $role) }}', this)"
+                        class="role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
+                        {{ $roleLabels[$role] ?? strtoupper(str_replace('_', ' ', $role)) }}
+                    </button>
+                    @endforeach
+
                 </div>
 
+                <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+                <!-- MODAL SHIFT CALENDAR -->
+                <div id="shiftModal"
+                    class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+
+                    <div class="bg-white rounded-3xl w-[98vw] h-[95vh] shadow-xl flex flex-col">
+
+                        <div class="flex items-center justify-between p-5 border-b">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-800">
+                                    Kalender Shift Bulan
+                                </h2>
+                                <p class="text-xs text-slate-500">
+                                    Jadwal seluruh pegawai
+                                </p>
+                            </div>
+
+                            <button id="closeShiftModal"
+                                class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">
+                                ✕
+                            </button>
+
+                            <div class="flex items-center gap-2 mt-3">
+                                <label class="text-xs font-semibold text-slate-600">
+                                    Filter Unit:
+                                </label>
+
+                                <select id="calendarRoleFilter"
+                                    class="border border-slate-200 rounded-lg px-3 py-2 text-xs">
+
+                                    <option value="all">Semua Unit</option>
+
+                                    @foreach($roles as $role)
+                                    <option value="{{ $role }}">
+                                        {{ $roleLabels[$role] ?? ucfirst($role) }}
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 overflow-hidden p-2">
+                            <div id="calendar"></div>
+                        </div>
+
+                    </div>
+                </div>
                 <div id="employeeList" class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
                     @foreach($recaps as $index => $recap)
-                    <div class="employee-card self-start bg-slate-50/50 border border-slate-200/80 rounded-2xl p-4 shadow-3xs hover:border-blue-400 hover:bg-white transition duration-200"
+                    <div class="employee-card self-start bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs transition duration-200"
                         data-role="{{ strtolower($recap['employee']->role_label) }}">
 
-                        <div class="flex justify-between items-start gap-3">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleDetail({{ $index }})">
                             <div class="flex items-center gap-3 truncate">
-                                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-sm font-black shadow-2xs shrink-0">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-black shadow-inner">
                                     {{ strtoupper(substr($recap['employee']->name, 0, 1)) }}
                                 </div>
-                                <div class="truncate">
-                                    <h2 class="employee-name text-xs font-bold text-gray-800 truncate tracking-wide">{{ $recap['employee']->name }}</h2>
-                                    <p class="employee-role text-[10px] text-indigo-700 font-bold tracking-wider mt-0.5 bg-indigo-50 border border-indigo-100/60 px-1.5 py-0.5 rounded-md inline-block capitalize">
+                                <div>
+                                    <h2 class="employee-name text-xs font-bold text-gray-800">
+                                        {{ $recap['employee']->name }}
+                                    </h2>
+                                    <p class="employee-role text-[10px] text-indigo-600 font-bold uppercase tracking-wide">
                                         {{ $recap['employee']->role_label }}
                                     </p>
                                 </div>
                             </div>
 
-                            <div class="shrink-0">
-                                @if($recap['telat'] > 5)
-                                <span class="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wide">⚠️ Evaluasi</span>
-                                @else
-                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wide">✅ Normal</span>
-                                @endif
-                            </div>
-                        </div>
+                            <div class="flex items-center gap-3">
+                                <button
+                                    onclick="showShiftModal({{ $recap['employee']->id }}, '{{ $recap['employee']->name }}')"
+                                    class="bg-indigo-50 hover:bg-indigo-100
+               text-indigo-700
+               border border-indigo-200
+               px-3 py-1 rounded-lg
+               text-[10px] font-bold">
 
-                        <div class="grid grid-cols-4 gap-2 mt-4">
-
-                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center shadow-3xs">
-                                <p class="text-[10px] text-gray-400 font-bold">Hadir</p>
-                                <h3 class="text-sm font-black text-emerald-600 mt-0.5">{{ $recap['hadir'] }}x</h3>
-                            </div>
-
-                            <div class="bg-white border border-slate-200 rounded-xl p-1.5 text-center shadow-3xs flex flex-col justify-between min-h-[50px]">
-                                <div>
-                                    <p class="text-[10px] text-gray-400 font-bold">Telat</p>
-                                    <h3 class="text-sm font-black text-amber-600 mt-0.5">{{ $recap['telat'] }}x</h3>
-                                </div>
-                                <p class="text-[8px] text-slate-400 font-semibold bg-slate-50 rounded py-0.5 mt-0.5 truncate" title="{{ $recap['late_formatted'] }}">
-                                    {{ $recap['late_minutes'] > 0 ? $recap['late_formatted'] : '0 Menit' }}
-                                </p>
-                            </div>
-
-                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center shadow-3xs">
-                                <p class="text-[10px] text-gray-400 font-bold">Jam Kerja</p>
-                                <h3 class="text-sm font-black text-cyan-600 mt-0.5">{{ $recap['total_jam'] }} J</h3>
-                            </div>
-
-                            <div class="bg-white border border-slate-200 rounded-xl p-2 text-center shadow-3xs flex flex-col justify-center items-center overflow-hidden">
-                                <p class="text-[10px] text-gray-400 font-bold">Jam Lembur</p>
-                                <h3 class="text-[10px] font-black text-indigo-700 mt-1 bg-indigo-50 border border-indigo-100/50 px-1 py-0.5 rounded w-full truncate" title="{{ $recap['overtimes'] }}">
-                                    {{ $recap['overtimes'] ?: '0 Menit' }}
-                                </h3>
-                            </div>
-
-                        </div>
-
-                        <div class="mt-3">
-                            <button onclick="toggleDetail({{ $index }})" class="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-1.5 rounded-xl text-xs transition shadow-3xs flex items-center justify-center gap-1">
-                                <span>📋</span> Opsi Manajemen Kuota Cuti
-                            </button>
-                        </div>
-
-                        <div id="detail-{{ $index }}" class="hidden mt-2 bg-white border border-slate-200 rounded-xl p-3 shadow-inner">
-                            <p class="text-[10px] text-gray-400 font-bold mb-1.5 uppercase tracking-wide">Sesuaikan Kuota Cuti Tahunan Pegawai</p>
-                            <form action="{{ route('hrd.update.leave.quota', $recap['employee']->id) }}" method="POST" class="flex gap-2 m-0">
-                                @csrf
-                                <input type="number" name="leave_quota" min="0" value="{{ $recap['employee']->leave_quota ?? 0 }}"
-                                    class="flex-1 rounded-xl border-gray-300 text-xs py-1.5 px-3 focus:border-indigo-500 focus:ring-0 shadow-3xs text-gray-700 font-bold">
-                                <button type="submit" class="px-4 py-1.5 bg-[#1E40AF] hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-2xs transition">
-                                    Simpan
+                                    📅 Shift
                                 </button>
-                            </form>
+
+                                @if($recap['telat'] > 5)
+                                <span class="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide">⚠️ Evaluasi</span>
+                                @else
+                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide">✅ Normal</span>
+                                @endif
+                                <span class="text-slate-400 text-xs">▼</span>
+                            </div>
                         </div>
 
+                        <div id="detail-{{ $index }}" class="hidden mt-4 pt-4 border-t border-slate-100 animate-in fade-in duration-300">
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase">Hadir</p>
+                                    <h3 class="text-xs font-black text-emerald-600 mt-0.5">{{ $recap['hadir'] }}x</h3>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase">Telat</p>
+                                    <h3 class="text-xs font-black text-amber-600 mt-0.5">{{ $recap['telat'] }}x</h3>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase">Jam Kerja</p>
+                                    <h3 class="text-xs font-black text-cyan-600 mt-0.5">{{ $recap['total_jam'] }} J</h3>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p class="text-[9px] text-gray-400 font-bold uppercase">Lembur</p>
+                                    <h3 class="text-xs font-black text-indigo-600 mt-0.5">{{ $recap['overtimes'] ?: '0' }}</h3>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                <p class="text-[10px] text-gray-400 font-bold mb-2 uppercase tracking-wide">Update Kuota Cuti</p>
+                                <form action="{{ route('hrd.update.leave.quota', $recap['employee']->id) }}" method="POST" class="flex gap-2">
+                                    @csrf
+                                    <input type="number" name="leave_quota" min="0" value="{{ $recap['employee']->leave_quota ?? 0 }}"
+                                        class="flex-1 rounded-lg border-gray-300 text-xs py-1.5 px-3 shadow-sm text-gray-700 font-bold">
+                                    <button type="submit" class="px-4 py-1.5 bg-[#1E40AF] text-white font-bold text-xs rounded-lg hover:bg-blue-800 transition">
+                                        Simpan
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                     @endforeach
                 </div>
@@ -230,25 +348,106 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
     <script>
         const searchInput = document.getElementById('searchInput');
         const cards = document.querySelectorAll('.employee-card');
+        const allEvents = @json($calendarEvents);
+        document.addEventListener('DOMContentLoaded', function() {
 
-        // LIVE FILTER KEYBOARD SEARCH SINKRONISASI NAMA DAN ROLE LABEL
+            const calendarEl = document.getElementById('calendar');
+            window.calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                locale: 'id',
+                allDaySlot: false,
+                height: '100%',
+
+                slotMinTime: '00:00:00',
+                slotMaxTime: '24:00:00',
+
+                expandRows: true,
+
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+
+                events: allEvents,
+
+                eventClick: function(info) {
+
+                    const start = info.event.start;
+                    const end = info.event.end;
+
+                    const hari = start.toLocaleDateString('id-ID', {
+                        weekday: 'long'
+                    });
+
+                    const jamMulai = start.toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const jamSelesai = end.toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    Swal.fire({
+                        title: info.event.title,
+                        html: `
+            <div style="text-align:left">
+                <b>${info.event.extendedProps.shift}</b><br>
+                ${hari}<br>
+                Jam ${jamMulai} - ${jamSelesai}
+            </div>
+        `
+                    });
+                }
+            });
+
+            window.calendar.render();
+            document.getElementById('calendarRoleFilter')
+                .addEventListener('change', function() {
+
+                    const role = this.value;
+
+                    const filteredEvents = role === 'all' ?
+                        allEvents :
+                        allEvents.filter(event =>
+                            event.extendedProps?.role === role
+                        );
+
+                    window.calendar.removeAllEvents();
+                    window.calendar.addEventSource(filteredEvents);
+                });
+        });
+
         searchInput.addEventListener('keyup', function() {
-            const keyword = this.value.toLowerCase();
-            cards.forEach(card => {
-                const name = card.querySelector('.employee-name').innerText.toLowerCase();
-                const roleLabel = card.querySelector('.employee-role').innerText.toLowerCase();
 
-                if (name.includes(keyword) || roleLabel.includes(keyword)) {
+            const keyword = this.value.toLowerCase();
+
+            cards.forEach(card => {
+
+                const name =
+                    card.querySelector('.employee-name')
+                    ?.innerText.toLowerCase() ?? '';
+
+                const role =
+                    card.querySelector('.employee-role')
+                    ?.innerText.toLowerCase() ?? '';
+
+                if (
+                    name.includes(keyword) ||
+                    role.includes(keyword)
+                ) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
                 }
             });
         });
-
         // DIVISION FAST BUTTON FILTER SYNC WITH LOWERCASING CONTEXT
         function filterRole(role, button) {
             cards.forEach(card => {
@@ -276,6 +475,195 @@
             const detail = document.getElementById('detail-' + index);
             detail.classList.toggle('hidden');
         }
+
+        async function showShiftModal(userId, employeeName) {
+            try {
+
+                const selectedMonth =
+                    document.querySelector(
+                        'input[name="month"]'
+                    ).value;
+
+                const response = await fetch(
+                    `/hrd/employee-shifts/${userId}?month=${selectedMonth}`
+                );
+
+                const result = await response.json();
+
+                const shifts = result.data;
+
+                let html = `
+            <div class="text-left">
+
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-800">
+                        ${employeeName}
+                    </h3>
+
+                    <p style="
+                    font-size:12px;
+                    color:#64748b;
+                    ">
+                    Bulan :
+                    ${new Date(result.month + '-01').toLocaleDateString('id-ID', {
+                        month: 'long',
+                        year: 'numeric'
+                    })}
+                    </p>
+                </div>
+
+                <div style="
+                    max-height:400px;
+                    overflow:auto;
+                ">
+        `;
+
+                shifts.forEach(item => {
+
+                    html += `
+                <div style="
+                    border:1px solid #e5e7eb;
+                    border-radius:10px;
+                    padding:10px;
+                    margin-bottom:8px;
+                ">
+
+                    <div>
+                        <strong>
+                            ${item.shift_date}
+                        </strong>
+                    </div>
+
+                    <div>
+                        ${item.start_time}
+                        -
+                        ${item.end_time}
+                    </div>
+
+                    <div style="
+                        color:#64748b;
+                        font-size:12px;
+                    ">
+                        ${item.shift?.name ?? 'Shift'}
+                    </div>
+
+                </div>
+            `;
+                });
+
+                html += `
+                </div>
+            </div>
+        `;
+
+                Swal.fire({
+                    title: 'Jadwal Shift',
+                    html: html,
+                    width: 700,
+                    confirmButtonText: 'Tutup'
+                });
+
+            } catch (e) {
+
+                Swal.fire(
+                    'Gagal',
+                    'Tidak dapat memuat jadwal shift',
+                    'error'
+                );
+            }
+        }
+
+        function showLateRanking() {
+
+            let html = `
+        <div class="space-y-2 text-left">
+    `;
+
+            @foreach($rankingTelat as $index => $item)
+
+            html += `
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                padding:10px;
+                border:1px solid #fcd34d;
+                border-radius:10px;
+                background:#fffaf0;
+            ">
+
+                <div>
+                    <div style="
+                        font-weight:700;
+                        color:#92400e;
+                    ">
+                        #{{ $index + 1 }}
+                        {{ $item['employee']->name }}
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        color:#78716c;
+                    ">
+                        {{ $item['employee']->role_label }}
+                    </div>
+                </div>
+
+                <div style="
+                    font-weight:800;
+                    color:#b45309;
+                ">
+                    {{ $item['telat'] }}x
+                    ({{ $item['late_formatted'] }})
+                </div>
+
+            </div>
+        `;
+
+            @endforeach
+
+            html += `</div>`;
+
+            Swal.fire({
+                title: '🏆 Top 5 Keterlambatan',
+                html: html,
+                width: 700,
+                confirmButtonText: 'Tutup'
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const modal = document.getElementById('shiftModal');
+            const openBtn = document.getElementById('openShiftModal');
+            const closeBtn = document.getElementById('closeShiftModal');
+
+            openBtn.addEventListener('click', function() {
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                setTimeout(() => {
+                    window.calendar.updateSize();
+                }, 300);
+            });
+
+            closeBtn.addEventListener('click', function() {
+
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            });
+
+            modal.addEventListener('click', function(e) {
+
+                if (e.target === modal) {
+
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            });
+
+        });
     </script>
 
 </x-app-layout>

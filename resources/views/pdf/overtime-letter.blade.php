@@ -216,7 +216,7 @@
             <tr>
                 <!-- Logo Kiri -->
                 <td style="width: 18%; text-align: left;">
-                    <img src="{{ public_path('images/rsprofile.jpg') }}"
+                    <img src="{{ public_path('images/rsprofile.png') }}" class="logo"
                         style="width: 90px;">
                 </td>
 
@@ -379,41 +379,35 @@
                         </tr>
                         <tr>
                             <td>
-                                {{-- Logika Menampilkan Head/Direktur/HRD --}}
-                                <div style="font-size: 9pt;">
-                                    @if($overtime->director_approved_by)
-                                    Direktur
-                                    @elseif($overtime->head_approved_by)
-                                    Kepala Unit / Head
-                                    @else
-                                    Manajemen / HRD
-                                    @endif
-                                </div>
+                                @php
+                                // Menentukan siapa yang tampil berdasarkan hirarki approval
+                                if ($overtime->director_approved_by) {
+                                $jabatan = 'Direktur';
+                                $nama = $overtime->directorApprover->name ?? '-';
+                                $sig = $overtime->director_signature;
+                                $status = $overtime->director_status;
+                                } elseif ($overtime->head_approved_by) {
+                                $jabatan = 'Kepala Unit / Head';
+                                $nama = $overtime->headApprover->name ?? '-';
+                                $sig = $overtime->head_signature;
+                                $status = $overtime->head_status;
+                                } else {
+                                $jabatan = 'Manajemen / HRD';
+                                $nama = $overtime->hrdApprover->name ?? '-';
+                                $sig = $overtime->hrd_signature;
+                                $status = $overtime->hrd_status;
+                                }
+                                @endphp
 
-                                <div class="status-badge">
-                                    [{{ strtoupper($overtime->hrd_status ?? 'PENDING') }}]
-                                </div>
+                                <div style="font-size: 9pt;">{{ $jabatan }}</div>
+                                <div class="status-badge">[{{ strtoupper($status ?? 'PENDING') }}]</div>
 
                                 <div class="sig-space-wrapper">
-                                    @php
-                                    // Menentukan tanda tangan mana yang ditampilkan
-                                    $sig = $overtime->hrd_signature;
-                                    $nama = $overtime->hrdApprover->name ?? '-';
-                                    $jabatan = 'Unit HRD';
-
-                                    if ($overtime->director_approved_by) {
-                                    $nama = $overtime->directorApprover->name ?? '-';
-                                    $jabatan = 'Direktur';
-                                    } elseif ($overtime->head_approved_by) {
-                                    $nama = $overtime->headApprover->name ?? '-';
-                                    $jabatan = 'Kepala Unit';
-                                    }
-                                    @endphp
-
                                     @if($sig)
-                                    <img src="{{ $sig }}" class="sig-image">
+                                    <img src="{{ (strpos($sig, 'data:image') === 0) ? $sig : public_path('storage/'.$sig) }}" class="sig-image">
                                     @endif
                                 </div>
+
                                 <div class="name-output">{{ $nama }}</div>
                                 <div style="font-size: 8pt; color:#444;">{{ $jabatan }}</div>
                             </td>

@@ -38,6 +38,17 @@ class Permission extends Model
         'hrd_approved_at',
 
         'hrd_note',
+        // Tambahkan kolom baru di bawah ini:
+        'head_status',
+        'director_status',
+        'head_note',
+        'director_note',
+        'head_signature',
+        'director_signature',
+        'head_approved_by',
+        'director_approved_by',
+        'head_approved_at',
+        'director_approved_at',
     ];
 
     public function user()

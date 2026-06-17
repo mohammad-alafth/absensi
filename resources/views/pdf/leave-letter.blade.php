@@ -380,9 +380,7 @@
                 <div>Menyetujui,</div>
                 <div>Atasan Langsung</div>
                 <div class="status-text">
-                    @if($leave->pj_status)
-                    ({{ strtoupper($leave->pj_status) }})
-                    @endif
+                    @if($leave->pj_status) ({{ strtoupper($leave->pj_status) }}) @endif
                 </div>
                 <div class="signature-space">
                     @if($leave->pj_signature)
@@ -390,24 +388,40 @@
                     @endif
                 </div>
                 <div class="name-line">{{ $leave->pjApprover->name ?? '........................' }}</div>
-
             </td>
 
             <td>
+                @php
+                // Logika menentukan siapa yang tampil di tengah
+                if ($leave->director_approved_by) {
+                $jabatan = 'Direktur';
+                $status = $leave->director_status;
+                $sig = $leave->director_signature;
+                $nama = $leave->directorApprover->name ?? '........................';
+                } elseif ($leave->head_approved_by) {
+                $jabatan = 'Kepala Unit';
+                $status = $leave->head_status;
+                $sig = $leave->head_signature;
+                $nama = $leave->headApprover->name ?? '........................';
+                } else {
+                $jabatan = 'HRD';
+                $status = $leave->hrd_status;
+                $sig = $leave->hrd_signature;
+                $nama = $leave->hrdApprover->name ?? '........................';
+                }
+                @endphp
+
                 <div>Mengetahui,</div>
-                <div>HRD</div>
+                <div>{{ $jabatan }}</div>
                 <div class="status-text">
-                    @if($leave->hrd_status)
-                    ({{ strtoupper($leave->hrd_status) }})
-                    @endif
+                    @if($status) ({{ strtoupper($status) }}) @endif
                 </div>
                 <div class="signature-space">
-                    @if($leave->hrd_signature)
-                    <img src="{{ $leave->hrd_signature }}" class="signature-img">
+                    @if($sig)
+                    <img src="{{ (strpos($sig, 'data:image') === 0) ? $sig : public_path('storage/'.$sig) }}" class="signature-img">
                     @endif
                 </div>
-                <div class="name-line">{{ $leave->hrdApprover->name ?? '........................' }}</div>
-
+                <div class="name-line">{{ $nama }}</div>
             </td>
 
             <td>
@@ -420,7 +434,6 @@
                     @endif
                 </div>
                 <div class="name-line">{{ $leave->user->name }}</div>
-
             </td>
         </tr>
     </table>

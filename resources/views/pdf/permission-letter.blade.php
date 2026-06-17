@@ -121,29 +121,49 @@
 
     <table class="signature-table">
         <tr>
-            <td class="signature-box">
-                Pemohon<br><br>
-                @if($permission->employee_signature)
-                <img src="{{ public_path($permission->employee_signature) }}" class="signature">
-                @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $permission->user->name }}</div>
-            </td>
+            @if($permission->pj_signature || $permission->pj_approved_by)
             <td class="signature-box">
                 PJ<br><br>
                 <div style="font-size: 8pt; font-style: italic;">[{{ $permission->pj_status }}]</div>
                 @if($permission->pj_signature)
-                <img src="{{ public_path($permission->pj_signature) }}" class="signature">
+                <img src="{{ $permission->pj_signature }}" class="signature">
                 @else <br><br><br> @endif
                 <div style="text-decoration: underline;">{{ $permission->pjApprover->name ?? '-' }}</div>
             </td>
+            @endif
+
+            @if($permission->head_approved_by)
+            <td class="signature-box">
+                Kepala Bagian<br><br>
+                <div style="font-size: 8pt; font-style: italic;">[Approved]</div>
+                @if($permission->head_signature)
+                <img src="{{ $permission->head_signature }}" class="signature">
+                @else <br><br><br> @endif
+                <div style="text-decoration: underline;">{{ $permission->headApprover->name ?? '...' }}</div>
+            </td>
+            @endif
+
+            @if($permission->director_approved_by)
+            <td class="signature-box">
+                Direktur<br><br>
+                <div style="font-size: 8pt; font-style: italic;">[{{ $permission->director_status ?? 'Approved' }}]</div>
+                @if($permission->director_signature)
+                <img src="{{ $permission->director_signature }}" class="signature">
+                @else <br><br><br> @endif
+                <div style="text-decoration: underline;">{{ $permission->directorApprover->name ?? '...' }}</div>
+            </td>
+            @endif
+
+            @if($permission->hrd_approved_by)
             <td class="signature-box">
                 HRD<br><br>
                 <div style="font-size: 8pt; font-style: italic;">[{{ $permission->hrd_status }}]</div>
                 @if($permission->hrd_signature)
-                <img src="{{ public_path($permission->hrd_signature) }}" class="signature">
+                <img src="{{ $permission->hrd_signature }}" class="signature">
                 @else <br><br><br> @endif
                 <div style="text-decoration: underline;">{{ $permission->hrdApprover->name ?? '-' }}</div>
             </td>
+            @endif
         </tr>
     </table>
 </body>

@@ -13,6 +13,18 @@ use App\Models\Leave;
 use App\Models\Overtime;
 use App\Models\EmployeeShift;
 use App\Models\Permission;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use Maatwebsite\Excel\Events\AfterSheet;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 
 
 class HRDController extends Controller
@@ -20,153 +32,415 @@ class HRDController extends Controller
     public function index(Request $request)
     {
         /*
-        |--------------------------------------------------------------------------
-        | FILTER BULAN
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | FILTER BULAN
+            |--------------------------------------------------------------------------
+            */
         $month = $request->month ?? now()->format('Y-m');
+
         $startDate = Carbon::parse($month . '-01')->startOfMonth();
-        $endDate = Carbon::parse($month . '-01')->endOfMonth();
-
-        $selectedMonth = $startDate->month;
-        $selectedYear = $startDate->year;
+        $endDate   = Carbon::parse($month . '-01')->endOfMonth();
 
         /*
-        |--------------------------------------------------------------------------
-        | EMPLOYEE
-        |--------------------------------------------------------------------------
-        */
-        $employees = User::whereNotIn('role', ['admin'])->get();
+            |--------------------------------------------------------------------------
+            | EMPLOYEE
+            |--------------------------------------------------------------------------
+            */
+        $employees = User::whereNotIn('role', ['admin'])
+            ->select('id', 'name', 'role', 'leave_quota')
+            ->get();
 
         /*
-        |--------------------------------------------------------------------------
-        | DATA REKAP
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | ATTENDANCE BULAN INI (1 QUERY)
+            |--------------------------------------------------------------------------
+            */
+        $attendanceGroups = Attendance::select([
+            'user_id',
+            'status',
+            'late_minutes',
+            'overtime_minutes',
+            'jam_masuk',
+            'jam_keluar',
+            'tanggal'
+        ])
+            ->whereBetween('tanggal', [
+                $startDate,
+                $endDate
+            ])
+            ->get()
+            ->groupBy('user_id');
+
+        /*
+            |--------------------------------------------------------------------------
+            | SHIFT BULAN INI (1 QUERY)
+            |--------------------------------------------------------------------------
+            */
+        $employeeShifts = EmployeeShift::select([
+            'id',
+            'user_id',
+            'shift_id',
+            'shift_date',
+            'start_time',
+            'end_time'
+        ])
+            ->with([
+                'user:id,name,role',
+                'shift:id,name'
+            ])
+            ->whereBetween('shift_date', [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d')
+            ])
+            ->get();
+
+        $shiftGroups = $employeeShifts->groupBy('user_id');
+
+        /*
+            |--------------------------------------------------------------------------
+            | REKAP
+            |--------------------------------------------------------------------------
+            */
+
+        $leaveGroups = Leave::select(
+            'user_id',
+            'start_date',
+            'end_date'
+        )
+            ->where('status', 'approved')
+            ->where(function ($q) use ($startDate, $endDate) {
+
+                $q->where('start_date', '<=', $endDate)
+                    ->where('end_date', '>=', $startDate);
+            })
+            ->get()
+            ->groupBy('user_id');
+
+        $permissionGroups = Permission::select(
+            'user_id',
+            'tanggal'
+        )
+            ->where('status', 'approved')
+            ->whereBetween('tanggal', [
+                $startDate,
+                $endDate
+            ])
+            ->get()
+            ->groupBy('user_id');
+
+        $roles = User::select('role')
+            ->distinct()
+            ->pluck('role')
+            ->map(function ($role) {
+
+                $role = strtolower($role);
+
+                // hilangkan prefix pj_
+                $role = str_replace('pj_', '', $role);
+
+                // gabungkan nurse_ok ke nurse
+                if ($role === 'nurse_ok') {
+                    $role = 'nurse';
+                }
+
+                return $role;
+            })
+            ->unique()
+            ->values();
+
+        $roleLabels = [
+            'nurse' => 'PERAWAT',
+            'security' => 'SECURITY',
+            'cs' => 'CLEANING SERVICE',
+            'administrasi' => 'ADMINISTRASI',
+            'ro' => 'REFRAKSIONIS OPTISIEN',
+            'finance' => 'KEUANGAN',
+            'pharmacist' => 'APOTEKER',
+            'casemix' => 'CASEMIX',
+            'ipsrs' => 'IPSRS',
+            'marketing' => 'MARKETING',
+            'it' => 'IT',
+            'hrd' => 'HRD',
+            'nutrition' => 'GIZI',
+            'medical_record' => 'REKAM MEDIS',
+            'medical_service' => 'MEDICAL SERVICE',
+            'head_pegawai' => 'KEPALA BAGIAN UMUM',
+            'director' => 'DIREKTUR',
+            'pipp' => 'PIPP',
+        ];
+
         $recaps = [];
 
         foreach ($employees as $employee) {
-            $attendances = Attendance::where('user_id', $employee->id)
-                ->whereBetween('tanggal', [$startDate, $endDate])
-                ->get();
+            $normalizedRole = strtolower($employee->role);
+
+            $normalizedRole = str_replace(
+                'pj_',
+                '',
+                $normalizedRole
+            );
+
+            if ($normalizedRole === 'nurse_ok') {
+                $normalizedRole = 'nurse';
+            }
+
+            $attendances = $attendanceGroups[$employee->id]
+                ?? collect();
+
+            $userShifts = $shiftGroups[$employee->id]
+                ?? collect();
+
+            $userLeaves =
+                $leaveGroups[$employee->id]
+                ?? collect();
+
+            $userPermissions =
+                $permissionGroups[$employee->id]
+                ?? collect();
 
             /*
-            |--------------------------------------------------------------------------
-            | TOTAL STATUS
-            |--------------------------------------------------------------------------
-            */
-            $hadir = $attendances->where('status', 'hadir')->count();
-            $telat = $attendances->where('status', 'terlambat')->count();
-            $izin = $attendances->where('status', 'izin')->count();
-            $sakit = $attendances->where('status', 'sakit')->count();
-            $alpha = $attendances->where('status', 'alpha')->count();
+                |--------------------------------------------------------------------------
+                | TANGGAL SHIFT
+                |--------------------------------------------------------------------------
+                */
+            $shiftDates = $userShifts
+                ->pluck('shift_date')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique()
+                ->values();
 
-            $totalLateMinutes = 0;
+            /*
+                |--------------------------------------------------------------------------
+                | TANGGAL HADIR/TELAT/SAKIT
+                |--------------------------------------------------------------------------
+                */
+            $attendanceDates = $attendances
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
 
-            foreach ($attendances as $attendance) {
-                $late = $attendance->late_minutes ?? 0;
+            /*
+                |--------------------------------------------------------------------------
+                | TANGGAL IZIN APPROVED
+                |--------------------------------------------------------------------------
+                */
+            $permissionDates = $userPermissions
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
+
+            /*
+                |--------------------------------------------------------------------------
+                | TANGGAL CUTI APPROVED
+                |--------------------------------------------------------------------------
+                */
+            $leaveDates = collect();
+
+            foreach ($userLeaves as $leave) {
+
+                $leaveStart = Carbon::parse($leave->start_date);
+                $leaveEnd   = Carbon::parse($leave->end_date);
 
                 /*
                 |--------------------------------------------------------------------------
-                | HITUNG SETELAH 15 MENIT
+                | Batasi hanya tanggal dalam bulan rekap
                 |--------------------------------------------------------------------------
                 */
-                $realLate = max($late - 15, 0);
-                $totalLateMinutes += $realLate;
+                $effectiveStart = $leaveStart->copy()->max($startDate);
+                $effectiveEnd   = $leaveEnd->copy()->min($endDate);
+
+                while ($effectiveStart->lte($effectiveEnd)) {
+
+                    $leaveDates->push(
+                        $effectiveStart->format('Y-m-d')
+                    );
+
+                    $effectiveStart->addDay();
+                }
             }
+
+            $leaveDates = $leaveDates->unique();
 
             /*
             |--------------------------------------------------------------------------
-            | FORMAT JAM MENIT KETERLAMBATAN
+            | STATUS
             |--------------------------------------------------------------------------
             */
+            $hadir = $attendances->where('status', 'hadir')->count();
+
+            $telat = $attendances->where('status', 'terlambat')->count();
+
+            $izin = $attendances->where('status', 'izin')->count();
+
+            $sakit = $attendances->where('status', 'sakit')->count();
+
+            /*
+            |--------------------------------------------------------------------------
+            | TOTAL HARI SHIFT
+            |--------------------------------------------------------------------------
+            */
+            $totalShiftDays = $userShifts
+                ->pluck('shift_date')
+                ->unique()
+                ->count();
+            /*
+            |--------------------------------------------------------------------------
+            | HITUNG ALPHA BERDASARKAN HARI SHIFT
+            |--------------------------------------------------------------------------
+            */
+            $alpha = 0;
+
+            foreach ($shiftDates as $shiftDate) {
+
+                $isAttendance =
+                    $attendanceDates->contains($shiftDate);
+
+                $isPermission =
+                    $permissionDates->contains($shiftDate);
+
+                $isLeave =
+                    $leaveDates->contains($shiftDate);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Jika pada hari shift tidak ada
+                | attendance, izin, ataupun cuti
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    !$isAttendance &&
+                    !$isPermission &&
+                    !$isLeave
+                ) {
+                    $alpha++;
+                }
+            }
+            /*
+        |--------------------------------------------------------------------------
+        | TOTAL KETERLAMBATAN
+        |--------------------------------------------------------------------------
+        */
+            $totalLateMinutes = 0;
+
+            foreach ($attendances as $attendance) {
+
+                $late = $attendance->late_minutes ?? 0;
+
+                $realLate = max($late - 15, 0);
+
+                $totalLateMinutes += $realLate;
+            }
+
             $lateHours = floor($totalLateMinutes / 60);
+
             $lateRemainMinutes = $totalLateMinutes % 60;
+
             $lateFormatted = '';
 
             if ($lateHours > 0) {
                 $lateFormatted .= $lateHours . ' Jam ';
             }
+
             $lateFormatted .= $lateRemainMinutes . ' Menit';
 
             /*
-            |--------------------------------------------------------------------------
-            | TOTAL JAM KERJA + AMBIL DATA MURNI OVERTIME MINUTES DARI ATTENDANCE
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | TOTAL JAM KERJA
+        |--------------------------------------------------------------------------
+        */
             $totalJam = 0;
+
             $totalActualOvertimeMinutes = 0;
 
             foreach ($attendances as $attendance) {
-                // Akumulasi murni data menit lembur dari field 'overtime_minutes' tabel attendance
-                $totalActualOvertimeMinutes += $attendance->overtime_minutes ?? 0;
 
-                if ($attendance->jam_masuk && $attendance->jam_keluar) {
-                    $masuk = Carbon::parse($attendance->jam_masuk);
-                    $keluar = Carbon::parse($attendance->jam_keluar);
+                $totalActualOvertimeMinutes +=
+                    ($attendance->overtime_minutes ?? 0);
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | SHIFT MALAM
-                    |--------------------------------------------------------------------------
-                    */
-                    if ($keluar->lt($masuk)) {
-                        $keluar->addDay();
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | TOTAL JAM KERJA AKTUAL
-                    |--------------------------------------------------------------------------
-                    */
-                    $workMinutes = $masuk->diffInMinutes($keluar);
-                    $totalJam += $workMinutes;
+                if (
+                    !$attendance->jam_masuk ||
+                    !$attendance->jam_keluar
+                ) {
+                    continue;
                 }
+
+                $masuk = Carbon::parse(
+                    $attendance->jam_masuk
+                );
+
+                $keluar = Carbon::parse(
+                    $attendance->jam_keluar
+                );
+
+                /*
+            |--------------------------------------------------------------------------
+            | SHIFT MALAM
+            |--------------------------------------------------------------------------
+            */
+                if ($keluar->lt($masuk)) {
+                    $keluar->addDay();
+                }
+
+                $totalJam +=
+                    $masuk->diffInMinutes($keluar);
             }
 
             /*
-            |--------------------------------------------------------------------------
-            | RATA-RATA JAM
-            |--------------------------------------------------------------------------
-            */
+        |--------------------------------------------------------------------------
+        | RATA-RATA JAM KERJA
+        |--------------------------------------------------------------------------
+        */
             $hariKerja = $hadir + $telat;
+
             $avgJam = $hariKerja > 0
                 ? round(($totalJam / 60) / $hariKerja, 1)
                 : 0;
 
             /*
-            |--------------------------------------------------------------------------
-            | STATUS PERFORMA
-            |--------------------------------------------------------------------------
-            */
-            if ($alpha >= 3 || $telat >= 8) {
+        |--------------------------------------------------------------------------
+        | PERFORMANCE
+        |--------------------------------------------------------------------------
+        */
+            if ($alpha >= 3) {
+
                 $performance = 'Buruk';
-            } elseif ($telat >= 5) {
+            } elseif ($alpha >= 1 || $telat >= 5) {
+
                 $performance = 'Evaluasi';
             } else {
+
                 $performance = 'Baik';
             }
 
             /*
-            |--------------------------------------------------------------------------
-            | FORMAT STRING JAM LEMBUR MURNI PRESENSI
-            |--------------------------------------------------------------------------
-            | Memecah total menit lembur murni dari database attendance 
-            | menjadi string format teks "X Jam Y Menit".
-            */
-            $finalOvertimeHours = floor($totalActualOvertimeMinutes / 60);
-            $finalOvertimeMinutes = $totalActualOvertimeMinutes % 60;
+        |--------------------------------------------------------------------------
+        | FORMAT OVERTIME
+        |--------------------------------------------------------------------------
+        */
+            $finalOvertimeHours =
+                floor($totalActualOvertimeMinutes / 60);
 
-            $overtimeFormatted = "";
+            $finalOvertimeMinutes =
+                $totalActualOvertimeMinutes % 60;
+
+            $overtimeFormatted = '';
+
             if ($finalOvertimeHours > 0) {
-                $overtimeFormatted .= $finalOvertimeHours . " Jam ";
+                $overtimeFormatted .=
+                    $finalOvertimeHours . ' Jam ';
             }
-            if ($finalOvertimeMinutes > 0 || $finalOvertimeHours == 0) {
-                $overtimeFormatted .= $finalOvertimeMinutes . " Menit";
+
+            if (
+                $finalOvertimeMinutes > 0 ||
+                $finalOvertimeHours == 0
+            ) {
+                $overtimeFormatted .=
+                    $finalOvertimeMinutes . ' Menit';
             }
 
             $recaps[] = [
                 'employee' => $employee,
+                'role' => $normalizedRole,
                 'hadir' => $hadir,
                 'telat' => $telat,
                 'izin' => $izin,
@@ -178,29 +452,89 @@ class HRDController extends Controller
                 'avg_jam' => $avgJam,
                 'performance' => $performance,
                 'leave_quota' => $employee->leave_quota ?? 0,
-                'overtimes' => trim($overtimeFormatted), // Dilempar berupa teks matang ke Blade UI Anda
+                'overtimes' => trim($overtimeFormatted),
+                'total_shift' => $totalShiftDays,
             ];
         }
 
         /*
         |--------------------------------------------------------------------------
-        | SORTING TELAT TERBANYAK
+        | RANKING TELAT
         |--------------------------------------------------------------------------
         */
         $rankingTelat = collect($recaps)
+            ->filter(fn($item) => $item['telat'] > 0)
             ->sortByDesc('telat')
-            ->take(5);
+            ->take(5)
+            ->values();
+
 
         /*
         |--------------------------------------------------------------------------
-        | RETURN VIEW
+        | TIMELINE SHIFT
         |--------------------------------------------------------------------------
         */
-        return view('hrd.rekap.index', compact(
-            'recaps',
-            'month',
-            'rankingTelat'
-        ));
+        $calendarEvents = [];
+
+        foreach ($employeeShifts as $shift) {
+
+            if (!$shift->user) {
+                continue;
+            }
+            $role = strtolower($shift->user->role);
+
+            if (str_starts_with($role, 'pj_')) {
+                $role = substr($role, 3);
+            }
+            if ($role === 'nurse_ok') {
+                $role = 'nurse';
+            }
+            $start = Carbon::parse(
+                $shift->shift_date . ' ' . $shift->start_time
+            );
+
+            $end = Carbon::parse(
+                $shift->shift_date . ' ' . $shift->end_time
+            );
+
+            if ($end->lt($start)) {
+                $end->addDay();
+            }
+            $roleColors = [
+                'nurse' => '#10b981',       // emerald
+                'security' => '#ef4444',    // red
+                'cs' => '#06b6d4',          // cyan
+                'administrasi' => '#6366f1', // indigo
+                'finance' => '#f59e0b',     // amber
+                'kasir' => '#ec4899',       // pink
+                'ipsrs' => '#64748b',       // slate
+                'pharmacist' => '#8b5cf6',  // violet
+            ];
+            $calendarEvents[] = [
+                'title' => $shift->user->name,
+                'start' => $start->toDateTimeString(),
+                'end'   => $end->toDateTimeString(),
+
+                'backgroundColor' => $roleColors[$role] ?? '#1E40AF',
+                'borderColor'     => $roleColors[$role] ?? '#1E40AF',
+
+                'extendedProps' => [
+                    'role'  => $role,
+                    'shift' => $shift->shift->name ?? '-'
+                ]
+            ];
+        }
+        return view(
+            'hrd.rekap.index',
+            compact(
+                'recaps',
+                'month',
+                'rankingTelat',
+                'calendarEvents',
+                'roles',
+                'roleLabels'
+            )
+        );
     }
 
     /*
@@ -250,23 +584,19 @@ class HRDController extends Controller
             'rejected'
         ];
 
-        // 1. Ambil data dengan eager loading 'user' agar tidak terjadi N+1 query
+        // 1. Ambil data
         switch ($type) {
             case 'attendance':
                 $data = Attendance::whereDate('tanggal', $date ?? Carbon::today())->with('user')->get();
                 break;
             case 'leave':
-                // Pastikan 'start_date' sudah benar di tabel leaves
-                $data = Leave::where('status', $statusList)->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $data = Leave::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
                 break;
             case 'permission':
-                // Cek database Anda, apakah kolomnya 'tanggal' atau 'permission_date'?
-                // Jika error 1054 muncul lagi, ganti 'tanggal' dengan nama kolom yang benar
-                $data = Permission::where('status', $statusList)->whereRaw("DATE_FORMAT(tanggal, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $data = Permission::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(tanggal, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
                 break;
             case 'overtime':
-                // PERBAIKAN: Gunakan 'overtime_date' sesuai screenshot Anda
-                $data = Overtime::where('status', $statusList)->whereRaw("DATE_FORMAT(overtime_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $data = Overtime::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(overtime_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
                 break;
             default:
                 $data = collect([]);
@@ -276,31 +606,110 @@ class HRDController extends Controller
             return back()->with('error', 'Tidak ada data untuk diekspor.');
         }
 
-        // 2. Gunakan class anonim dengan mapping yang lebih fleksibel
-        return Excel::download(new class($data, $type) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
-            protected $data, $type;
-            public function __construct($data, $type)
+        // 2. Ekspor dengan Class Anonim yang sudah Disamakan Formatnya
+        return Excel::download(new class($data) implements FromCollection, WithHeadings, WithMapping, WithEvents, WithColumnWidths {
+            protected $data;
+            public function __construct($data)
             {
                 $this->data = $data;
-                $this->type = $type;
             }
-
             public function collection()
             {
-                return $this->data->map(function ($item) {
-                    // Pemetaan dinamis berdasarkan tipe
-                    return [
-                        'Nama Pegawai' => $item->user->name ?? 'N/A',
-                        'Tanggal'      => $item->tanggal ?? $item->start_date ?? $item->overtime_date ?? 'N/A',
-                        'Status'       => ucwords(str_replace('_', ' ', $item->status ?? 'N/A')),
-                        'Keterangan'   => $item->reason ?? $item->hrd_note ?? '-'
-                    ];
-                });
+                return $this->data;
             }
 
             public function headings(): array
             {
-                return ['Nama Pegawai', 'Tanggal / Waktu', 'Status / Keterangan'];
+                return ['NAMA PEGAWAI', 'TANGGAL / WAKTU', 'STATUS', 'KETERANGAN'];
+            }
+
+            public function map($item): array
+            {
+                return [
+                    $item->user->name ?? 'N/A',
+                    $item->tanggal ?? $item->start_date ?? $item->overtime_date ?? 'N/A',
+                    ucwords(str_replace('_', ' ', $item->status ?? 'N/A')),
+                    $item->reason ?? $item->hrd_note ?? $item->alasan ?? '-'
+                ];
+            }
+
+            public function columnWidths(): array
+            {
+                // Disamakan lebar kolomnya agar proporsional
+                return [
+                    'A' => 30, // Nama
+                    'B' => 20, // Tanggal
+                    'C' => 30, // Status
+                    'D' => 45, // Keterangan (Dibuat lebar)
+                ];
+            }
+
+            public function registerEvents(): array
+            {
+                return [
+                    AfterSheet::class => function (AfterSheet $event) {
+                        $sheet = $event->sheet;
+
+                        // 1. Geser ke bawah 5 baris untuk Kop Surat
+                        $sheet->insertNewRowBefore(1, 5);
+
+                        // 2. Teks Header (Ditaruh di B dan C agar di tengah A dan D)
+                        $sheet->setCellValue('B1', 'RS MATA Pekanbaru Eye Center');
+                        $sheet->setCellValue('B2', 'Jl. Soekarno Hatta No. 236 – Pekanbaru – Riau');
+                        $sheet->setCellValue('B3', 'Telp. (0761) 7875191, 0811 7605191 Fax. (0761) 7875195');
+                        $sheet->setCellValue('B4', 'www.pekanbarueyecenter.com');
+
+                        $sheet->mergeCells('B1:C1');
+                        $sheet->mergeCells('B2:C2');
+                        $sheet->mergeCells('B3:C3');
+                        $sheet->mergeCells('B4:C4');
+
+                        // 3. Styling Kop Surat
+                        $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('5a6ea8');
+                        $sheet->getStyle('B1:C4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        $sheet->getStyle('B1:C4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+                        // 4. Logo Kiri (A1) dan Logo Kanan (D1)
+                        if (file_exists(public_path('images/rsprofile.png'))) {
+                            $drawing1 = new Drawing();
+                            $drawing1->setPath(public_path('images/rsprofile.png'));
+                            $drawing1->setHeight(50);
+                            $drawing1->setCoordinates('A1');
+                            $drawing1->setWorksheet($sheet->getDelegate());
+                        }
+                        if (file_exists(public_path('images/Picture1.png'))) {
+                            $drawing2 = new Drawing();
+                            $drawing2->setPath(public_path('images/Picture1.png'));
+                            $drawing2->setHeight(50);
+                            $drawing2->setOffsetX(180);
+                            $drawing2->setCoordinates('D1');
+                            $drawing2->setWorksheet($sheet->getDelegate());
+                        }
+
+                        // 5. Styling Heading Tabel (Baris 6)
+                        $sheet->getRowDimension(6)->setRowHeight(35);
+                        $sheet->getStyle('A6:D6')->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 12],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E40AF']],
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                                'vertical' => Alignment::VERTICAL_CENTER,
+                            ],
+                        ]);
+
+                        // 6. Styling Data, Border, dan Wrap Text
+                        $lastRow = $sheet->getHighestRow();
+                        $sheet->getStyle('A6:D' . $lastRow)->applyFromArray([
+                            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
+                            'alignment' => ['vertical' => Alignment::VERTICAL_CENTER]
+                        ]);
+
+                        $sheet->getStyle('A7:D' . $lastRow)->getAlignment()->setWrapText(true);
+
+                        // 7. Fit to screen
+                        $sheet->getPageSetup()->setFitToWidth(1);
+                    },
+                ];
             }
         }, "Laporan_" . ucfirst($type) . "_" . now()->format('Ymd_His') . ".xlsx");
     }
@@ -320,10 +729,55 @@ class HRDController extends Controller
 
     public function reportAbsentDaily()
     {
-        $today = Carbon::today();
-        $presentIds = Attendance::whereDate('tanggal', $today)->pluck('user_id');
-        $data = User::whereNotIn('id', $presentIds)->where('work_type', 'shift')->get();
-        return view('hrd.reports.template-absent', ['data' => $data, 'title' => 'Pegawai Tidak Hadir Hari Ini']);
+        $today = Carbon::today()->format('Y-m-d');
+
+        $attendanceIds = Attendance::whereDate('tanggal', $today)
+            ->pluck('user_id');
+
+        $leaveIds = Leave::where('status', 'approved')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->pluck('user_id');
+
+        $permissionIds = Permission::where('status', 'approved')
+            ->whereDate('tanggal', $today)
+            ->pluck('user_id');
+
+        $excludedIds = $attendanceIds
+            ->merge($leaveIds)
+            ->merge($permissionIds)
+            ->unique();
+
+        $data = User::whereNotIn('id', $excludedIds)
+            ->whereNotIn('role', ['admin'])
+            ->get()
+            ->map(function ($employee) {
+
+                $alphaDays = Attendance::where(
+                    'user_id',
+                    $employee->id
+                )
+                    ->whereMonth('tanggal', now()->month)
+                    ->whereYear('tanggal', now()->year)
+                    ->where('status', 'alpha')
+                    ->count();
+
+                $employee->alpha_days = $alphaDays;
+
+                return $employee;
+            });
+        foreach ($data as $employee) {
+
+            $employee->alpha_days =
+                $this->calculateAlphaDays(
+                    $employee,
+                    now()->format('Y-m')
+                );
+        }
+        return view('hrd.reports.template-absent', [
+            'data' => $data,
+            'title' => 'Pegawai Tidak Hadir Hari Ini'
+        ]);
     }
 
     public function reportLeave(Request $request)
@@ -390,5 +844,191 @@ class HRDController extends Controller
         $overtimes = \App\Models\Overtime::with('user')->latest()->get();
 
         return view('hrd.tracking', compact('leaves', 'permissions', 'overtimes'));
+    }
+
+    public function employeeShifts(
+        Request $request,
+        User $user
+    ) {
+
+        $month =
+            $request->month
+            ??
+            now()->format('Y-m');
+
+        $shifts = EmployeeShift::with('shift')
+            ->where('user_id', $user->id)
+            ->whereRaw(
+                "DATE_FORMAT(shift_date,'%Y-%m') = ?",
+                [$month]
+            )
+            ->orderBy('shift_date')
+            ->orderBy('start_time')
+            ->get();
+
+        return response()->json([
+            'month' => $month,
+            'data' => $shifts
+        ]);
+    }
+    private function calculateAlphaDays(User $employee, $month = null)
+    {
+        $month = $month ?? now()->format('Y-m');
+
+        $startDate = Carbon::parse($month . '-01')->startOfMonth();
+        $endDate   = Carbon::parse($month . '-01')->endOfMonth();
+
+        /*
+    |--------------------------------------------------------------------------
+    | TANGGAL HADIR
+    |--------------------------------------------------------------------------
+    */
+        $attendanceDates = Attendance::where('user_id', $employee->id)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->pluck('tanggal')
+            ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+            ->unique();
+
+        /*
+    |--------------------------------------------------------------------------
+    | TANGGAL IZIN
+    |--------------------------------------------------------------------------
+    */
+        $permissionDates = Permission::where('user_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->pluck('tanggal')
+            ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+            ->unique();
+
+        /*
+    |--------------------------------------------------------------------------
+    | TANGGAL CUTI
+    |--------------------------------------------------------------------------
+    */
+        $leaveDates = collect();
+
+        $leaves = Leave::where('user_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where('start_date', '<=', $endDate)
+                    ->where('end_date', '>=', $startDate);
+            })
+            ->get();
+
+        foreach ($leaves as $leave) {
+
+            $start = Carbon::parse($leave->start_date);
+            $end   = Carbon::parse($leave->end_date);
+
+            while ($start->lte($end)) {
+
+                if ($start->between($startDate, $endDate)) {
+                    $leaveDates->push(
+                        $start->format('Y-m-d')
+                    );
+                }
+
+                $start->addDay();
+            }
+        }
+
+        $leaveDates = $leaveDates->unique();
+
+        /*
+    |--------------------------------------------------------------------------
+    | SHIFT EMPLOYEE
+    |--------------------------------------------------------------------------
+    */
+        if ($employee->work_type === 'shift') {
+
+            $shiftDates = EmployeeShift::where('user_id', $employee->id)
+                ->whereBetween('shift_date', [$startDate, $endDate])
+                ->pluck('shift_date')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
+
+            $alpha = 0;
+
+            foreach ($shiftDates as $date) {
+
+                if (
+                    !$attendanceDates->contains($date) &&
+                    !$permissionDates->contains($date) &&
+                    !$leaveDates->contains($date)
+                ) {
+                    $alpha++;
+                }
+            }
+
+            return $alpha;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | OFFICE_5 (SENIN - JUMAT)
+    |--------------------------------------------------------------------------
+    */
+        if ($employee->work_type === 'office_5') {
+
+            $alpha = 0;
+
+            $date = $startDate->copy();
+
+            while ($date->lte($endDate)) {
+
+                if (!$date->isWeekend()) {
+
+                    $day = $date->format('Y-m-d');
+
+                    if (
+                        !$attendanceDates->contains($day) &&
+                        !$permissionDates->contains($day) &&
+                        !$leaveDates->contains($day)
+                    ) {
+                        $alpha++;
+                    }
+                }
+
+                $date->addDay();
+            }
+
+            return $alpha;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | OFFICE_6 (SENIN - SABTU)
+    |--------------------------------------------------------------------------
+    */
+        if ($employee->work_type === 'office_6') {
+
+            $alpha = 0;
+
+            $date = $startDate->copy();
+
+            while ($date->lte($endDate)) {
+
+                // Minggu libur
+                if ($date->dayOfWeek !== Carbon::SUNDAY) {
+
+                    $day = $date->format('Y-m-d');
+
+                    if (
+                        !$attendanceDates->contains($day) &&
+                        !$permissionDates->contains($day) &&
+                        !$leaveDates->contains($day)
+                    ) {
+                        $alpha++;
+                    }
+                }
+
+                $date->addDay();
+            }
+
+            return $alpha;
+        }
+
+        return 0;
     }
 }

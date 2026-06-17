@@ -34,7 +34,8 @@ class PermissionController extends Controller
             'jam_mulai' => 'nullable|required_with:jam_selesai',
             'jam_selesai' => 'nullable|required_with:jam_mulai',
             'alasan' => 'required|string|min:2',
-            'lampiran' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048'
+            'lampiran' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
+            // 'employee_signature' => 'required|string',
         ]);
 
         /*
@@ -102,6 +103,7 @@ class PermissionController extends Controller
             'lampiran' => $lampiran,
             'status' => $status,
             'pj_status' => $pjStatus,
+            // 'employee_signature' => $request->employee_signature,
             'hrd_status' => $hrdStatus,
         ]);
 

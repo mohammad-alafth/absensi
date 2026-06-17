@@ -127,27 +127,16 @@ class ScheduleService
             );
 
             return [
-
                 'type' => 'shift',
-
                 'shift_id' => $employeeShift->shift->id,
-
-                'shift_name' => $employeeShift->shift->name,
-
+                'shift_name' => optional($employeeShift->shift)->name ?? 'Shift',
                 'start_time' => $employeeShift->start_time,
-
                 'end_time' => $employeeShift->end_time,
-
-                'grace_minutes' => $employeeShift->shift->grace_minutes,
-
+                'grace_minutes' => 15,
                 'is_overnight' => $employeeShift->is_overnight,
-
                 'shift_start' => $shiftStart,
-
                 'shift_end' => $shiftEnd,
-
                 'shift_date' => $employeeShift->shift_date,
-
                 'invalid_window' => !$isValidWindow,
             ];
         }
