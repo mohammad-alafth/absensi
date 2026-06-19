@@ -49,7 +49,7 @@ class PJOvertimeController extends Controller
             'pj_signature' => $request->signature,
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
-            'status' => $flow['status'],
+            'status' => 'waiting_hrd',
             'hrd_status' => $flow['hrd_status'],
         ]);
 

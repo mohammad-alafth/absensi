@@ -25,6 +25,10 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use App\Exports\CalendarExport;
+use App\Exports\CalendarUserExport;
+use App\Services\ScheduleService;
+use App\Exports\CalendarMultiExport;
 
 
 class HRDController extends Controller
@@ -85,9 +89,12 @@ class HRDController extends Controller
             'end_time'
         ])
             ->with([
-                'user:id,name,role',
+                'user:id,name,role,work_type',
                 'shift:id,name'
             ])
+            ->whereHas('user', function ($q) {
+                $q->where('work_type', 'shift');
+            })
             ->whereBetween('shift_date', [
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d')
@@ -477,10 +484,20 @@ class HRDController extends Controller
         $calendarEvents = [];
 
         foreach ($employeeShifts as $shift) {
+            $attendances = Attendance::whereBetween('tanggal', [
+                $employeeShifts->min('shift_date'),
+                $employeeShifts->max('shift_date')
+
+            ])
+                ->get()
+                ->keyBy(fn($a) => $a->user_id . '_' . $a->tanggal);
 
             if (!$shift->user) {
                 continue;
             }
+            $key = $shift->user_id . '_' .
+                Carbon::parse($shift->shift_date)->format('Y-m-d');
+            $attendance = $attendances->get($key);
             $role = strtolower($shift->user->role);
 
             if (str_starts_with($role, 'pj_')) {
@@ -501,14 +518,26 @@ class HRDController extends Controller
                 $end->addDay();
             }
             $roleColors = [
-                'nurse' => '#10b981',       // emerald
-                'security' => '#ef4444',    // red
-                'cs' => '#06b6d4',          // cyan
-                'administrasi' => '#6366f1', // indigo
-                'finance' => '#f59e0b',     // amber
-                'kasir' => '#ec4899',       // pink
-                'ipsrs' => '#64748b',       // slate
-                'pharmacist' => '#8b5cf6',  // violet
+                'superadmin'     => '#dc2626', // red-600
+                'admin'          => '#2563eb', // blue-600
+                'nurse'          => '#10b981', // emerald
+                'doctor'         => '#0ea5e9', // sky
+                'pharmacist'     => '#8b5cf6', // violet
+                'security'       => '#ef4444', // red
+                'cs'             => '#06b6d4', // cyan
+                'administrasi'   => '#6366f1', // indigo
+                'finance'        => '#f59e0b', // amber
+                'kasir'          => '#ec4899', // pink
+                'ipsrs'          => '#64748b', // slate
+
+                'lab'            => '#14b8a6', // teal
+                'radiologi'      => '#f97316', // orange
+                'gizi'           => '#84cc16', // lime
+                'rekam_medis'    => '#3b82f6', // blue
+                'it'             => '#1e293b', // slate dark
+                'marketing'      => '#e11d48', // rose
+                'manager'        => '#7c3aed', // purple
+                'direktur'       => '#991b1b', // dark red
             ];
             $calendarEvents[] = [
                 'title' => $shift->user->name,
@@ -519,8 +548,20 @@ class HRDController extends Controller
                 'borderColor'     => $roleColors[$role] ?? '#1E40AF',
 
                 'extendedProps' => [
-                    'role'  => $role,
-                    'shift' => $shift->shift->name ?? '-'
+                    'role'      => $role,
+                    'shift'     => $shift->shift->name ?? '-',
+                    'date'      => $shift->shift_date,
+                    'user_id' => $shift->user_id,
+                    'shift_in'  => $shift->start_time,
+                    'shift_out' => $shift->end_time,
+
+                    'check_in'  => $attendance?->jam_masuk
+                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                        : '-',
+
+                    'check_out' => $attendance?->jam_keluar
+                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                        : '-',
                 ]
             ];
         }
@@ -534,6 +575,121 @@ class HRDController extends Controller
                 'roles',
                 'roleLabels'
             )
+        );
+    }
+
+    public function calendarEmployee($userId)
+    {
+        $month = now()->month;
+        $year  = now()->year;
+
+        $data = EmployeeShift::with('shift')
+            ->where('user_id', $userId)
+            ->whereMonth('shift_date', $month)
+            ->whereYear('shift_date', $year)
+            ->orderBy('shift_date')
+            ->get()
+            ->map(function ($item) {
+
+                $attendance = Attendance::where('user_id', $item->user_id)
+                    ->whereDate('tanggal', $item->shift_date)
+                    ->first();
+
+                return [
+                    'tanggal'    => Carbon::parse($item->shift_date)->format('d-m-Y'),
+                    'shift'      => $item->shift->name ?? '-',
+                    'jam_masuk'  => $item->start_time,
+                    'jam_keluar' => $item->end_time,
+
+                    'check_in' => $attendance?->jam_masuk
+                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                        : '-',
+
+                    'check_out' => $attendance?->jam_keluar
+                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                        : '-',
+                ];
+            });
+
+        return response()->json($data);
+    }
+
+    public function exportCalendarUser(
+        Request $request,
+        User $user
+    ) {
+        $month = $request->month;
+
+        $year  = Carbon::parse($month)->year;
+        $monthNumber = Carbon::parse($month)->month;
+
+        $user = $user;
+
+        $startDate = Carbon::createFromDate($year, $monthNumber, 1);
+        $endDate   = $startDate->copy()->endOfMonth();
+
+        $days = collect();
+
+        for ($date = $startDate; $date <= $endDate; $date->addDay()) {
+
+            $schedule = \App\Services\ScheduleService::getTodaySchedule(
+                $user,
+                $date->format('Y-m-d')
+            );
+
+            if (!$schedule) continue;
+
+            $days->push((object)[
+                'user_id' => $user->id,
+                'shift_date' => $date->format('Y-m-d'),
+                'shift' => (object)[
+                    'name' => $schedule['shift_name']
+                ],
+                'start_time' => $schedule['start_time'],
+                'end_time' => $schedule['end_time'],
+            ]);
+        }
+
+        $data = $days;
+
+        return Excel::download(
+            new CalendarUserExport(
+                $data,
+                $user,
+                $month
+            ),
+            'shift-' . $user->name . '.xlsx'
+        );
+    }
+
+    public function exportCalendar(Request $request)
+    {
+        $month = $request->month;
+        $role = $request->role;
+
+        $startDate = Carbon::parse($month . '-01')->startOfMonth();
+        $endDate = Carbon::parse($month . '-01')->endOfMonth();
+
+        $data = EmployeeShift::with(['user', 'shift'])
+            ->whereBetween('shift_date', [$startDate, $endDate])
+            ->whereHas('user', function ($q) use ($role) {
+                if ($role !== 'all') {
+                    $q->whereRaw("LOWER(REPLACE(role,'pj_','')) = ?", [strtolower($role)]);
+                }
+            })
+            ->orderBy('shift_date')
+            ->get();
+
+        return Excel::download(
+            new CalendarExport($data),
+            "calendar-{$role}-{$month}.xlsx"
+        );
+    }
+    public function exportCalendarAll(Request $request)
+    {
+        return Excel::download(
+            new CalendarMultiExport($request->month),
+            "calendar-all-{$request->month}.xlsx"
         );
     }
 
@@ -846,31 +1002,87 @@ class HRDController extends Controller
         return view('hrd.tracking', compact('leaves', 'permissions', 'overtimes'));
     }
 
-    public function employeeShifts(
-        Request $request,
-        User $user
-    ) {
+    public function employeeShifts(Request $request, User $user)
+    {
+        $month = $request->month ?? now()->format('Y-m');
 
-        $month =
-            $request->month
-            ??
-            now()->format('Y-m');
+        $year = Carbon::parse($month)->year;
+        $monthNumber = Carbon::parse($month)->month;
 
         $shifts = EmployeeShift::with('shift')
             ->where('user_id', $user->id)
-            ->whereRaw(
-                "DATE_FORMAT(shift_date,'%Y-%m') = ?",
-                [$month]
-            )
+            ->whereMonth('shift_date', $monthNumber)
+            ->whereYear('shift_date', $year)
             ->orderBy('shift_date')
-            ->orderBy('start_time')
-            ->get();
+            ->get()
+            ->map(function ($item) use ($user) {
+
+                $attendance = Attendance::where('user_id', $item->user_id)
+                    ->whereDate('tanggal', $item->shift_date)
+                    ->first();
+
+                return [
+                    'shift_date' => Carbon::parse($item->shift_date)->format('d-m-Y'),
+                    'shift_name' => $item->shift->name ?? '-',
+
+                    // SHIFT DATA
+                    'start_time' => $item->start_time,
+                    'end_time'   => $item->end_time,
+
+                    // OFFICE FIX (ambil dari schedule service kalau kosong)
+                    'office_start' => $item->start_time,
+                    'office_end'   => $item->end_time,
+
+                    'check_in' => $attendance?->jam_masuk
+                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                        : '-',
+
+                    'check_out' => $attendance?->jam_keluar
+                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                        : '-',
+                ];
+            });
+
+        /**
+         * 🔥 TAMBAHAN: kalau user OFFICE, inject schedule hari ini
+         */
+        if (in_array($user->work_type, ['office_5', 'office_6'])) {
+
+            $today = Carbon::now()->format('Y-m-d');
+
+            $schedule = ScheduleService::getTodaySchedule($user);
+
+            if ($schedule) {
+
+                $attendance = Attendance::where('user_id', $user->id)
+                    ->whereDate('tanggal', $today)
+                    ->first();
+
+                $shifts->push([
+                    'shift_date' => Carbon::now()->format('d-m-Y'),
+                    'shift_name' => 'Office Schedule',
+
+                    // INI YANG KAMU MAU
+                    'start_time' => $schedule['start_time'],
+                    'end_time'   => $schedule['end_time'],
+
+                    'check_in' => $attendance?->jam_masuk
+                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                        : '-',
+
+                    'check_out' => $attendance?->jam_keluar
+                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                        : '-',
+                ]);
+            }
+        }
 
         return response()->json([
             'month' => $month,
             'data' => $shifts
         ]);
     }
+
     private function calculateAlphaDays(User $employee, $month = null)
     {
         $month = $month ?? now()->format('Y-m');

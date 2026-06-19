@@ -1,3 +1,6 @@
+
+
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -388,16 +391,25 @@ Route::middleware([
             Route::get('/tracking', [HRDController::class, 'tracking'])->name('tracking');
         });
 
+    Route::get(
+        '/hrd/calendar/export',
+        [HRDController::class, 'exportCalendar']
+    )->name('hrd.calendar.export');
 
+    Route::get(
+        '/hrd/calendar/export-user/{user}',
+        [HRDController::class, 'exportCalendarUser']
+    )->name('hrd.calendar.export.user');
+    Route::get('/hrd/calendar/export-all', [HRDController::class, 'exportCalendarAll']);
     /*
         |--------------------------------------------------------------------------
         | SHIFT
         |--------------------------------------------------------------------------
     */
-        Route::get(
-            '/hrd/employee-shifts/{user}',
-            [HRDController::class, 'employeeShifts']
-        )->name('hrd.employee.shifts');
+    Route::get(
+        '/hrd/employee-shifts/{user}',
+        [HRDController::class, 'employeeShifts']
+    )->name('hrd.employee.shifts');
     Route::middleware(['auth'])->group(function () {
         // Rute Shift Umum (Bisa diakses user)
         Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
@@ -413,7 +425,10 @@ Route::middleware([
             // Store tetap menggunakan POST
             Route::post('/shifts/store', [ShiftManagementController::class, 'store'])->name('shifts.store');
         });
-
+        Route::get(
+            '/hrd/calendar-employee/{user}',
+            [HrdController::class, 'calendarEmployee']
+        );
     });
 });
 

@@ -236,28 +236,45 @@
                                     Jadwal seluruh pegawai
                                 </p>
                             </div>
-
-                            <button id="closeShiftModal"
-                                class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">
-                                ✕
-                            </button>
-
                             <div class="flex items-center gap-2 mt-3">
-                                <label class="text-xs font-semibold text-slate-600">
-                                    Filter Unit:
-                                </label>
+                                <div class="flex items-center gap-2">
 
-                                <select id="calendarRoleFilter"
-                                    class="border border-slate-200 rounded-lg px-3 py-2 text-xs">
+                                    <label class="text-xs font-semibold text-slate-600">
+                                        Filter Unit:
+                                    </label>
 
-                                    <option value="all">Semua Unit</option>
+                                    <select id="calendarRoleFilter"
+                                        class="border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-sm">
+                                        <option value="all">Semua Unit</option>
 
-                                    @foreach($roles as $role)
-                                    <option value="{{ $role }}">
-                                        {{ $roleLabels[$role] ?? ucfirst($role) }}
-                                    </option>
-                                    @endforeach
-                                </select>
+                                        @foreach($roles as $role)
+                                        <option value="{{ $role }}">
+                                            {{ $roleLabels[$role] ?? ucfirst($role) }}
+                                        </option>
+                                        @endforeach
+                                    </select>
+
+                                    <button
+                                        id="exportCalendarBtn"
+                                        class="
+            flex items-center gap-2
+            bg-emerald-600
+            hover:bg-emerald-700
+            text-white
+            px-4 py-2
+            rounded-xl
+            text-xs font-bold
+            shadow-sm hover:shadow-md
+            transition
+        ">
+                                        <span>📊</span>
+                                        Export Jadwal
+                                    </button>
+                                    <button id="closeShiftModal"
+                                        class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -375,35 +392,98 @@
 
                 events: allEvents,
 
-                eventClick: function(info) {
+                eventClick: async function(info) {
 
-                    const start = info.event.start;
-                    const end = info.event.end;
+                    const userId =
+                        info.event.extendedProps.user_id;
 
-                    const hari = start.toLocaleDateString('id-ID', {
-                        weekday: 'long'
-                    });
+                    const response =
+                        await fetch(
+                            `/hrd/calendar-employee/${userId}`
+                        );
 
-                    const jamMulai = start.toLocaleTimeString('id-ID', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
+                    const data = await response.json();
 
-                    const jamSelesai = end.toLocaleTimeString('id-ID', {
-                        hour: '2-digit',
-                        minute: '2-digit'
+                    let rows = '';
+
+                    data.forEach(item => {
+
+                        rows += `
+        <tr>
+            <td style="border:1px solid #e5e7eb;padding:10px">
+                ${item.tanggal}
+            </td>
+
+            <td style="border:1px solid #e5e7eb;padding:10px">
+                ${item.shift}
+            </td>
+
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:center">
+                ${item.jam_masuk}
+            </td>
+
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:center">
+                ${item.jam_keluar}
+            </td>
+
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:center">
+                ${item.check_in}
+            </td>
+
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:center">
+                ${item.check_out}
+            </td>
+        </tr>
+    `;
+
                     });
 
                     Swal.fire({
-                        title: info.event.title,
-                        html: `
-            <div style="text-align:left">
-                <b>${info.event.extendedProps.shift}</b><br>
-                ${hari}<br>
-                Jam ${jamMulai} - ${jamSelesai}
-            </div>
-        `
-                    });
+                            title: info.event.title,
+                            width: 1200,
+
+                            html: `
+        <div style="max-height:500px;overflow:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Shift</th>
+                        <th>Masuk</th>
+                        <th>Keluar</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    `,
+
+                            showCancelButton: true,
+
+                            confirmButtonText: '📥 Export Excel',
+
+                            cancelButtonText: 'Tutup'
+                        })
+                        .then(result => {
+
+                            if (result.isConfirmed) {
+
+                                const month =
+                                    document.querySelector(
+                                        'input[name="month"]'
+                                    ).value;
+
+                                window.open(
+                                    `/hrd/calendar/export-user/${userId}?month=${month}`,
+                                    '_blank'
+                                );
+                            }
+                        });
+
                 }
             });
 
@@ -477,12 +557,11 @@
         }
 
         async function showShiftModal(userId, employeeName) {
+
             try {
 
                 const selectedMonth =
-                    document.querySelector(
-                        'input[name="month"]'
-                    ).value;
+                    document.querySelector('input[name="month"]').value;
 
                 const response = await fetch(
                     `/hrd/employee-shifts/${userId}?month=${selectedMonth}`
@@ -490,80 +569,206 @@
 
                 const result = await response.json();
 
-                const shifts = result.data;
+                const shifts = result.data || [];
 
-                let html = `
-            <div class="text-left">
-
-                <div class="mb-3">
-                    <h3 class="font-bold text-slate-800">
-                        ${employeeName}
-                    </h3>
-
-                    <p style="
-                    font-size:12px;
-                    color:#64748b;
-                    ">
-                    Bulan :
-                    ${new Date(result.month + '-01').toLocaleDateString('id-ID', {
-                        month: 'long',
-                        year: 'numeric'
-                    })}
-                    </p>
-                </div>
-
-                <div style="
-                    max-height:400px;
-                    overflow:auto;
-                ">
-        `;
+                let rows = '';
 
                 shifts.forEach(item => {
 
-                    html += `
-                <div style="
-                    border:1px solid #e5e7eb;
-                    border-radius:10px;
-                    padding:10px;
-                    margin-bottom:8px;
-                ">
+                    const late =
+                        item.check_in &&
+                        item.check_in !== '-' &&
+                        item.start_time &&
+                        item.check_in > item.start_time;
 
-                    <div>
-                        <strong>
-                            ${item.shift_date}
-                        </strong>
-                    </div>
+                    rows += `
+                <tr>
 
-                    <div>
-                        ${item.start_time}
-                        -
-                        ${item.end_time}
-                    </div>
-
-                    <div style="
-                        color:#64748b;
-                        font-size:12px;
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
                     ">
-                        ${item.shift?.name ?? 'Shift'}
-                    </div>
+                        ${item.shift_date}
+                    </td>
 
-                </div>
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
+                    ">
+                        ${item.shift_name ?? '-'}
+                    </td>
+
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
+                        text-align:center;
+                    ">
+                        ${item.start_time}
+                    </td>
+
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
+                        text-align:center;
+                    ">
+                        ${item.end_time}
+                    </td>
+
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
+                        text-align:center;
+                        font-weight:bold;
+                        color:${late ? '#dc2626' : '#16a34a'};
+                    ">
+                        ${item.check_in ?? '-'}
+                    </td>
+
+                    <td style="
+                        border:1px solid #e5e7eb;
+                        padding:10px;
+                        text-align:center;
+                    ">
+                        ${item.check_out ?? '-'}
+                    </td>
+
+                </tr>
             `;
                 });
 
-                html += `
+                if (!rows) {
+
+                    rows = `
+                <tr>
+                    <td colspan="6"
+                        style="
+                            padding:20px;
+                            text-align:center;
+                            border:1px solid #e5e7eb;
+                            color:#64748b;
+                        ">
+                        Tidak ada data shift
+                    </td>
+                </tr>
+            `;
+                }
+
+                const html = `
+            <div style="text-align:left">
+
+                <div style="
+                    margin-bottom:15px;
+                    padding:12px;
+                    background:#f8fafc;
+                    border-radius:10px;
+                ">
+
+                    <h3 style="
+                        margin:0;
+                        font-size:16px;
+                        font-weight:700;
+                        color:#0f172a;
+                    ">
+                        ${employeeName}
+                    </h3>
+
+                    <div style="
+                        margin-top:4px;
+                        font-size:12px;
+                        color:#64748b;
+                    ">
+                        Bulan :
+                        ${new Date(result.month + '-01')
+                            .toLocaleDateString('id-ID',{
+                                month:'long',
+                                year:'numeric'
+                            })}
+                    </div>
+
                 </div>
+
+                <div style="
+                    max-height:550px;
+                    overflow:auto;
+                    border:1px solid #e5e7eb;
+                    border-radius:12px;
+                ">
+
+                    <table style="
+                        width:100%;
+                        border-collapse:collapse;
+                        font-size:13px;
+                    ">
+
+                        <thead style="
+                            background:#f8fafc;
+                            position:sticky;
+                            top:0;
+                            z-index:10;
+                        ">
+                            <tr>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Tanggal
+                                </th>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Shift
+                                </th>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Jadwal Masuk
+                                </th>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Jadwal Keluar
+                                </th>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Check In
+                                </th>
+
+                                <th style="border:1px solid #e5e7eb;padding:12px">
+                                    Check Out
+                                </th>
+
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            ${rows}
+                        </tbody>
+
+                    </table>
+
+                </div>
+
             </div>
         `;
 
                 Swal.fire({
-                    title: 'Jadwal Shift',
+                    title: 'Detail Shift Pegawai',
                     html: html,
-                    width: 700,
-                    confirmButtonText: 'Tutup'
+                    width: 1200,
+                    showCancelButton: true,
+                    confirmButtonText: 'Export Excel',
+                    cancelButtonText: 'Tutup'
+                }).then(result => {
+
+                    if (result.isConfirmed) {
+
+                        window.open(
+                            `/hrd/calendar/export-user/${userId}?month=${selectedMonth}`,
+                            '_blank'
+                        );
+
+                    }
+
                 });
 
             } catch (e) {
+
+                console.error(e);
 
                 Swal.fire(
                     'Gagal',
@@ -664,6 +869,44 @@
             });
 
         });
+        document
+            .getElementById('exportCalendarBtn')
+            .addEventListener('click', function() {
+
+                const btn = this;
+
+                const role =
+                    document.getElementById('calendarRoleFilter').value;
+
+                const month =
+                    document.querySelector('input[name="month"]').value;
+
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Menyiapkan File...';
+
+                // 🔥 LOGIC UTAMA DI SINI
+                if (role === 'all') {
+
+                    // MULTI SHEET EXPORT (SEMUA ROLE)
+                    window.open(
+                        `/hrd/calendar/export-all?month=${month}`,
+                        '_blank'
+                    );
+
+                } else {
+
+                    // SINGLE ROLE EXPORT
+                    window.open(
+                        `/hrd/calendar/export?month=${month}&role=${role}`,
+                        '_blank'
+                    );
+                }
+
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '📊 Export Jadwal';
+                }, 1500);
+            });
     </script>
 
 </x-app-layout>

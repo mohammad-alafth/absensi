@@ -11,15 +11,16 @@ class ApprovalFlowService
             'pj_status' => 'pending',
             'hrd_status' => 'pending',
         ];
-
         /**
          * SKIP PJ ROLE
          */
         $skipPjRoles = [
+            'hrd',
+            'head_pegawai',
+            'director',
+            'it',
             'marketing',
             'konten_creator',
-            'hrd',
-            'it',
         ];
 
         if (in_array($userRole, $skipPjRoles)) {

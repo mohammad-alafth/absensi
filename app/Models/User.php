@@ -98,10 +98,15 @@ class User extends Authenticatable
             'nutrition' => 'GIZI',
             'medical_record' => 'REKAM MEDIS',
             'casemix' => 'CASEMIX',
-            'ipsrs' => 'INSTALASI PEMELIHARAAN RS',
+            'ipsrs' => 'IPSRS',
         ];
 
         return $roles[$this->role]
             ?? strtoupper(str_replace('_', ' ', $this->role));
+    }
+
+    public function shifts()
+    {
+        return $this->hasMany(\App\Models\EmployeeShift::class, 'user_id');
     }
 }

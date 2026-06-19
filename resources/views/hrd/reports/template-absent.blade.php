@@ -3,22 +3,28 @@
         position: relative;
         min-height: 18px;
     }
+
     .employee-name {
         display: block;
     }
+
     .employee-alpha {
         display: none;
     }
+
     .employee-card:hover .employee-name {
         display: none;
     }
+
     .employee-card:hover .employee-alpha {
         display: block;
     }
+
     .employee-card {
         transition: all .25s ease;
         cursor: pointer;
     }
+
     .employee-card:hover {
         transform: translateY(-2px);
         background: #fff7ed;
@@ -35,24 +41,53 @@
                     <h1 class="text-lg sm:text-xl font-extrabold text-gray-900">{{ $title }}</h1>
                     <a href="{{ route('hrd.rekap') }}" class="text-xs font-bold text-[#1E40AF] hover:underline">← Kembali</a>
                 </div>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+                    <div class="text-xs font-semibold text-gray-500">
+                        Total Tidak Hadir :
+                        <span id="employeeCount">{{ count($data ?? []) }}</span> Pegawai
+                    </div>
+
+                    <div class="w-full md:w-72">
+                        <input
+                            type="text"
+                            id="searchEmployee"
+                            placeholder="Cari nama pegawai..."
+                            class="w-full rounded-xl border-gray-300 text-sm focus:ring-[#1E40AF] focus:border-[#1E40AF]">
+                    </div>
+
+                </div>
 
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+
                     @forelse($data as $employee)
-                    <div class="employee-card p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center shadow-sm">
+
+                    <div
+                        class="employee-card p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center shadow-sm"
+                        data-name="{{ strtolower($employee->name) }}">
+
                         <div class="employee-name-wrapper">
+
                             <span class="employee-name text-[11px] font-bold text-rose-800">
                                 {{ $employee->name }}
                             </span>
+
                             <span class="employee-alpha text-[11px] font-bold text-amber-700">
                                 Tidak Hadir {{ $employee->alpha_days ?? 0 }} Hari
                             </span>
+
                         </div>
+
                     </div>
+
                     @empty
+
                     <div class="col-span-full p-8 text-center text-gray-400 text-xs">
                         Semua pegawai hadir hari ini.
                     </div>
+
                     @endforelse
+
                 </div>
             </div>
         </div>
@@ -65,6 +100,8 @@
         const cards = document.querySelectorAll('.employee-card');
         const countElement = document.getElementById('employeeCount');
 
+        if (!searchInput) return;
+
         searchInput.addEventListener('keyup', function() {
 
             const keyword = this.value.toLowerCase();
@@ -72,22 +109,21 @@
 
             cards.forEach(card => {
 
-                const name = card.dataset.name;
+                const name = card.dataset.name || '';
 
                 if (name.includes(keyword)) {
-
                     card.style.display = '';
                     visibleCount++;
-
                 } else {
-
                     card.style.display = 'none';
-
                 }
 
             });
 
-            countElement.innerText = visibleCount;
+            if (countElement) {
+                countElement.textContent = visibleCount;
+            }
+
         });
 
     });
