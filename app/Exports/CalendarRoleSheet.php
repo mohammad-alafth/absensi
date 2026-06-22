@@ -78,20 +78,71 @@ class CalendarRoleSheet implements WithTitle, WithEvents
                         $date->addDay()
                     ) {
 
+                        $employeeShift = EmployeeShift::with('shift')
+                            ->where('user_id', $user->id)
+                            ->whereDate('shift_date', $date->format('Y-m-d'))
+                            ->first();
                         $attendance = Attendance::where('user_id', $user->id)
                             ->whereDate('tanggal', $date->format('Y-m-d'))
                             ->first();
 
-                        $schedule = \App\Services\ScheduleService::getTodaySchedule($user);
+                        $dayOfWeek = $date->dayOfWeek; // 0=Minggu, 6=Sabtu
 
-                        if (!$schedule) {
-                            $shiftName = '-';
-                            $startTime = '-';
-                            $endTime   = '-';
+                        if ($user->work_type === 'shift') {
+
+                            $shiftName = $employeeShift?->shift?->name ?? '-';
+
+                            $startTime = $employeeShift?->shift?->start_time ?? '-';
+
+                            $endTime = $employeeShift?->shift?->end_time ?? '-';
+                        } elseif ($user->work_type === 'office_5') {
+
+                            if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
+
+                                $shiftName = 'Office 5';
+
+                                $startTime = '08:00';
+
+                                $endTime = '17:00';
+                            } else {
+
+                                $shiftName = 'Libur';
+
+                                $startTime = '-';
+
+                                $endTime = '-';
+                            }
+                        } elseif ($user->work_type === 'office_6') {
+
+                            if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
+
+                                $shiftName = 'Office 6';
+
+                                $startTime = '08:00';
+
+                                $endTime = '16:00';
+                            } elseif ($dayOfWeek == 6) {
+
+                                $shiftName = 'Office 6';
+
+                                $startTime = '08:00';
+
+                                $endTime = '13:00';
+                            } else {
+
+                                $shiftName = 'Libur';
+
+                                $startTime = '-';
+
+                                $endTime = '-';
+                            }
                         } else {
-                            $shiftName = $schedule['shift_name'] ?? '-';
-                            $startTime = $schedule['start_time'] ?? '-';
-                            $endTime   = $schedule['end_time'] ?? '-';
+
+                            $shiftName = '-';
+
+                            $startTime = '-';
+
+                            $endTime = '-';
                         }
 
                         $days->push([
@@ -99,8 +150,12 @@ class CalendarRoleSheet implements WithTitle, WithEvents
                             'shift'     => $shiftName,
                             'masuk'     => $startTime,
                             'keluar'    => $endTime,
-                            'check_in'  => $attendance?->jam_masuk ?? '-',
-                            'check_out' => $attendance?->jam_keluar ?? '-',
+                            'check_in'  => $attendance?->jam_masuk
+                                ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                                : '-',
+                            'check_out' => $attendance?->jam_keluar
+                                ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                                : '-',
                         ]);
                     }
 
