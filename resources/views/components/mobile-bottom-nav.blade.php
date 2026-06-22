@@ -1,4 +1,4 @@
-<div class="fixed bottom-0 left-0 right-0 md:hidden z-50 px-2 pb-3">
+<div id="mobileBottomNav" class="fixed bottom-0 left-0 right-0 md:hidden z-50 px-2 pb-3 transition-all duration-300">
     <div class="relative bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl p-1 overflow-hidden">
 
         <div class="absolute top-1 bottom-1 w-[24%] rounded-xl transition-all duration-500 ease-out shadow-lg 

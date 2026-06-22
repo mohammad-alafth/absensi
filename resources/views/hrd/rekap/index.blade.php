@@ -7,10 +7,15 @@
             /* Membuat warna latar belakang luar lebih gelap agar elemen putih menonjol */
         }
 
-        /* HEADER */
+        /* Header */
+        .fc .fc-toolbar {
+            margin-bottom: 12px !important;
+        }
+
         .fc .fc-toolbar-title {
+            font-size: 18px !important;
+            font-weight: 800 !important;
             color: #0f172a;
-            font-weight: 800;
         }
 
         .fc .fc-button-primary {
@@ -52,15 +57,85 @@
             background: #eff6ff !important;
         }
 
+        .fc-col-header-cell-cushion {
+            padding: 10px 0;
+            font-weight: 700;
+        }
+
         /* TIME SLOT */
         .fc-timegrid-slot {
-            background: #fff;
+            height: 3rem !important;
+        }
+
+        @media (max-width: 768px) {
+            #calendar {
+                overflow-x: auto;
+            }
+
+            .fc-view-harness {
+                min-width: 900px;
+            }
+
+            .fc-toolbar {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px;
+            }
+
+            .fc-toolbar-chunk {
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .fc-event-title {
+                white-space: normal !important;
+            }
+
+            .fc .fc-toolbar-title {
+                font-size: 14px !important;
+            }
+
+            .fc-button {
+                font-size: 11px !important;
+                padding: 4px 8px !important;
+            }
+        }
+
+        html,
+        body {
+            overflow-x: hidden;
+        }
+
+        .employee-card {
+            width: 100%;
+        }
+
+        .fc {
+            max-width: 100%;
+        }
+
+        .swal2-popup {
+            max-width: 95vw !important;
+        }
+
+        @media (max-width: 640px) {
+
+            .text-xl {
+                font-size: 1rem !important;
+            }
+
+            .text-2xl {
+                font-size: 1.25rem !important;
+            }
+
         }
     </style>
 
     <div class="min-h-screen bg-[#f0f2f9] px-3 sm:px-5 py-6 pb-28">
 
-        <div class="w-full max-w-6xl mx-auto">
+        <div class="w-full max-w-[1600px] mx-auto">
 
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-100/70 border border-white p-5 sm:p-7 space-y-5">
 
@@ -81,7 +156,6 @@
 
 
                     <div class="flex flex-col sm:flex-row items-center gap-1 w-full lg:w-auto">
-
                         <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center w-full sm:w-52 h-[38px]">
                             <input type="text" id="searchInput" placeholder="Cari nama atau role..."
                                 class="border-0 bg-transparent focus:ring-0 text-xs w-full p-0 text-gray-700 placeholder-gray-400">
@@ -124,7 +198,7 @@
 
                     </div>
                 </div>
-                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2 flex flex-wrap gap-2 mb-2">
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-2 flex flex-wrap gap-2 mb-2 overflow-x-auto">
 
                     <a href="{{ route('hrd.reports.attendance.daily') }}"
                         class="flex items-center gap-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 transition shadow-2xs">
@@ -223,11 +297,11 @@
                 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                 <!-- MODAL SHIFT CALENDAR -->
                 <div id="shiftModal"
-                    class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+                    class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-0 md:p-4">
 
-                    <div class="bg-white rounded-3xl w-[98vw] h-[95vh] shadow-xl flex flex-col">
+                    <div class="bg-white rounded-3xl w-full max-w-[1600px] h-[95vh] shadow-xl flex flex-col">
 
-                        <div class="flex items-center justify-between p-5 border-b">
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-5 border-b">
                             <div>
                                 <h2 class="text-lg font-bold text-slate-800">
                                     Kalender Shift Bulan
@@ -236,7 +310,7 @@
                                     Jadwal seluruh pegawai
                                 </p>
                             </div>
-                            <div class="flex items-center gap-2 mt-3">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <div class="flex items-center gap-2">
 
                                     <label class="text-xs font-semibold text-slate-600">
@@ -289,7 +363,7 @@
                     <div class="employee-card self-start bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs transition duration-200"
                         data-role="{{ strtolower($recap['employee']->role_label) }}">
 
-                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleDetail({{ $index }})">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 cursor-pointer" onclick="toggleDetail({{ $index }})">
                             <div class="flex items-center gap-3 truncate">
                                 <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-black shadow-inner">
                                     {{ strtoupper(substr($recap['employee']->name, 0, 1)) }}
@@ -304,7 +378,7 @@
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-3">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <button
                                     onclick="showShiftModal({{ $recap['employee']->id }}, '{{ $recap['employee']->name }}')"
                                     class="bg-indigo-50 hover:bg-indigo-100
@@ -326,7 +400,7 @@
                         </div>
 
                         <div id="detail-{{ $index }}" class="hidden mt-4 pt-4 border-t border-slate-100 animate-in fade-in duration-300">
-                            <div class="grid grid-cols-4 gap-2">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
                                 <div class="bg-slate-50 rounded-xl p-2 text-center">
                                     <p class="text-[9px] text-gray-400 font-bold uppercase">Hadir</p>
                                     <h3 class="text-xs font-black text-emerald-600 mt-0.5">{{ $recap['hadir'] }}x</h3>
