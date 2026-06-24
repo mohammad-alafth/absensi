@@ -57,7 +57,11 @@ class ApprovalFlowService
          * SEMUA PJ ROLE (termasuk pj_casemix)
          */
         if (str_starts_with($userRole, 'pj_')) {
-            return $base;
+            return [
+                'status' => 'waiting_hrd',
+                'pj_status' => 'approved',
+                'hrd_status' => 'pending',
+            ];
         }
 
         return $base;

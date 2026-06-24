@@ -60,6 +60,10 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
             'Jadwal Keluar',
             'Check In',
             'Check Out',
+            'Status Kehadiran',
+            'Terlambat',
+            'Jam Kerja',
+            'Lembur',
         ];
     }
 
@@ -74,49 +78,43 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
             'F' => 15,
             'G' => 15,
             'H' => 15,
+            'I' => 30,
+            'J' => 15,
+            'K' => 15,
+            'L' => 15,
         ];
     }
     public function registerEvents(): array
     {
         return [
-
             AfterSheet::class => function (AfterSheet $event) {
-
                 $sheet = $event->sheet;
-
                 // Header
                 $sheet->insertNewRowBefore(1, 4);
-
-                $sheet->mergeCells('A1:H1');
-                $sheet->mergeCells('A2:H2');
-
+                $sheet->mergeCells('A1:L1');
+                $sheet->mergeCells('A2:L2');
                 $sheet->setCellValue(
                     'A1',
                     'REKAP JADWAL SHIFT PEGAWAI'
                 );
-
                 $sheet->setCellValue(
                     'A2',
                     'HRD MANAGEMENT REPORT'
                 );
-
                 $sheet->getStyle('A1')
                     ->getFont()
                     ->setBold(true)
                     ->setSize(16);
-
                 $sheet->getStyle('A2')
                     ->getFont()
                     ->setSize(11);
-
                 $sheet->getStyle('A1:H2')
                     ->getAlignment()
                     ->setHorizontal(
                         Alignment::HORIZONTAL_CENTER
                     );
-
                 // Heading table
-                $sheet->getStyle('A5:H5')
+                $sheet->getStyle('A5:L5')
                     ->applyFromArray([
                         'font' => [
                             'bold' => true,
@@ -124,14 +122,12 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
                                 'rgb' => 'FFFFFF'
                             ]
                         ],
-
                         'fill' => [
                             'fillType' => Fill::FILL_SOLID,
                             'startColor' => [
                                 'rgb' => '1E40AF'
                             ]
                         ],
-
                         'alignment' => [
                             'horizontal' =>
                             Alignment::HORIZONTAL_CENTER,
@@ -139,12 +135,10 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
                             Alignment::VERTICAL_CENTER,
                         ]
                     ]);
-
                 $lastRow = $sheet->getHighestRow();
-
                 // Border semua data
                 $sheet->getStyle(
-                    'A5:H' . $lastRow
+                    'A5:L' . $lastRow
                 )->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -153,7 +147,6 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
                         ]
                     ]
                 ]);
-
                 // Tengah kolom jam
                 $sheet->getStyle(
                     'A5:H' . $lastRow
@@ -161,35 +154,28 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
                     ->setVertical(
                         Alignment::VERTICAL_CENTER
                     );
-
                 $sheet->getStyle(
                     'A5:A' . $lastRow
                 )->getAlignment()
                     ->setHorizontal(
                         Alignment::HORIZONTAL_CENTER
                     );
-
                 $sheet->getStyle(
                     'E5:H' . $lastRow
                 )->getAlignment()
                     ->setHorizontal(
                         Alignment::HORIZONTAL_CENTER
                     );
-
                 // Freeze header
                 $sheet->freezePane('A6');
-
                 // Auto filter
                 $sheet->setAutoFilter(
                     'A5:H' . $lastRow
                 );
-
                 // Highlight keterlambatan
                 for ($row = 6; $row <= $lastRow; $row++) {
-
                     $schedule = $sheet->getCell('E' . $row)->getValue();
                     $checkin  = $sheet->getCell('G' . $row)->getValue();
-
                     if (
                         $schedule !== '-' &&
                         $checkin !== '-'
@@ -209,13 +195,11 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
                         }
                     }
                 }
-
                 // Landscape print
                 $sheet->getPageSetup()
                     ->setOrientation(
                         \PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE
                     );
-
                 $sheet->getPageSetup()
                     ->setFitToWidth(1);
             }
@@ -224,11 +208,197 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
 
     public function map($row): array
     {
-        $attendance = \App\Models\Attendance::where('user_id', $row->user_id)
-            ->whereDate('tanggal', $row->shift_date)
+        $attendance = Attendance::where(
+            'user_id',
+            $row->user_id
+        )
+            ->whereDate(
+                'tanggal',
+                $row->shift_date
+            )
             ->first();
+
+        /*
+    |--------------------------------------------------------------------------
+    | CEK CUTI / IZIN / LEMBUR DULU
+    |--------------------------------------------------------------------------
+    */
+
+        $leave = \App\Models\Leave::where(
+            'user_id',
+            $row->user_id
+        )
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $row->shift_date)
+            ->whereDate('end_date', '>=', $row->shift_date)
+            ->exists();
+
+        $permission = \App\Models\Permission::where(
+            'user_id',
+            $row->user_id
+        )
+            ->whereDate('tanggal', $row->shift_date)
+            ->where('status', 'approved')
+            ->exists();
+
+        $overtime = \App\Models\Overtime::where(
+            'user_id',
+            $row->user_id
+        )
+            ->whereDate('overtime_date', $row->shift_date)
+            ->where('status', 'approved')
+            ->first();
+
+        $statusKehadiran = '-';
+        $terlambat = '-';
+        $jamKerja = '-';
+        $jamLembur = '-';
+
+        /*
+    |--------------------------------------------------------------------------
+    | PRIORITAS STATUS
+    |--------------------------------------------------------------------------
+    */
+
+        if ($leave) {
+
+            $statusKehadiran = 'Cuti';
+        } elseif ($permission) {
+
+            $statusKehadiran = 'Izin';
+        } elseif ($overtime) {
+
+            $statusKehadiran = 'Lembur';
+        } elseif ($attendance) {
+
+            $statusKehadiran = 'Hadir';
+
+            /*
+        |--------------------------------------------------------------------------
+        | TERLAMBAT (>15 MENIT)
+        |--------------------------------------------------------------------------
+        */
+            if (
+                $attendance->jam_masuk &&
+                $row->start_time
+            ) {
+
+                try {
+
+                    $jamMasuk = Carbon::parse(
+                        $attendance->jam_masuk
+                    );
+
+                    $jadwalMasuk = Carbon::parse(
+                        $row->start_time
+                    );
+
+                    $selisihMenit = $jadwalMasuk->diffInMinutes(
+                        $jamMasuk,
+                        false
+                    );
+
+                    if ($selisihMenit > 15) {
+
+                        $statusKehadiran = 'Terlambat';
+
+                        $menitTerlambat = $selisihMenit - 15;
+
+                        $terlambat = sprintf(
+                            '%02d:%02d',
+                            floor($menitTerlambat / 60),
+                            $menitTerlambat % 60
+                        );
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | JAM KERJA
+        |--------------------------------------------------------------------------
+        */
+            if (
+                $attendance->jam_masuk &&
+                $attendance->jam_keluar
+            ) {
+
+                try {
+
+                    $masuk = Carbon::parse(
+                        $attendance->jam_masuk
+                    );
+
+                    $keluar = Carbon::parse(
+                        $attendance->jam_keluar
+                    );
+
+                    $menitKerja = $masuk->diffInMinutes(
+                        $keluar
+                    );
+
+                    $jamKerja = sprintf(
+                        '%02d:%02d',
+                        floor($menitKerja / 60),
+                        $menitKerja % 60
+                    );
+                } catch (\Exception $e) {
+                }
+            }
+        } else {
+
+            $today = now()->toDateString();
+
+            if ($row->shift_date >= $today) {
+
+                $statusKehadiran = 'Belum Absen';
+            } else {
+
+                $statusKehadiran = 'Alpha';
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | JAM LEMBUR
+    |--------------------------------------------------------------------------
+    */
+
+        if (
+            $overtime &&
+            $overtime->start_time &&
+            $overtime->end_time
+        ) {
+
+            try {
+
+                $mulai = Carbon::parse(
+                    $overtime->start_time
+                );
+
+                $selesai = Carbon::parse(
+                    $overtime->end_time
+                );
+
+                $menitLembur = $mulai->diffInMinutes(
+                    $selesai
+                );
+
+                $jamLembur = sprintf(
+                    '%02d:%02d',
+                    floor($menitLembur / 60),
+                    $menitLembur % 60
+                );
+            } catch (\Exception $e) {
+            }
+        }
+
         return [
-            Carbon::parse($row->shift_date)->format('d-m-Y'),
+
+            Carbon::parse(
+                $row->shift_date
+            )->format('d-m-Y'),
 
             $row->user->name ?? '-',
 
@@ -241,13 +411,24 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
             $row->end_time,
 
             $attendance?->jam_masuk
-                ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                ? Carbon::parse(
+                    $attendance->jam_masuk
+                )->format('H:i')
                 : '-',
 
             $attendance?->jam_keluar
-                ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                ? Carbon::parse(
+                    $attendance->jam_keluar
+                )->format('H:i')
                 : '-',
+
+            $statusKehadiran,
+
+            $terlambat,
+
+            $jamKerja,
+
+            $jamLembur,
         ];
     }
 }
-

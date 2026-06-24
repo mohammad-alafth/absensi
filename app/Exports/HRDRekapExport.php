@@ -34,15 +34,23 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
     public function columnWidths(): array
     {
         return [
-            'A' => 30,
-            'B' => 20,
+            'A' => 50,
+            'B' => 40,
             'C' => 15,
             'D' => 15,
-            'E' => 25,
+            'E' => 30,
             'F' => 20
         ];
     }
+    private function normalizeRole($role)
+    {
+        $role = strtolower($role);
 
+        $role = str_replace('pj_', '', $role);
+        $role = str_replace('_ok', '', $role);
+
+        return $role;
+    }
     public function collection()
     {
         $startDate = Carbon::parse($this->month . '-01')->startOfMonth();
@@ -94,43 +102,140 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
             'medical_record' => 'REKAM MEDIS',
             'creator' => 'KONTEN CREATOR',
         ];
+
         if ($this->role != 'all') {
 
-            $employees->where(function ($q) {
+            $employees = $employees->get()->filter(function ($user) {
 
-                $q->where('role', $this->role)
-                    ->orWhere('role', 'pj_' . $this->role);
-
-                if ($this->role === 'nurse') {
-
-                    $q->orWhere('role', 'nurse_ok')
-                        ->orWhere('role', 'pj_nurse_ok');
-                }
+                return $this->normalizeRole($user->role)
+                    == $this->normalizeRole($this->role);
             });
+        } else {
+
+            $employees = $employees->get();
         }
 
-        return $employees->get()->map(function ($employee) use ($startDate, $endDate, $roleLabels) {
-            $attendances = Attendance::where('user_id', $employee->id)->whereBetween('tanggal', [$startDate, $endDate])->get();
-            $hadir = $attendances->where('status', 'hadir')->count();
-            $telat = $attendances->where('status', 'terlambat')->count();
+        return $employees->map(function (
+            $employee
+        ) use (
+            $startDate,
+            $endDate,
+            $roleLabels
+        ) {
+
+            $attendances = Attendance::where(
+                'user_id',
+                $employee->id
+            )
+                ->whereBetween(
+                    'tanggal',
+                    [$startDate, $endDate]
+                )
+                ->get();
+
+            $hadir = 0;
+            $telat = 0;
+
             $lateMinutes = 0;
-            $totalJam = 0;
+            $totalWorkMinutes = 0;
+
             foreach ($attendances as $attendance) {
-                $lateMinutes += max((int)($attendance->late_minutes ?? 0) - 15, 0);
-                if ($attendance->jam_masuk && $attendance->jam_keluar) {
-                    $masuk = Carbon::parse($attendance->jam_masuk);
-                    $keluar = Carbon::parse($attendance->jam_keluar);
-                    $totalJam += abs($masuk->diffInMinutes($keluar));
+
+                if ($attendance->jam_masuk) {
+                    $hadir++;
+                }
+
+                $shift = \App\Models\EmployeeShift::where(
+                    'user_id',
+                    $employee->id
+                )
+                    ->whereDate(
+                        'shift_date',
+                        $attendance->tanggal
+                    )
+                    ->first();
+
+                if (
+                    $shift &&
+                    $attendance->jam_masuk
+                ) {
+
+                    try {
+
+                        $jadwalMasuk = Carbon::parse(
+                            $shift->start_time
+                        );
+
+                        $jamMasuk = Carbon::parse(
+                            $attendance->jam_masuk
+                        );
+
+                        $selisih = $jadwalMasuk
+                            ->diffInMinutes(
+                                $jamMasuk,
+                                false
+                            );
+
+                        if ($selisih > 15) {
+
+                            $telat++;
+
+                            $lateMinutes += (
+                                $selisih - 15
+                            );
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                if (
+                    $attendance->jam_masuk &&
+                    $attendance->jam_keluar
+                ) {
+
+                    $masuk = Carbon::parse(
+                        $attendance->jam_masuk
+                    );
+
+                    $keluar = Carbon::parse(
+                        $attendance->jam_keluar
+                    );
+
+                    $totalWorkMinutes +=
+                        $masuk->diffInMinutes(
+                            $keluar
+                        );
                 }
             }
+
             return [
+
                 $employee->name,
+
                 $roleLabels[$employee->role]
-                    ?? strtoupper(str_replace('_', ' ', $employee->role)),
+                    ?? strtoupper(
+                        str_replace(
+                            '_',
+                            ' ',
+                            $employee->role
+                        )
+                    ),
+
                 $hadir,
+
                 $telat,
-                floor($lateMinutes / 60) . ' Jam ' . ($lateMinutes % 60) . ' Menit',
-                round($totalJam / 60, 1),
+
+                sprintf(
+                    '%02d:%02d',
+                    floor($lateMinutes / 60),
+                    $lateMinutes % 60
+                ),
+
+                sprintf(
+                    '%02d:%02d',
+                    floor($totalWorkMinutes / 60),
+                    $totalWorkMinutes % 60
+                ),
             ];
         });
     }
