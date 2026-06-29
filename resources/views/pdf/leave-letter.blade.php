@@ -331,14 +331,18 @@
         </thead>
         <tbody>
             @php
-            // 1. Ambil jatah total dari database jatah user
-            $quotaTotal = $leave->user->leave_quota ?? 12;
+            $quotaTotal = $leave->user->leave_quota;
 
-            // 2. Ambil nilai $remainingLeave jatah jatah sisa SEBELUM dipotong form cuti ini
-            $masihAdaSebelumnya = $remainingLeave ?? ($quotaTotal - ($usedLeave ?? 0));
+            $usedLeave = $usedLeave ?? 0;
 
-            // 3. Hitung jatah akhir jatah sisa SETELAH dikurangi pengajuan saat ini
-            $sisaCutiSetelahnya = $masihAdaSebelumnya - $leave->total_days;
+            $remainingLeave = $remainingLeave ?? 0;
+
+            $masihAdaSebelumnya = $remainingLeave;
+
+            $sisaCutiSetelahnya = max(
+            $remainingLeave - $leave->total_days,
+            0
+            );
             @endphp
             <tr>
                 <td>1</td>

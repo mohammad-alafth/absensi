@@ -18,25 +18,12 @@ class LeaveController extends Controller
     */
     public function create()
     {
-        $usedLeave = Leave::where(
-            'user_id',
-            auth()->id()
-        )
-            ->where('status', 'approved')
-            ->sum('total_days');
+        $user = auth()->user();
 
-        $quota = auth()->user()->leave_quota;
-
-        $remainingLeave = $quota - $usedLeave;
-
-        if ($remainingLeave < 0) {
-            $remainingLeave = 0;
-        }
-
-        return view('cuti', compact(
-            'usedLeave',
-            'remainingLeave'
-        ));
+        return view('cuti', [
+            'usedLeave' => $user->used_leave,
+            'remainingLeave' => $user->remaining_leave,
+        ]);
     }
 
 
@@ -116,22 +103,13 @@ class LeaveController extends Controller
 | VALIDASI QUOTA CUTI
 |--------------------------------------------------------------------------
 */
-        $usedLeave = Leave::where(
-            'user_id',
-            auth()->id()
-        )
-            ->where('status', 'approved')
-            ->sum('total_days');
+        $user = auth()->user();
 
-        $remainingLeave =
-            auth()->user()->leave_quota - $usedLeave;
-
-        if ($totalDays > $remainingLeave) {
+        if ($totalDays > $user->remaining_leave) {
 
             return back()
                 ->withErrors([
-                    'start_date' =>
-                    'Sisa cuti tidak mencukupi'
+                    'start_date' => 'Sisa cuti tidak mencukupi'
                 ])
                 ->withInput();
         }
@@ -193,12 +171,14 @@ class LeaveController extends Controller
     | GENERATE PDF
     |--------------------------------------------------------------------------
     */
+        $user = $leave->load('user')->user;
+
         $pdf = Pdf::loadView(
             'pdf.leave-letter',
             [
-                'leave'          => $leave->load('user'),
-                'remainingLeave' => $remainingLeave, // Ambil data sisa jatah sebelum cuti ini disetujui
-                'usedLeave'      => $usedLeave       // Ambil data total cuti terpakai sebelumnya
+                'leave' => $leave,
+                'usedLeave' => $user->used_leave,
+                'remainingLeave' => $user->remaining_leave,
             ]
         );
 
@@ -242,14 +222,14 @@ class LeaveController extends Controller
         }
 
         // Jika file biner fisik hilang di storage, generate ulang secara instan
-        $usedLeave = Leave::where('user_id', $leave->user_id)->where('status', 'approved')->where('id', '<', $leave->id)->sum('total_days');
-        $remainingLeave = $leave->user->leave_quota - $usedLeave;
-
-        $pdf = Pdf::loadView('pdf.leave-letter', [
-            'leave' => $leave->load('user'),
-            'remainingLeave' => $remainingLeave,
-            'usedLeave' => $usedLeave
-        ]);
+        $pdf = Pdf::loadView(
+            'pdf.leave-letter',
+            [
+                'leave' => $leave->load('user'),
+                'usedLeave' => $leave->user->used_leave,
+                'remainingLeave' => $leave->user->remaining_leave,
+            ]
+        );
 
         return $pdf->stream('Surat_Cuti_' . $leave->id . '.pdf');
     }

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-
+use App\Models\Leave;
 
 class User extends Authenticatable
 {
@@ -57,7 +57,7 @@ class User extends Authenticatable
 
     public function leaves()
     {
-        return $this->hasMany(LeaveRequest::class);
+        return $this->hasMany(Leave::class);
     }
 
     public function employeeShifts()
@@ -108,5 +108,20 @@ class User extends Authenticatable
     public function shifts()
     {
         return $this->hasMany(\App\Models\EmployeeShift::class, 'user_id');
+    }
+
+    public function getUsedLeaveAttribute()
+    {
+        return $this->leaves()
+            ->where('status', 'approved')
+            ->sum('total_days');
+    }
+
+    public function getRemainingLeaveAttribute()
+    {
+        return max(
+            $this->leave_quota - $this->used_leave,
+            0
+        );
     }
 }
