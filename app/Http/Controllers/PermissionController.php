@@ -144,7 +144,12 @@ class PermissionController extends Controller
     */
     public function history()
     {
-        $permissions = Permission::with(['pjApprover', 'hrdApprover'])
+        $permissions = Permission::with([
+            'pjApprover',
+            'hrdApprover',
+            'headApprover',
+            'directorApprover',
+        ])
             ->where('user_id', auth()->id())
             ->latest()
             ->get();

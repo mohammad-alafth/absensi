@@ -7,8 +7,15 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .modal-animate {
@@ -32,7 +39,7 @@
             @if($permissions->count() > 0)
 
             <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
-                
+
                 <div class="border-b pb-4 mb-5 flex items-center justify-between">
                     <div>
                         <h2 class="text-2xl font-bold text-gray-800">Log Aktivitas Izin</h2>
@@ -46,8 +53,8 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
 
                     @foreach($permissions as $item)
-                    <div x-data Tint x-data="{ showDetail: false }" class="border border-blue-50 rounded-2xl p-4 bg-[#f8f9ff] hover:shadow-md transition flex flex-col justify-between min-h-[150px]">
-                        
+                    <div x-data="{ showDetail: false }" class="border border-blue-50 rounded-2xl p-4 bg-[#f8f9ff] hover:shadow-md transition flex flex-col justify-between min-h-[150px]">
+
                         <div>
                             <div class="flex justify-between items-start mb-2 gap-2">
                                 <div>
@@ -60,19 +67,19 @@
                                 </div>
 
                                 @if($item->status == 'pending')
-                                    <span class="bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Pending PJ</span>
+                                <span class="bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Pending PJ</span>
                                 @elseif($item->status == 'waiting_hrd')
-                                    <span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting HRD</span>
+                                <span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting HRD</span>
                                 @elseif($item->status == 'waiting_head')
-                                    <span class="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Head</span>
+                                <span class="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Head</span>
                                 @elseif($item->status == 'waiting_director')
-                                    <span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Direktur</span>
+                                <span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Direktur</span>
                                 @elseif($item->status == 'waiting_medical_service')
-                                    <span class="bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Medis</span>
+                                <span class="bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Medis</span>
                                 @elseif($item->status == 'approved')
-                                    <span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Approved</span>
+                                <span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Approved</span>
                                 @elseif($item->status == 'rejected')
-                                    <span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Rejected</span>
+                                <span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Rejected</span>
                                 @endif
                             </div>
 
@@ -85,7 +92,7 @@
                             <button @click="showDetail = true" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
                                 📋 Detail
                             </button>
-                            
+
                             @if($item->pdf_file)
                             <a href="{{ asset('storage/' . $item->pdf_file) }}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
                                 🖨️ Cetak PDF
@@ -100,9 +107,9 @@
                         <div x-show="showDetail" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs" style="display:none;">
                             <div @click.away="showDetail = false" class="bg-white rounded-3xl w-full max-w-lg p-6 relative shadow-2xl modal-animate border">
                                 <button @click="showDetail = false" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
-                                
+
                                 <h2 class="text-xl font-black text-indigo-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Surat Keperluan Izin</h2>
-                                
+
                                 <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
                                     <div class="bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Hari / Tanggal Izin</p>
@@ -134,7 +141,12 @@
                                     </div>
                                 </div>
 
-                                @if($item->pj_note || $item->hrd_note)
+                                @if(
+                                $item->pj_note ||
+                                $item->hrd_note ||
+                                $item->head_note ||
+                                $item->director_note
+                                )
                                 <div class="mt-4 grid grid-cols-1 gap-3 text-xs">
                                     @if($item->pj_note)
                                     <div class="p-3 rounded-xl border {{ $item->pj_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700' }}">
@@ -149,6 +161,20 @@
                                         <p class="font-bold mb-1">💬 {{ $item->hrd_status == 'rejected' ? 'Alasan Penolakan HRD' : 'Catatan HRD Verifikator' }}</p>
                                         <p class="text-gray-700 italic">"{{ $item->hrd_note }}"</p>
                                         <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh: {{ $item->hrdApprover->name ?? '-' }}</p>
+                                    </div>
+                                    @endif
+                                    @if($item->head_note)
+                                    <div class="p-3 rounded-xl border {{ $item->head_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-orange-50 border-orange-100 text-orange-700' }}">
+                                        <p class="font-bold mb-1">💬 {{ $item->head_status == 'rejected' ? 'Alasan Penolakan Head' : 'Catatan Head' }} </p>
+                                        <p class="text-gray-700 italic">"{{ $item->head_note }}"</p>
+                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh : {{ $item->headApprover->name ?? '-' }}</p>
+                                    </div>
+                                    @endif
+                                    @if($item->director_note)
+                                    <div class="p-3 rounded-xl border {{ $item->director_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700': 'bg-purple-50 border-purple-100 text-purple-700' }}">
+                                        <p class="font-bold mb-1"> 💬 {{ $item->director_status == 'rejected' ? 'Alasan Penolakan Direktur' : 'Catatan Direktur' }}</p>
+                                        <p class="text-gray-700 italic">"{{ $item->director_note }}"</p>
+                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh : {{ $item->directorApprover->name ?? '-' }}</p>
                                     </div>
                                     @endif
                                 </div>

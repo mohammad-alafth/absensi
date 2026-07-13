@@ -66,7 +66,7 @@
         }
     </style>
 
-    <div class="min-h-screen bg-[#f0f2f9] px-3 sm:px-5 py-6 pb-24 flex items-center justify-center">
+    <div class="min-h-screen bg-[#f0f2f9] px-3 sm:px-5 pt-3 pb-24 flex justify-center">
 
         <div class="w-full max-w-md">
 
