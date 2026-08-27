@@ -80,7 +80,45 @@
                         <div class="space-y-2">
                             <label class="text-[10px] uppercase tracking-wider font-bold text-gray-400">Assign Role</label>
                             <select name="role" class="w-full rounded-2xl text-sm border-gray-200 bg-gray-50 focus:ring-2 focus:ring-indigo-500">
-                                @foreach(['head_pegawai', 'director', 'hrd', 'it', 'marketing', 'creator', 'medical_service', 'pipp', 'pj_security', 'pj_marketing', 'pj_ipsrs', 'pj_casemix', 'nurse', 'finance'] as $role)
+                                @foreach([
+                                'director',
+                                'hrd',
+                                'it',
+                                'security',
+                                'pj_security',
+
+                                'nurse',
+                                'nurse_ok',
+                                'koor_nurse',
+
+                                'admin',
+                                'pj_admin',
+
+                                'finance_mgr',
+                                'finance',
+
+                                'cs',
+                                'ro',
+
+                                'pharmacist',
+                                'pj_pharmacist',
+
+                                'casemix',
+                                'pj_casemix',
+
+                                'ipsrs',
+                                'pj_ipsrs',
+
+                                'rm',
+
+                                'ppp',
+                                'nutrition',
+
+                                'marketing',
+                                'pj_marketing',
+
+                                'medical_service'
+                                ] as $role)
                                 <option value="{{ $role }}">{{ strtoupper($role) }}</option>
                                 @endforeach
                             </select>

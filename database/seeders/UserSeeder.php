@@ -44,6 +44,8 @@ class UserSeeder extends Seeder
             'STAFF IPSRS' => 'ipsrs',
             'PJ IPSRS' => 'pj_ipsrs',
 
+            'STAFF REKAM MEDIS' => 'rm',
+
             'STAFF PPP' => 'ppp',
             'STAFF GIZI' => 'nutrition',
             'STAFF MARKETING' => 'marketing',
