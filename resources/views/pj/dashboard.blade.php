@@ -32,7 +32,7 @@
                     </a>
                 </div>
 
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
 
                     <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 flex flex-col justify-between h-[110px] shadow-sm shadow-amber-100/50">
                         <div class="flex items-center justify-between text-amber-800/80">
@@ -58,6 +58,14 @@
                         <h2 class="text-3xl font-black text-purple-950">{{ $pendingPermission }}</h2>
                     </div>
 
+                    <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-100 rounded-2xl p-5 flex flex-col justify-between h-[110px] shadow-sm shadow-cyan-100/50">
+                        <div class="flex items-center justify-between text-cyan-800/80">
+                            <span class="text-xs font-semibold tracking-wide">Pending Ubah Shift</span>
+                            <span class="text-lg">🔄</span>
+                        </div>
+                        <h2 class="text-3xl font-black text-cyan-950">{{ $pendingShiftChange ?? 0 }}</h2>
+                    </div>
+
                     <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5 flex flex-col justify-between h-[110px] shadow-sm shadow-emerald-100/50">
                         <div class="flex items-center justify-between text-emerald-800/80">
                             <span class="text-xs font-semibold tracking-wide">Total Approved</span>
@@ -76,7 +84,7 @@
 
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 zone-menu">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 zone-menu">
 
                     <a href="{{ route('pj.cuti') }}" class="bg-white border border-gray-100 rounded-2xl p-5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/40 hover:-translate-y-1 transition-all duration-300 flex items-center justify-between group shadow-sm">
                         <div class="flex items-center gap-3">
@@ -102,6 +110,14 @@
                         <span class="text-xs text-gray-300 group-hover:text-blue-500 transition group-hover:translate-x-1">→</span>
                     </a>
 
+                    <a href="{{ route('pj.shift-change') }}" class="bg-white border border-gray-100 rounded-2xl p-5 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100/40 hover:-translate-y-1 transition-all duration-300 flex items-center justify-between group shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition">🔄</span>
+                            <p class="text-sm font-bold text-gray-700 group-hover:text-cyan-800">Otorisasi Perubahan Shift</p>
+                        </div>
+                        <span class="text-xs text-gray-300 group-hover:text-cyan-500 transition group-hover:translate-x-1">→</span>
+                    </a>
+
                 </div>
 
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -122,15 +138,15 @@
 
                                 <div class="flex items-center gap-4 truncate">
                                     <div class="w-10 h-10 rounded-2xl bg-blue-50 text-[#1E40AF] border border-blue-100 flex items-center justify-center font-black text-sm shrink-0 shadow-3xs">
-                                        {{ strtoupper(substr($item->user->name, 0, 1)) }}
+                                        {{ strtoupper(substr($item->user->name ?? 'N', 0, 1)) }}
                                     </div>
 
                                     <div class="truncate">
-                                        <h3 class="font-bold text-gray-800 text-sm truncate tracking-wide">{{ $item->user->name }}</h3>
+                                        <h3 class="font-bold text-gray-800 text-sm truncate tracking-wide">{{ $item->user->name ?? 'N/A' }}</h3>
                                         <div class="flex items-center gap-2.5 mt-1 text-[11px] text-gray-400 font-medium">
-                                            <span class="text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md capitalize font-semibold border border-slate-200">{{ $item->leave_type }}</span>
+                                            <span class="text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md capitalize font-semibold border border-slate-200">{{ $item->leave_type ?? 'Pengajuan' }}</span>
                                             <span>•</span>
-                                            <span>Masuk: {{ $item->created_at->format('d M Y, H:i') }}</span>
+                                            <span>Masuk: {{ isset($item->created_at) ? $item->created_at->format('d M Y, H:i') : '-' }}</span>
                                         </div>
                                     </div>
                                 </div>

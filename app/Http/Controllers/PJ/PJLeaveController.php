@@ -12,12 +12,12 @@ class PJLeaveController extends Controller
 {
     public function index()
     {
-        $divisionRole = $this->getDivisionRole();
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
 
         $leaves = Leave::with('user')
             ->where('pj_status', 'pending')
-            ->whereHas('user', function ($q) use ($divisionRole) {
-                $q->where('role', $divisionRole);
+            ->whereHas('user', function ($q) use ($divisionRoles) {
+                $q->whereIn('role', $divisionRoles);
             })
             ->latest()
             ->get();
@@ -37,11 +37,6 @@ class PJLeaveController extends Controller
             return back()->with('error', 'Cuti sudah diproses PJ');
         }
 
-        /*
-        |----------------------------------------------------------
-        | FLOW DARI SERVICE (SINGLE SOURCE OF TRUTH)
-        |----------------------------------------------------------
-        */
         $flow = ApprovalFlowService::handle($leave->user->role);
 
         $leave->update([
@@ -81,15 +76,6 @@ class PJLeaveController extends Controller
         $this->regenerateLeavePdf($leave);
 
         return back()->with('success', 'Cuti ditolak PJ');
-    }
-
-    private function getDivisionRole()
-    {
-        $role = auth()->user()->role;
-
-        return str_starts_with($role, 'pj_')
-            ? str_replace('pj_', '', $role)
-            : $role;
     }
 
     private function regenerateLeavePdf($leave)

@@ -168,18 +168,31 @@
         </div>
     </div>
 
-    <div id="signatureModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl modal-animate border">
-            <h3 class="font-bold text-sm text-center mb-3 text-gray-800">Goreskan Tanda Tangan</h3>
-            <div class="border border-gray-200 rounded-xl overflow-hidden bg-white">
-                <canvas id="signature-pad" width="340" height="160" class="w-full bg-white"></canvas>
-            </div>
-            <div class="flex gap-2 mt-4">
-                <button type="button" onclick="clearSignature()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-lg font-semibold text-xs transition">
-                    Reset
+    <div id="signatureModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl modal-animate border border-gray-100">
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="closeSignatureModal()" class="text-xs font-bold text-gray-500 hover:text-indigo-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+                        <span>←</span> Kembali
+                    </button>
+                    <h3 class="font-bold text-sm text-gray-800">Tanda Tangan Pemohon</h3>
+                </div>
+                <button type="button" onclick="closeSignatureModal()" class="text-xl text-gray-400 hover:text-gray-700">
+                    ×
                 </button>
-                <button type="button" onclick="saveSignature()" class="flex-1 bg-[#1E40AF] hover:bg-blue-800 text-white py-2.5 rounded-lg font-semibold text-xs transition shadow-xs">
-                    Kunci & Simpan
+            </div>
+            <div class="border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-white shadow-inner">
+                <canvas id="signature-pad" class="w-full h-44 bg-white touch-none" style="touch-action: none;"></canvas>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-4">
+                <button type="button" onclick="clearSignature()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs transition active:scale-95">
+                    🔄 Reset
+                </button>
+                <button type="button" onclick="closeSignatureModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 rounded-xl font-bold text-xs transition active:scale-95">
+                    ← Kembali
+                </button>
+                <button type="button" onclick="saveSignature()" class="bg-[#1E40AF] hover:bg-blue-800 text-white py-2.5 rounded-xl font-bold text-xs transition shadow-md active:scale-95">
+                    ✓ Simpan
                 </button>
             </div>
         </div>
@@ -259,18 +272,25 @@
 
             const canvas = document.getElementById('signature-pad');
 
-            if (!signaturePad) {
-                signaturePad = new SignaturePad(canvas, {
-                    backgroundColor: 'rgba(255, 255, 255, 0)',
-                    penColor: 'rgb(0, 0, 0)'
-                });
-
+            setTimeout(() => {
                 const ratio = Math.max(window.devicePixelRatio || 1, 1);
                 canvas.width = canvas.offsetWidth * ratio;
-                canvas.height = canvas.offsetHeight * ratio;
+                canvas.height = 176 * ratio;
                 canvas.getContext("2d").scale(ratio, ratio);
-                signaturePad.clear();
-            }
+
+                if (!signaturePad) {
+                    signaturePad = new SignaturePad(canvas, {
+                        backgroundColor: 'rgba(255, 255, 255, 0)',
+                        penColor: 'rgb(0, 0, 0)'
+                    });
+                } else {
+                    signaturePad.clear();
+                }
+            }, 100);
+        }
+
+        function closeSignatureModal() {
+            document.getElementById('signatureModal').classList.add('hidden');
         }
 
         function clearSignature() {

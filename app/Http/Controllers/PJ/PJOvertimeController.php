@@ -12,12 +12,12 @@ class PJOvertimeController extends Controller
 {
     public function index()
     {
-        $divisionRole = $this->getDivisionRole();
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
 
         $overtimes = Overtime::with('user')
             ->where('pj_status', 'pending')
-            ->whereHas('user', function ($q) use ($divisionRole) {
-                $q->where('role', $divisionRole);
+            ->whereHas('user', function ($q) use ($divisionRoles) {
+                $q->whereIn('role', $divisionRoles);
             })
             ->latest()
             ->get();
@@ -37,11 +37,6 @@ class PJOvertimeController extends Controller
             return back()->with('error', 'Lembur sudah diproses PJ');
         }
 
-        /*
-        |----------------------------------------------------------
-        | FLOW DARI SERVICE (SINGLE SOURCE OF TRUTH)
-        |----------------------------------------------------------
-        */
         $flow = ApprovalFlowService::handle($overtime->user->role);
 
         $overtime->update([
@@ -55,7 +50,7 @@ class PJOvertimeController extends Controller
 
         $this->regeneratePdf($overtime);
 
-        return back()->with('success', 'Lembur berhasil diproses');
+        return back()->with('success', 'Lembur diteruskan sesuai flow');
     }
 
     public function reject(Request $request, $id)
@@ -81,15 +76,6 @@ class PJOvertimeController extends Controller
         return back()->with('success', 'Lembur ditolak PJ');
     }
 
-    private function getDivisionRole()
-    {
-        $role = auth()->user()->role;
-
-        return str_starts_with($role, 'pj_')
-            ? str_replace('pj_', '', $role)
-            : $role;
-    }
-
     private function regeneratePdf($overtime)
     {
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
@@ -105,15 +91,10 @@ class PJOvertimeController extends Controller
             ]
         );
 
-        $fileName = "overtime/overtime_{$overtime->id}.pdf";
+        $fileName = "overtimes/overtime_{$overtime->id}.pdf";
 
-        Storage::disk('public')->put(
-            $fileName,
-            $pdf->output()
-        );
+        Storage::disk('public')->put($fileName, $pdf->output());
 
-        $overtime->update([
-            'pdf_file' => $fileName
-        ]);
+        $overtime->update(['pdf_file' => $fileName]);
     }
 }

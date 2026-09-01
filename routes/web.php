@@ -12,6 +12,7 @@ use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\ShiftChangeController;
 use App\Http\Controllers\HRD\HRDController;
 use App\Http\Controllers\HRD\HRDUserController;
 
@@ -25,6 +26,7 @@ use App\Http\Controllers\PJ\PJDashboardController;
 use App\Http\Controllers\PJ\PJLeaveController;
 use App\Http\Controllers\PJ\PJPermissionController;
 use App\Http\Controllers\PJ\PJOvertimeController;
+use App\Http\Controllers\PJ\PJShiftChangeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -151,6 +153,32 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
+    | SHIFT CHANGE REQUEST (USER)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/shift-change', [
+        ShiftChangeController::class,
+        'create'
+    ])->name('shift-change.create');
+
+    Route::post('/shift-change', [
+        ShiftChangeController::class,
+        'store'
+    ])->name('shift-change.store');
+
+    Route::get('/shift-change/history', [
+        ShiftChangeController::class,
+        'history'
+    ])->name('shift-change.history');
+
+    Route::get('/shift-change/get-shift', [
+        ShiftChangeController::class,
+        'getShiftByDate'
+    ])->name('shift-change.get-shift');
+
+    /*
+    |--------------------------------------------------------------------------
     | HISTORY
     |--------------------------------------------------------------------------
     */
@@ -261,6 +289,27 @@ Route::middleware([
                 PJOvertimeController::class,
                 'reject'
             ])->name('pj.lembur.reject');
+
+            /*
+            |--------------------------------------------------------------------------
+            | SHIFT CHANGE
+            |--------------------------------------------------------------------------
+            */
+
+            Route::get('/shift-change', [
+                PJShiftChangeController::class,
+                'index'
+            ])->name('pj.shift-change');
+
+            Route::post('/shift-change/{id}/approve', [
+                PJShiftChangeController::class,
+                'approve'
+            ])->name('pj.shift-change.approve');
+
+            Route::post('/shift-change/{id}/reject', [
+                PJShiftChangeController::class,
+                'reject'
+            ])->name('pj.shift-change.reject');
         });
 
     Route::middleware(['auth'])->group(function () {
@@ -414,6 +463,8 @@ Route::middleware([
         // Rute Shift Umum (Bisa diakses user)
         Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
         Route::post('/shift/assign', [ShiftController::class, 'assign'])->name('shift.assign');
+        Route::post('/shift/bulk-assign', [ShiftController::class, 'bulkAssign'])->name('shift.bulk-assign');
+        Route::post('/shift/weekly-assign', [ShiftController::class, 'weeklyAssign'])->name('shift.weekly-assign');
         Route::get('/shift/data', [ShiftController::class, 'data'])->name('shift.data');
         Route::get('/shifts/calendar-events', [ShiftController::class, 'calendarEvents'])->name('shift.calendar');
 

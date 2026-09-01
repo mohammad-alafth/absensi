@@ -7,66 +7,31 @@ use App\Models\Shift;
 use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\EmployeeShift;
+use App\Http\Controllers\PJ\PJDashboardController;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 class ShiftController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | HALAMAN SHIFT
-    |--------------------------------------------------------------------------
-    */
-
     public function index(Request $request)
     {
         $user = auth()->user();
-        if (!str_starts_with($user->role, 'pj_') || $user->work_type !== 'shift') {
+        if (!str_starts_with($user->role, 'pj_') && $user->work_type !== 'shift') {
             abort(403, 'Anda tidak memiliki otoritas untuk mengakses halaman ini.');
         }
 
         $date = $request->date ?? now()->format('Y-m-d');
         $role = $user->role;
-        $targetRole = str_replace('pj_', '', $role);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser($role);
 
-        $employees = User::whereIn('role', [$targetRole, $role])->where('work_type', 'shift')->get();
-        $shifts = Shift::whereJsonContains('allowed_roles', $role)->get();
-        $period = $this->getShiftPeriod($date);
+        $employees = User::whereIn('role', $divisionRoles)->get();
+        $shifts = Shift::all();
 
-        $employeeShifts = EmployeeShift::with('user')
-            ->whereDate('start_date', $period['start_date'])
-            ->whereDate('end_date', $period['end_date'])
-            ->whereHas('user', function ($query) use ($targetRole) {
-                $query->where('role', $targetRole);
-            })
-            ->get();
-
-        $approvedPermissions = Permission::whereDate('tanggal', $date)->where('status', 'approved')->pluck('jenis', 'user_id');
-        $approvedLeaves = Leave::whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date)->where('status', 'approved')->pluck('leave_type', 'user_id');
-
-        $showReminder = false;
-        if (Carbon::today()->gte(Carbon::parse($period['end_date'])->copy()->subDays(2))) {
-            $nextPeriod = $this->getShiftPeriod(Carbon::parse($period['end_date'])->copy()->addDay());
-            $nextShiftExist = EmployeeShift::whereDate('start_date', $nextPeriod['start_date'])
-                ->whereDate('end_date', $nextPeriod['end_date'])->exists();
-            if (!$nextShiftExist) {
-                $showReminder = true;
-            }
-        }
-
-        return view('shifts.index', compact('employees', 'shifts', 'employeeShifts', 'date', 'approvedPermissions', 'approvedLeaves', 'showReminder', 'period'));
+        return view('shifts.index', compact('employees', 'shifts', 'date'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ASSIGN SHIFT (DENGAN CUSTOM JAM)
-    |--------------------------------------------------------------------------
-    */
     public function assign(Request $request)
     {
-        \Log::info('Data diterima:', $request->all());
-
-        // 1. Aksi Hapus (Tetap di atas)
         if ($request->boolean('is_delete')) {
             EmployeeShift::where('user_id', $request->user_id)
                 ->where('shift_date', $request->shift_date)
@@ -74,208 +39,170 @@ class ShiftController extends Controller
             return response()->json(['success' => true]);
         }
 
-        // 2. Validasi ketat agar tidak ada data yang kosong/undefined
         $request->validate([
             'user_id'    => 'required|exists:users,id',
             'shift_date' => 'required|date',
             'shift_id'   => 'required|exists:shifts,id',
-            'start_time' => 'required',
-            'end_time'   => 'required',
         ]);
 
         try {
-            $period = $this->getShiftPeriod($request->shift_date);
+            $shift = Shift::findOrFail($request->shift_id);
+            $shiftDate = Carbon::parse($request->shift_date)->format('Y-m-d');
+            $year = Carbon::parse($shiftDate)->year;
+            $month = Carbon::parse($shiftDate)->month;
 
-            // Bersihkan format waktu menjadi H:i:s
-            $startTime = \Carbon\Carbon::parse($request->start_time)->format('H:i:s');
-            $endTime   = \Carbon\Carbon::parse($request->end_time)->format('H:i:s');
+            $startTime = $request->start_time ?? $shift->start_time;
+            $endTime   = $request->end_time ?? $shift->end_time;
 
-            // 3. Update atau Create
-            // Menggunakan updateOrCreate sudah cukup, tidak perlu if event_id 
-            // kecuali Anda benar-benar perlu menangani ID secara manual
-            if ($request->event_id) {
-
-                $shift = EmployeeShift::findOrFail($request->event_id);
-
-                $shift->update([
-                    'shift_id'      => $request->shift_id,
-                    'shift_date'    => $request->shift_date,
-                    'start_date'    => $period['start_date'],
-                    'end_date'      => $period['end_date'],
-                    'start_time'    => $startTime,
-                    'end_time'      => $endTime,
-                    'is_overnight'  => $request->is_overnight ?? 0,
-                ]);
-            } else {
-
-                EmployeeShift::create([
-                    'user_id'       => $request->user_id,
-                    'shift_id'      => $request->shift_id,
-                    'shift_date'    => $request->shift_date,
-                    'start_date'    => $period['start_date'],
-                    'end_date'      => $period['end_date'],
-                    'assigned_by'   => auth()->id(),
-                    'start_time'    => $startTime,
-                    'end_time'      => $endTime,
-                    'is_overnight'  => $request->is_overnight ?? 0,
-                ]);
-            }
+            EmployeeShift::updateOrCreate(
+                [
+                    'user_id'    => $request->user_id,
+                    'shift_date' => $shiftDate,
+                ],
+                [
+                    'shift_id'     => $shift->id,
+                    'month'        => $month,
+                    'year'         => $year,
+                    'assigned_by'  => auth()->id(),
+                    'start_time'   => $startTime,
+                    'end_time'     => $endTime,
+                    'is_overnight' => $request->is_overnight ?? 0,
+                ]
+            );
 
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            \Log::error('DB ERROR: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | REALTIME DATA
-    |--------------------------------------------------------------------------
-    */
-
-    public function data(Request $request)
+    public function bulkAssign(Request $request)
     {
-        $user = auth()->user();
-
-        if (
-            !str_starts_with($user->role, 'pj_') ||
-            $user->work_type !== 'shift'
-        ) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 403);
-        }
-        $date = $request->date ?? now()->format('Y-m-d');
-        $userRole = auth()->user()->role;
-        $targetRole = str_replace('pj_', '', $userRole);
-        $period = $this->getShiftPeriod($date);
-
-        $employeeShifts = EmployeeShift::with('user')
-            ->whereDate(
-                'start_date',
-                $period['start_date']
-            )
-            ->whereDate(
-                'end_date',
-                $period['end_date']
-            )
-            ->whereHas('user', function ($query) use ($targetRole) {
-                $query->where('role', $targetRole);
-            })
-            ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | IZIN
-        |--------------------------------------------------------------------------
-        */
-
-        $permissions = Permission::whereDate(
-            'tanggal',
-            $date
-        )
-            ->where('status', 'approved')
-            ->pluck('jenis', 'user_id');
-
-        /*
-        |--------------------------------------------------------------------------
-        | CUTI
-        |--------------------------------------------------------------------------
-        */
-
-        $leaves = Leave::whereDate(
-            'start_date',
-            '<=',
-            $date
-        )
-            ->whereDate(
-                'end_date',
-                '>=',
-                $date
-            )
-            ->where('status', 'approved')
-            ->pluck('leave_type', 'user_id');
-
-        return response()->json([
-            'employeeShifts' => $employeeShifts,
-            'permissions' => $permissions,
-            'leaves' => $leaves
+        $request->validate([
+            'user_ids'   => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'shift_id'   => 'required|exists:shifts,id',
         ]);
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | GET SHIFT PERIOD
-    |--------------------------------------------------------------------------
-    */
+        try {
+            $shift = Shift::findOrFail($request->shift_id);
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
 
-    private function getShiftPeriod($date)
-    {
-        $date = Carbon::parse($date);
-        $payrollDay = 26;
-        if ($date->day >= $payrollDay) {
-            $startDate = $date->copy()->day($payrollDay);
-            $endDate = $startDate->copy()->addMonth()->subDay();
-        } else {
-            $startDate = $date->copy()->subMonth()->day($payrollDay);
-            $endDate = $startDate->copy()->addMonth()->subDay();
+            foreach ($request->user_ids as $userId) {
+                $curr = $startDate->copy();
+                while ($curr->lte($endDate)) {
+                    $shiftDate = $curr->format('Y-m-d');
+                    EmployeeShift::updateOrCreate(
+                        [
+                            'user_id'    => $userId,
+                            'shift_date' => $shiftDate,
+                        ],
+                        [
+                            'shift_id'     => $shift->id,
+                            'month'        => $curr->month,
+                            'year'         => $curr->year,
+                            'assigned_by'  => auth()->id(),
+                            'start_time'   => $shift->start_time,
+                            'end_time'     => $shift->end_time,
+                        ]
+                    );
+                    $curr->addDay();
+                }
+            }
+
+            return response()->json(['success' => true, 'message' => 'Jadwal shift berhasil diterapkan masal.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-        return ['start_date' => $startDate->format('Y-m-d'), 'end_date' => $endDate->format('Y-m-d')];
     }
 
+    public function weeklyAssign(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+            'schedule' => 'required|array', // ['YYYY-MM-DD' => shift_id]
+        ]);
+
+        try {
+            foreach ($request->user_ids as $userId) {
+                foreach ($request->schedule as $dateStr => $shiftId) {
+                    if (!$shiftId) continue;
+
+                    $shift = Shift::find($shiftId);
+                    if (!$shift) continue;
+
+                    $currDate = Carbon::parse($dateStr);
+
+                    EmployeeShift::updateOrCreate(
+                        [
+                            'user_id'    => $userId,
+                            'shift_date' => $currDate->format('Y-m-d'),
+                        ],
+                        [
+                            'shift_id'     => $shift->id,
+                            'month'        => $currDate->month,
+                            'year'         => $currDate->year,
+                            'assigned_by'  => auth()->id(),
+                            'start_time'   => $shift->start_time,
+                            'end_time'     => $shift->end_time,
+                        ]
+                    );
+                }
+            }
+
+            return response()->json(['success' => true, 'message' => 'Jadwal mingguan berhasil disimpan!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 
     public function calendarEvents(Request $request)
     {
-        $user = auth()->user();
+        $pjRole = auth()->user()->role;
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser($pjRole);
 
-        if (!str_starts_with($user->role, 'pj_')) {
-            return response()->json([], 403);
-        }
+        $start = $request->start ? Carbon::parse($request->start)->format('Y-m-d') : now()->startOfMonth()->format('Y-m-d');
+        $end = $request->end ? Carbon::parse($request->end)->format('Y-m-d') : now()->endOfMonth()->format('Y-m-d');
 
-        $targetRole = str_replace('pj_', '', $user->role);
-        $rolesAllowed = [$targetRole, $user->role];
-
-        $start = Carbon::parse($request->start)->format('Y-m-d');
-        $end   = Carbon::parse($request->end)->format('Y-m-d');
+        $userIds = User::whereIn('role', $divisionRoles)->pluck('id');
 
         $employeeShifts = EmployeeShift::with(['user', 'shift'])
+            ->whereIn('user_id', $userIds)
             ->whereBetween('shift_date', [$start, $end])
-            ->whereHas('user', function ($query) use ($rolesAllowed) {
-                $query->whereIn('role', $rolesAllowed);
-            })
             ->get();
 
         $events = [];
 
         foreach ($employeeShifts as $es) {
-
-            $startTime = Carbon::parse($es->start_time)->format('H:i');
-            $endTime   = Carbon::parse($es->end_time)->format('H:i');
-
-            $endDateTime = $es->is_overnight
-                ? Carbon::parse($es->shift_date)
-                ->addDay()
-                ->format('Y-m-d') . 'T' . $endTime
-                : $es->shift_date . 'T' . $endTime;
-
             $events[] = [
                 'id' => $es->id,
-                'title' => $es->user->name . ' - ' . ($es->shift->name ?? 'Shift'),
-                'start' => $es->shift_date . 'T' . $startTime,
-                'end' => $endDateTime,
-
+                'user_id' => $es->user_id,
+                'title' => ($es->user->name ?? 'N/A') . ' (' . ($es->shift->name ?? 'Shift') . ')',
+                'start' => $es->shift_date,
+                'backgroundColor' => $this->getShiftColor($es->shift->name ?? ''),
+                'borderColor' => 'transparent',
                 'extendedProps' => [
-                    'user_id' => $es->user_id,
-                    'shift_id' => $es->shift_id,
-                    'shift_name' => $es->shift->name ?? null,
-                    'start_time' => $startTime,
-                    'end_time' => $endTime,
-                    'is_overnight' => (bool) $es->is_overnight,
+                    'shift_name' => $es->shift->name ?? '-',
+                    'start_time' => $es->start_time,
+                    'end_time' => $es->end_time,
                 ]
             ];
         }
 
         return response()->json($events);
+    }
+
+    private function getShiftColor($name)
+    {
+        $name = strtolower($name);
+        if (str_contains($name, 'pagi')) return '#10b981'; // Green/Emerald
+        if (str_contains($name, 'siang')) return '#f59e0b'; // Amber/Orange
+        if (str_contains($name, 'malam')) return '#6366f1'; // Indigo/Purple
+        if (str_contains($name, 'libur')) return '#ef4444'; // Red
+        return '#1E40AF'; // Default Blue
     }
 }

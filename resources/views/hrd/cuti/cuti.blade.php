@@ -441,41 +441,56 @@
                 @endforelse
                 <div
                     id="hrdSignatureModal"
-                    class="hidden fixed inset-0 bg-black/50 z-[999] flex items-center justify-center">
+                    class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
 
-                    <div class="bg-white rounded-3xl p-6 w-full max-w-md">
+                    <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-100 modal-animate">
 
-                        <h2 class="font-bold text-xl mb-4 text-center">
-                            Tanda Tangan HRD
-                        </h2>
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="closeHRDSignatureModal()" class="text-xs font-bold text-gray-500 hover:text-indigo-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+                                    <span>←</span> Kembali
+                                </button>
+                                <h2 class="font-bold text-lg text-gray-800">
+                                    ✍️ Tanda Tangan HRD
+                                </h2>
+                            </div>
+                            <button type="button" onclick="closeHRDSignatureModal()" class="text-2xl text-gray-400 hover:text-gray-700">
+                                ×
+                            </button>
+                        </div>
 
-                        <canvas
-                            id="hrd-signature-pad"
-                            width="350"
-                            height="180"
-                            class="border rounded-xl w-full">
-                        </canvas>
+                        <div class="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50/50 shadow-inner">
+                            <canvas
+                                id="hrd-signature-pad"
+                                class="w-full h-48 bg-white cursor-crosshair touch-none"
+                                style="touch-action: none;">
+                            </canvas>
+                            <div class="absolute bottom-2 right-3 pointer-events-none text-[11px] text-gray-400 font-medium">
+                                Goreskan tanda tangan Anda
+                            </div>
+                        </div>
 
-                        <div class="grid grid-cols-2 gap-3 mt-4">
-
+                        <div class="grid grid-cols-3 gap-2 mt-5">
                             <button
                                 type="button"
                                 onclick="clearHRDSignature()"
-                                class="bg-gray-200 py-2 rounded-xl">
+                                class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-2xl text-xs font-bold transition active:scale-95">
+                                🔄 Bersihkan
+                            </button>
 
-                                Clear
-
+                            <button
+                                type="button"
+                                onclick="closeHRDSignatureModal()"
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-2xl text-xs font-bold transition active:scale-95">
+                                ← Kembali
                             </button>
 
                             <button
                                 type="button"
                                 onclick="saveHRDSignature()"
-                                class="bg-blue-500 text-white py-2 rounded-xl">
-
-                                Simpan
-
+                                class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl text-xs font-bold shadow-md shadow-blue-200 transition active:scale-95">
+                                ✓ Simpan
                             </button>
-
                         </div>
 
                     </div>
@@ -491,73 +506,49 @@
 
     <script>
         let currentHRDLeaveId = null;
-
-        const hrdCanvas =
-            document.getElementById(
-                'hrd-signature-pad'
-            );
-
-        const hrdPad =
-            new SignaturePad(hrdCanvas);
+        let hrdPad = null;
 
         function openHRDSignatureModal(leaveId) {
-
             currentHRDLeaveId = leaveId;
+            document.getElementById('hrdSignatureModal').classList.remove('hidden');
 
-            hrdPad.clear();
+            const hrdCanvas = document.getElementById('hrd-signature-pad');
 
-            document
-                .getElementById(
-                    'hrdSignatureModal'
-                )
-                .classList.remove('hidden');
+            setTimeout(() => {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                hrdCanvas.width = hrdCanvas.offsetWidth * ratio;
+                hrdCanvas.height = 192 * ratio;
+                hrdCanvas.getContext("2d").scale(ratio, ratio);
 
+                if (!hrdPad) {
+                    hrdPad = new SignaturePad(hrdCanvas, {
+                        backgroundColor: 'white',
+                        penColor: 'black'
+                    });
+                } else {
+                    hrdPad.clear();
+                }
+            }, 100);
+        }
+
+        function closeHRDSignatureModal() {
+            document.getElementById('hrdSignatureModal').classList.add('hidden');
         }
 
         function clearHRDSignature() {
-
-            hrdPad.clear();
-
+            if (hrdPad) hrdPad.clear();
         }
 
         function saveHRDSignature() {
-
-            if (hrdPad.isEmpty()) {
-
-                alert(
-                    'Tanda tangan masih kosong'
-                );
-
+            if (!hrdPad || hrdPad.isEmpty()) {
+                alert('Tanda tangan masih kosong');
                 return;
-
             }
 
-            const signature =
-                hrdPad.toDataURL(
-                    'image/png'
-                );
-
-            document
-                .getElementById(
-                    'hrdSignatureInput' +
-                    currentHRDLeaveId
-                ).value = signature;
-
-            document
-                .getElementById(
-                    'hrdSignatureModal'
-                )
-                .classList.add(
-                    'hidden'
-                );
-
-            document
-                .getElementById(
-                    'hrdApproveForm' +
-                    currentHRDLeaveId
-                )
-                .submit();
-
+            const signature = hrdPad.toDataURL('image/png');
+            document.getElementById('hrdSignatureInput' + currentHRDLeaveId).value = signature;
+            closeHRDSignatureModal();
+            document.getElementById('hrdApproveForm' + currentHRDLeaveId).submit();
         }
     </script>
 </x-app-layout>

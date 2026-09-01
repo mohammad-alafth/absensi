@@ -103,6 +103,15 @@ class DashboardController extends Controller
             ->count();
 
         /*
+        |------------------------------------------------------------------
+        | SHIFT CHANGE REQUEST
+        |------------------------------------------------------------------
+        */
+        $pendingShiftChangeCount = \App\Models\ShiftChangeRequest::where('user_id', $user->id)
+            ->where('status', 'pending')
+            ->count();
+
+        /*
     |------------------------------------------------------------------
     | REMINDER SHIFT UNTUK PJ
     |------------------------------------------------------------------
@@ -155,6 +164,7 @@ class DashboardController extends Controller
             'latestLeave',
             'pendingLeaveCount',
             'pendingOvertimeCount',
+            'pendingShiftChangeCount',
             'showShiftReminder',
             'shiftReminderMessage',
             'isHoliday'

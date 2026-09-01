@@ -65,6 +65,11 @@ class User extends Authenticatable
         return $this->hasMany(EmployeeShift::class);
     }
 
+    public function shiftChangeRequests()
+    {
+        return $this->hasMany(ShiftChangeRequest::class);
+    }
+
     public function getRoleLabelAttribute()
     {
         $roles = [

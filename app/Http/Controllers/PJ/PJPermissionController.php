@@ -12,12 +12,12 @@ class PJPermissionController extends Controller
 {
     public function index()
     {
-        $divisionRole = $this->getDivisionRole();
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
 
         $permissions = Permission::with('user')
             ->where('pj_status', 'pending')
-            ->whereHas('user', function ($q) use ($divisionRole) {
-                $q->where('role', $divisionRole);
+            ->whereHas('user', function ($q) use ($divisionRoles) {
+                $q->whereIn('role', $divisionRoles);
             })
             ->latest()
             ->get();
@@ -37,11 +37,6 @@ class PJPermissionController extends Controller
             return back()->with('error', 'Izin sudah diproses PJ');
         }
 
-        /*
-        |----------------------------------------------------------
-        | FLOW DARI SERVICE (SINGLE SOURCE OF TRUTH)
-        |----------------------------------------------------------
-        */
         $flow = ApprovalFlowService::handle($permission->user->role);
 
         $permission->update([
@@ -81,18 +76,8 @@ class PJPermissionController extends Controller
         return back()->with('success', 'Izin ditolak PJ');
     }
 
-    private function getDivisionRole()
-    {
-        $role = auth()->user()->role;
-
-        return str_starts_with($role, 'pj_')
-            ? str_replace('pj_', '', $role)
-            : $role;
-    }
-
     private function regeneratePdf($permission)
     {
-        // Tambahkan 'headApprover' dan 'directorApprover' di sini agar tidak error saat dipanggil di view
         $permission = $permission->fresh([
             'user',
             'pjApprover',

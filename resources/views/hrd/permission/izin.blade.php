@@ -182,33 +182,49 @@
 
                 <div x-show="approveModal"
                     x-transition
-                    class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4"
+                    class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     style="display:none;">
 
                     <div @click.away="approveModal = false"
-                        class="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl">
+                        class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
 
-                        <h2 class="text-xl font-bold text-green-600 mb-4">
-                            Tanda Tangan Approval HRD
-                        </h2>
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="approveModal = false" class="text-xs font-bold text-gray-500 hover:text-indigo-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+                                    <span>←</span> Kembali
+                                </button>
+                                <h2 class="text-lg font-bold text-gray-800">
+                                    ✍️ Tanda Tangan Approval HRD
+                                </h2>
+                            </div>
+                            <button type="button" @click="approveModal = false" class="text-2xl text-gray-400 hover:text-gray-700">
+                                ×
+                            </button>
+                        </div>
 
                         <form id="approve-form-{{ $item->id }}" method="POST" action="{{ route('hrd.izin.approve', $item->id) }}">
                             @csrf
-                            <canvas id="signature-pad-{{ $item->id }}" width="400" height="200"
-                                class="border rounded-2xl w-full bg-white">
-                            </canvas>
+                            <div class="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50/50 shadow-inner">
+                                <canvas id="signature-pad-{{ $item->id }}"
+                                    class="w-full h-48 bg-white cursor-crosshair touch-none"
+                                    style="touch-action: none;">
+                                </canvas>
+                                <div class="absolute bottom-2 right-3 pointer-events-none text-[11px] text-gray-400 font-medium">
+                                    Goreskan tanda tangan Anda
+                                </div>
+                            </div>
 
                             <input type="hidden" name="signature" id="signature-input-{{ $item->id }}">
 
-                            <div class="grid grid-cols-3 gap-2 mt-4">
-                                <button type="button" onclick="clearPad({{ $item->id }})" class="bg-gray-200 py-3 rounded-xl text-xs font-semibold">
-                                    Clear
+                            <div class="grid grid-cols-3 gap-2 mt-5">
+                                <button type="button" onclick="clearPad({{ $item->id }})" class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-2xl text-xs font-bold transition active:scale-95">
+                                    🔄 Bersihkan
                                 </button>
-                                <button type="button" @click="approveModal = false" class="bg-red-500 text-white py-3 rounded-xl text-xs font-semibold">
-                                    Batal
+                                <button type="button" @click="approveModal = false" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-2xl text-xs font-bold transition active:scale-95">
+                                    ← Kembali
                                 </button>
-                                <button type="button" onclick="submitApprove({{ $item->id }})" class="bg-green-600 text-white py-3 rounded-xl text-xs font-semibold">
-                                    Simpan
+                                <button type="button" onclick="submitApprove({{ $item->id }})" class="bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-2xl text-xs font-bold shadow-md shadow-emerald-200 transition active:scale-95">
+                                    ✓ Simpan
                                 </button>
                             </div>
                         </form>
@@ -267,7 +283,7 @@
 
                 const ratio = Math.max(window.devicePixelRatio || 1, 1);
                 canvas.width = canvas.offsetWidth * ratio;
-                canvas.height = 200 * ratio;
+                canvas.height = 192 * ratio;
                 canvas.getContext("2d").scale(ratio, ratio);
 
                 if (signaturePads[id]) {

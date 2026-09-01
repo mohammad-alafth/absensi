@@ -397,6 +397,39 @@
 
                     </a>
 
+                    @if(auth()->user()->work_type === 'shift')
+
+                    <a href="{{ route('shift-change.create') }}"
+                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
+                        min-h-[110px]
+                        flex flex-col items-center justify-center
+                        shadow-lg hover:shadow-2xl hover:-translate-y-1
+                        transition duration-300 active:scale-95">
+
+                        @if(isset($pendingShiftChangeCount) && $pendingShiftChangeCount > 0)
+
+                        <span
+                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
+                            flex items-center justify-center
+                            bg-gradient-to-r from-pink-500 to-red-500
+                            text-white text-xs font-bold rounded-full shadow-lg">
+                            {{ $pendingShiftChangeCount }}
+                        </span>
+
+                        @endif
+
+                        <div class="text-4xl drop-shadow-md">
+                            🔄
+                        </div>
+
+                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700 text-center">
+                            Ubah Shift
+                        </p>
+
+                    </a>
+
+                    @endif
+
                     @if(auth()->user()->role === 'admin')
 
                     <a href="/register-face"

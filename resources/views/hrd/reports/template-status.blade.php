@@ -7,7 +7,7 @@
                     <div class="flex items-center justify-between">
                         <a href="{{ route('hrd.rekap') }}" class="text-xs font-bold text-[#1E40AF] hover:underline whitespace-nowrap">← Kembali</a>
 
-                        <a href="{{ route('hrd.reports.export', array_merge(request()->query(), ['type' => $reportType])) }}"
+                        <a href="{{ route('hrd.reports.export', ['type' => $reportType, 'start_date' => $start_date ?? now()->startOfMonth()->format('Y-m-d'), 'end_date' => $end_date ?? now()->format('Y-m-d')]) }}"
                             class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">
                             <span>📥</span> Export Excel
                         </a>
@@ -18,13 +18,28 @@
                     </h1>
                 </div>
 
-                <form method="GET" class="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Filter:</label>
-                    @if(isset($filter_date))
-                    <input type="date" name="date" value="{{ $filter_date }}" onchange="this.form.submit()" class="text-xs rounded-xl border-gray-200 focus:ring-blue-500">
-                    @elseif(isset($filter_month))
-                    <input type="month" name="month" value="{{ $filter_month }}" onchange="this.form.submit()" class="text-xs rounded-xl border-gray-200 focus:ring-blue-500">
-                    @endif
+                <form method="GET" class="flex flex-wrap items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Dari:</label>
+                        <input
+                            type="date"
+                            name="start_date"
+                            value="{{ $start_date ?? now()->startOfMonth()->format('Y-m-d') }}"
+                            class="text-xs rounded-xl border-gray-300 focus:ring-[#1E40AF] focus:border-[#1E40AF]">
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sampai:</label>
+                        <input
+                            type="date"
+                            name="end_date"
+                            value="{{ $end_date ?? now()->format('Y-m-d') }}"
+                            class="text-xs rounded-xl border-gray-300 focus:ring-[#1E40AF] focus:border-[#1E40AF]">
+                    </div>
+
+                    <button type="submit" class="bg-[#1E40AF] hover:bg-blue-800 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+                        🔍 Filter
+                    </button>
                 </form>
 
                 <div class="bg-white border border-gray-100 rounded-2xl overflow-x-auto shadow-sm">
@@ -41,8 +56,17 @@
                             @forelse($data as $item)
                             <tr class="hover:bg-slate-50 transition-colors duration-150">
                                 <td class="p-4 font-bold text-gray-800">{{ $item->user->name ?? 'N/A' }}</td>
-                                <td class="p-4 text-gray-600">{{ $item->start_date ?? $item->tanggal ?? $item->overtime_date ?? 'N/A' }}</td>
-                                <td class="p-4 text-gray-600 italic">{{ $item->reason ?? 'Tidak ada keterangan' }}</td>
+                                <td class="p-4 text-gray-600">
+                                    @if(isset($item->start_date))
+                                        {{ Carbon\Carbon::parse($item->start_date)->format('d/m/Y') }}
+                                        @if($item->end_date)
+                                            s/d {{ Carbon\Carbon::parse($item->end_date)->format('d/m/Y') }}
+                                        @endif
+                                    @else
+                                        {{ Carbon\Carbon::parse($item->tanggal ?? $item->overtime_date)->format('d/m/Y') }}
+                                    @endif
+                                </td>
+                                <td class="p-4 text-gray-600 italic">{{ $item->reason ?? $item->alasan ?? 'Tidak ada keterangan' }}</td>
 
                                 <td class="p-4">
                                     @if($item->status == 'waiting_hrd')
@@ -53,7 +77,7 @@
                                     </a>
                                     @else
                                     <span class="inline-block px-3 py-1 rounded-xl font-bold text-[10px] uppercase tracking-wide
-                                            {{ $item->status == 'approved' ? 'bg-emerald-100 text-emerald-700' : 
+                                            {{ $item->status == 'approved' ? 'bg-emerald-100 text-emerald-700' :
                                                ($item->status == 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-600') }}">
                                         {{ str_replace('_', ' ', $item->status ?? 'Pending') }}
                                     </span>
@@ -62,7 +86,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="4" class="p-8 text-center text-gray-400 font-medium">Data tidak ditemukan.</td>
+                                <td colspan="4" class="p-8 text-center text-gray-400 font-medium">Data tidak ditemukan pada rentang tanggal ini.</td>
                             </tr>
                             @endforelse
                         </tbody>

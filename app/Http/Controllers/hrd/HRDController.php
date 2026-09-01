@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Exports\HRDRekapExport;
+use App\Exports\HRDAbsentExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Leave;
 use App\Models\Overtime;
@@ -730,6 +731,16 @@ class HRDController extends Controller
         $type = $request->type;
         $date = $request->date;
         $month = $request->month;
+
+        if ($type === 'absent') {
+            $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+            $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+            return Excel::download(
+                new HRDAbsentExport($startDate, $endDate),
+                "Laporan_Tidak_Hadir_" . $startDate . "_sd_" . $endDate . ".xlsx"
+            );
+        }
+
         $statusList = [
             'pending',
             'waiting_head',
@@ -740,19 +751,42 @@ class HRDController extends Controller
             'rejected'
         ];
 
-        // 1. Ambil data
+        // 1. Ambil data berdasarkan rentang tanggal
         switch ($type) {
             case 'attendance':
-                $data = Attendance::whereDate('tanggal', $date ?? Carbon::today())->with('user')->get();
+                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+                $data = Attendance::whereBetween('tanggal', [$startDate, $endDate])->with('user')->get();
                 break;
             case 'leave':
-                $data = Leave::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+                $data = Leave::whereIn('status', $statusList)
+                    ->where(function ($q) use ($startDate, $endDate) {
+                        $q->where('start_date', '<=', $endDate)
+                          ->where('end_date', '>=', $startDate);
+                    })
+                    ->with('user')
+                    ->latest()
+                    ->get();
                 break;
             case 'permission':
-                $data = Permission::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(tanggal, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+                $data = Permission::whereIn('status', $statusList)
+                    ->whereBetween('tanggal', [$startDate, $endDate])
+                    ->with('user')
+                    ->latest()
+                    ->get();
                 break;
             case 'overtime':
-                $data = Overtime::whereIn('status', $statusList)->whereRaw("DATE_FORMAT(overtime_date, '%Y-%m') = ?", [$month ?? now()->format('Y-m')])->with('user')->get();
+                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+                $data = Overtime::whereIn('status', $statusList)
+                    ->whereBetween('overtime_date', [$startDate, $endDate])
+                    ->with('user')
+                    ->latest()
+                    ->get();
                 break;
             default:
                 $data = collect([]);
@@ -883,112 +917,183 @@ class HRDController extends Controller
         ]);
     }
 
-    public function reportAbsentDaily()
+    public function reportAbsentDaily(Request $request)
     {
-        $today = Carbon::today()->format('Y-m-d');
+        $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+        $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
-        $attendanceIds = Attendance::whereDate('tanggal', $today)
-            ->pluck('user_id');
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end   = Carbon::parse($endDate)->endOfDay();
 
-        $leaveIds = Leave::where('status', 'approved')
-            ->whereDate('start_date', '<=', $today)
-            ->whereDate('end_date', '>=', $today)
-            ->pluck('user_id');
+        $employees = User::whereNotIn('role', ['admin'])->get();
+        $data = collect();
 
-        $permissionIds = Permission::where('status', 'approved')
-            ->whereDate('tanggal', $today)
-            ->pluck('user_id');
+        foreach ($employees as $employee) {
+            $attendanceDates = Attendance::where('user_id', $employee->id)
+                ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
 
-        $excludedIds = $attendanceIds
-            ->merge($leaveIds)
-            ->merge($permissionIds)
-            ->unique();
+            $permissionDates = Permission::where('user_id', $employee->id)
+                ->where('status', 'approved')
+                ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
 
-        $data = User::whereNotIn('id', $excludedIds)
-            ->whereNotIn('role', ['admin'])
-            ->get()
-            ->map(function ($employee) {
+            $leaveDates = collect();
+            $leaves = Leave::where('user_id', $employee->id)
+                ->where('status', 'approved')
+                ->where(function ($q) use ($start, $end) {
+                    $q->where('start_date', '<=', $end->format('Y-m-d'))
+                        ->where('end_date', '>=', $start->format('Y-m-d'));
+                })
+                ->get();
 
-                $alphaDays = Attendance::where(
-                    'user_id',
-                    $employee->id
-                )
-                    ->whereMonth('tanggal', now()->month)
-                    ->whereYear('tanggal', now()->year)
-                    ->where('status', 'alpha')
-                    ->count();
+            foreach ($leaves as $leave) {
+                $lStart = Carbon::parse($leave->start_date);
+                $lEnd   = Carbon::parse($leave->end_date);
+                while ($lStart->lte($lEnd)) {
+                    if ($lStart->between($start, $end)) {
+                        $leaveDates->push($lStart->format('Y-m-d'));
+                    }
+                    $lStart->addDay();
+                }
+            }
+            $leaveDates = $leaveDates->unique();
 
-                $employee->alpha_days = $alphaDays;
+            $absentCount = 0;
 
-                return $employee;
-            });
-        foreach ($data as $employee) {
+            if ($employee->work_type === 'shift') {
+                $shiftDates = EmployeeShift::where('user_id', $employee->id)
+                    ->whereBetween('shift_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                    ->pluck('shift_date')
+                    ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                    ->unique();
 
-            $employee->alpha_days =
-                $this->calculateAlphaDays(
-                    $employee,
-                    now()->format('Y-m')
-                );
+                foreach ($shiftDates as $sDate) {
+                    if (
+                        !$attendanceDates->contains($sDate) &&
+                        !$permissionDates->contains($sDate) &&
+                        !$leaveDates->contains($sDate)
+                    ) {
+                        $absentCount++;
+                    }
+                }
+            } elseif ($employee->work_type === 'office_5') {
+                $curr = $start->copy();
+                while ($curr->lte($end)) {
+                    if (!$curr->isWeekend()) {
+                        $day = $curr->format('Y-m-d');
+                        if (
+                            !$attendanceDates->contains($day) &&
+                            !$permissionDates->contains($day) &&
+                            !$leaveDates->contains($day)
+                        ) {
+                            $absentCount++;
+                        }
+                    }
+                    $curr->addDay();
+                }
+            } elseif ($employee->work_type === 'office_6') {
+                $curr = $start->copy();
+                while ($curr->lte($end)) {
+                    if ($curr->dayOfWeek !== Carbon::SUNDAY) {
+                        $day = $curr->format('Y-m-d');
+                        if (
+                            !$attendanceDates->contains($day) &&
+                            !$permissionDates->contains($day) &&
+                            !$leaveDates->contains($day)
+                        ) {
+                            $absentCount++;
+                        }
+                    }
+                    $curr->addDay();
+                }
+            }
+
+            if ($absentCount > 0) {
+                $employee->alpha_days = $absentCount;
+                $data->push($employee);
+            }
         }
+
+        $title = 'Pegawai Tidak Hadir (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
+
         return view('hrd.reports.template-absent', [
             'data' => $data,
-            'title' => 'Pegawai Tidak Hadir Hari Ini'
+            'title' => $title,
+            'start_date' => $startDate,
+            'end_date' => $endDate
         ]);
     }
 
     public function reportLeave(Request $request)
     {
-        $month = $request->month ?? now()->format('Y-m');
+        $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+        $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
         $data = Leave::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
-            ->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$month])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->where('start_date', '<=', $endDate)
+                  ->where('end_date', '>=', $startDate);
+            })
             ->with('user')
             ->latest()
             ->get();
 
+        $title = 'Rekap Cuti (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
+
         return view('hrd.reports.template-status', [
             'data' => $data,
-            'title' => 'Rekap Cuti ' . $month,
-            'filter_month' => $month,
+            'title' => $title,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'reportType' => 'leave'
         ]);
     }
 
     public function reportPermission(Request $request)
     {
-        $month = $request->month ?? now()->format('Y-m');
+        $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+        $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
-        // Pastikan nama kolom 'tanggal' sesuai dengan database Anda
         $data = Permission::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
-            ->whereRaw("DATE_FORMAT(tanggal, '%Y-%m') = ?", [$month])
+            ->whereBetween('tanggal', [$startDate, $endDate])
             ->with('user')
             ->latest()
             ->get();
 
+        $title = 'Rekap Izin (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
+
         return view('hrd.reports.template-status', [
             'data' => $data,
-            'title' => 'Rekap Izin ' . $month,
-            'filter_month' => $month,
+            'title' => $title,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'reportType' => 'permission'
         ]);
     }
 
     public function reportOvertime(Request $request)
     {
-        $month = $request->month ?? now()->format('Y-m');
+        $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+        $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
-        // Gunakan 'status' untuk filter waiting_...
-        // Gunakan 'overtime_date' untuk filter bulan
         $data = Overtime::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
-            ->whereRaw("DATE_FORMAT(overtime_date, '%Y-%m') = ?", [$month])
+            ->whereBetween('overtime_date', [$startDate, $endDate])
             ->with('user')
             ->latest()
             ->get();
 
+        $title = 'Rekap Lembur (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
+
         return view('hrd.reports.template-status', [
             'data' => $data,
-            'title' => 'Rekap Lembur ' . $month,
-            'filter_month' => $month,
+            'title' => $title,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'reportType' => 'overtime'
         ]);
     }
