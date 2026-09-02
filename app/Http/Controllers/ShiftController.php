@@ -16,7 +16,7 @@ class ShiftController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        if (!str_starts_with($user->role, 'pj_') && $user->work_type !== 'shift') {
+        if (!str_starts_with($user->role, 'pj_')) {
             abort(403, 'Anda tidak memiliki otoritas untuk mengakses halaman ini.');
         }
 

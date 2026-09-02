@@ -99,7 +99,7 @@
                                     <div class="relative mb-3">
                                         <input type="text"
                                             oninput="filterRoles(this, 'role-list-{{ $shift->id }}')"
-                                            placeholder="🔍 Cari role..."
+                                            placeholder="Cari role..."
                                             class="w-full text-xs rounded-xl border-gray-200 bg-gray-50 py-2 pl-8 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
                                         <span class="absolute left-2.5 top-2.5 text-slate-400 text-xs">🔍</span>
                                     </div>
@@ -172,7 +172,7 @@
                     <div class="relative mb-2">
                         <input type="text"
                             oninput="filterRoles(this, 'role-list-tambah')"
-                            placeholder="🔍 Cari role..."
+                            placeholder="Cari role..."
                             class="w-full text-xs rounded-xl border-gray-200 bg-gray-50 py-2 pl-8 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
                         <span class="absolute left-2.5 top-2.5 text-slate-400 text-xs">🔍</span>
                     </div>

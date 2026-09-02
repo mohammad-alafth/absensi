@@ -54,64 +54,42 @@ class ShiftManagementController extends Controller
     {
         $shifts = Shift::all();
 
-        // Daftar semua role yang ada di sistem
-        $allRoles = [
-            'admin', 'hrd', 'it', 'marketing', 'creator',
-            'head_pegawai', 'director', 'medical_service', 'pipp',
-            'pj_security', 'security',
-            'pj_marketing',
-            'pj_ipsrs', 'ipsrs',
-            'pj_casemix', 'casemix',
-            'pj_nurse', 'nurse', 'nurse_ok',
-            'finance', 'pj_finance',
+        // Daftar role yang work_type-nya shift (sesuai feedback user)
+        $shiftRoles = [
+            'nurse', 'pj_nurse',
+            'nurse_ok', 'pj_nurse_ok',
             'ro', 'pj_ro',
+            'security', 'pj_security',
             'pharmacist', 'pj_pharmacist',
-            'cs', 'pj_cs',
+            'finance', 'pj_finance',
             'administrasi', 'pj_administrasi',
-            'nutrition', 'medical_record',
         ];
 
-        // Ambil role unik dari database juga
-        $dbRoles = User::whereNotNull('role')
+        // Ambil role unik dari database yang work_type-nya shift
+        $dbRoles = User::where('work_type', 'shift')
+            ->whereNotNull('role')
             ->distinct()
             ->pluck('role')
             ->toArray();
 
-        $roles = array_values(array_unique(array_merge($allRoles, $dbRoles)));
+        $roles = array_values(array_unique(array_merge($shiftRoles, $dbRoles)));
 
         // Label untuk tampilan
         $roleLabels = [
-            'admin' => 'ADMIN',
-            'hrd' => 'HRD',
-            'it' => 'IT',
-            'marketing' => 'MARKETING',
-            'creator' => 'KONTEN CREATOR',
-            'head_pegawai' => 'KEPALA BAGIAN UMUM DAN KEPEGAWAIAN',
-            'director' => 'DIREKTUR',
-            'medical_service' => 'MEDICAL SERVICE',
-            'pipp' => 'PIPP',
-            'pj_security' => 'PENANGGUNG JAWAB SECURITY',
-            'security' => 'SECURITY',
-            'pj_marketing' => 'PENANGGUNG JAWAB MARKETING',
-            'pj_ipsrs' => 'PENANGGUNG JAWAB IPSRS',
-            'ipsrs' => 'IPSRS',
-            'pj_casemix' => 'PENANGGUNG JAWAB CASEMIX',
-            'casemix' => 'CASEMIX',
-            'pj_nurse' => 'PENANGGUNG JAWAB PERAWAT',
             'nurse' => 'PERAWAT',
+            'pj_nurse' => 'PENANGGUNG JAWAB PERAWAT',
             'nurse_ok' => 'PERAWAT OK',
-            'finance' => 'KEUANGAN',
-            'pj_finance' => 'PENANGGUNG JAWAB KEUANGAN',
+            'pj_nurse_ok' => 'PENANGGUNG JAWAB PERAWAT OK',
             'ro' => 'REFRAKSIONIS OPTISIEN',
             'pj_ro' => 'PENANGGUNG JAWAB REFRAKSIONIS OPTISIEN',
+            'security' => 'SECURITY',
+            'pj_security' => 'PENANGGUNG JAWAB SECURITY',
             'pharmacist' => 'APOTEKER',
             'pj_pharmacist' => 'PENANGGUNG JAWAB APOTEKER',
-            'cs' => 'CLEANING SERVICE',
-            'pj_cs' => 'PENANGGUNG JAWAB CLEANING SERVICE',
+            'finance' => 'KEUANGAN',
+            'pj_finance' => 'PENANGGUNG JAWAB KEUANGAN',
             'administrasi' => 'ADMINISTRASI',
             'pj_administrasi' => 'PENANGGUNG JAWAB ADMINISTRASI',
-            'nutrition' => 'GIZI',
-            'medical_record' => 'REKAM MEDIS',
         ];
 
         return view('hrd.shifts.index', compact('shifts', 'roles', 'roleLabels'));
