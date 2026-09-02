@@ -466,7 +466,6 @@ Route::middleware([
         Route::post('/shift/bulk-assign', [ShiftController::class, 'bulkAssign'])->name('shift.bulk-assign');
         Route::post('/shift/weekly-assign', [ShiftController::class, 'weeklyAssign'])->name('shift.weekly-assign');
         Route::get('/shift/weekly-schedules',[ShiftController::class, 'weeklySchedules'])->name('shift.weekly-schedules');
-        Route::get('/shift/data', [ShiftController::class, 'data'])->name('shift.data');
         Route::get('/shifts/calendar-events', [ShiftController::class, 'calendarEvents'])->name('shift.calendar');
 
         // Rute Shift Management (Khusus HRD)

@@ -39,13 +39,15 @@
                 <!-- LIST SHIFT -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     @foreach($shifts as $shift)
+                    @php
+                        $currentRole = is_array($shift->allowed_roles) && !empty($shift->allowed_roles) ? $shift->allowed_roles[0] : null;
+                    @endphp
                     <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
                         <form action="{{ route('hrd.shifts.update', $shift->id) }}" method="POST">
                             @csrf @method('PUT')
 
                             <div class="flex flex-col gap-6">
                                 <div>
-                                    <!-- <span class="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider">ID: {{ $shift->id }}</span> -->
                                     <h3 class="text-sm font-extrabold text-gray-900 uppercase tracking-tight">
                                         {{ $shift->name }}
                                     </h3>
@@ -93,17 +95,27 @@
                                         Otoritas Role Pengguna
                                     </p>
 
-                                    <div class="flex flex-wrap gap-2">
+                                    <!-- Search Input -->
+                                    <div class="relative mb-3">
+                                        <input type="text"
+                                            oninput="filterRoles(this, 'role-list-{{ $shift->id }}')"
+                                            placeholder="🔍 Cari role..."
+                                            class="w-full text-xs rounded-xl border-gray-200 bg-gray-50 py-2 pl-8 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
+                                        <span class="absolute left-2.5 top-2.5 text-slate-400 text-xs">🔍</span>
+                                    </div>
+
+                                    <!-- Role Radio List -->
+                                    <div id="role-list-{{ $shift->id }}" class="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto">
                                         @foreach($roles as $role)
-                                        <label class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all">
-                                            <input type="checkbox"
-                                                name="roles[]"
+                                        <label class="role-item flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all" data-role-label="{{ strtolower($roleLabels[$role] ?? str_replace('_', ' ', str_replace('pj_', '', $role))) }}">
+                                            <input type="radio"
+                                                name="role"
                                                 value="{{ $role }}"
-                                                {{ in_array($role, (array)$shift->allowed_roles) ? 'checked' : '' }}
-                                                class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-0">
+                                                {{ $currentRole === $role ? 'checked' : '' }}
+                                                class="w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-0">
 
                                             <span class="text-xs font-bold text-gray-700 capitalize">
-                                                {{ str_replace('_', ' ', str_replace('pj_', '', $role)) }}
+                                                {{ $roleLabels[$role] ?? str_replace('_', ' ', str_replace('pj_', '', $role)) }}
                                             </span>
                                         </label>
                                         @endforeach
@@ -146,17 +158,34 @@
                     </div>
                 </div>
 
+                <label class="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer">
+                    <input type="checkbox"
+                        name="is_overnight"
+                        class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-0">
+                    Cross-Day (Lewat Tengah Malam)
+                </label>
+
                 <div class="pt-2">
                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Otoritas Role Pengguna</p>
-                    <div class="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto p-1">
+
+                    <!-- Search Input -->
+                    <div class="relative mb-2">
+                        <input type="text"
+                            oninput="filterRoles(this, 'role-list-tambah')"
+                            placeholder="🔍 Cari role..."
+                            class="w-full text-xs rounded-xl border-gray-200 bg-gray-50 py-2 pl-8 focus:bg-white focus:ring-2 focus:ring-blue-100 transition">
+                        <span class="absolute left-2.5 top-2.5 text-slate-400 text-xs">🔍</span>
+                    </div>
+
+                    <div id="role-list-tambah" class="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto p-1">
                         @foreach($roles as $role)
-                        <label class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all">
-                            <input type="checkbox"
-                                name="roles[]"
+                        <label class="role-item flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all" data-role-label="{{ strtolower($roleLabels[$role] ?? str_replace('_', ' ', str_replace('pj_', '', $role))) }}">
+                            <input type="radio"
+                                name="role"
                                 value="{{ $role }}"
-                                class="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-0">
+                                class="w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-0">
                             <span class="text-xs font-bold text-gray-700 capitalize">
-                                {{ str_replace('_', ' ', str_replace('pj_', '', $role)) }}
+                                {{ $roleLabels[$role] ?? str_replace('_', ' ', str_replace('pj_', '', $role)) }}
                             </span>
                         </label>
                         @endforeach
@@ -188,5 +217,20 @@
             time_24hr: true,
             minuteIncrement: 15
         });
+
+        function filterRoles(input, listId) {
+            const filter = input.value.toLowerCase();
+            const list = document.getElementById(listId);
+            const items = list.querySelectorAll('.role-item');
+
+            items.forEach(function(item) {
+                const label = item.getAttribute('data-role-label') || '';
+                if (label.includes(filter)) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+        }
     </script>
 </x-app-layout>

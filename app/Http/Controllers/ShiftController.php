@@ -25,7 +25,14 @@ class ShiftController extends Controller
         $divisionRoles = PJDashboardController::getDivisionRolesForUser($role);
 
         $employees = User::whereIn('role', $divisionRoles)->get();
-        $shifts = Shift::all();
+
+        // Filter shift: hanya tampilkan shift yang allowed_roles-nya
+        // mengandung salah satu role divisi PJ yang login
+        $shifts = Shift::where(function ($query) use ($divisionRoles) {
+            foreach ($divisionRoles as $divRole) {
+                $query->orWhereJsonContains('allowed_roles', $divRole);
+            }
+        })->get();
 
         return view('shifts.index', compact('employees', 'shifts', 'date'));
     }
@@ -203,9 +210,7 @@ class ShiftController extends Controller
         if (str_contains($name, 'siang')) return '#f59e0b'; // Amber/Orange
         if (str_contains($name, 'malam')) return '#6366f1'; // Indigo/Purple
         if (str_contains($name, 'libur')) return '#ef4444'; // Red
-        return '#1E4
-        
-        0AF'; // Default Blue
+        return '#1E40AF'; // Default Blue
     }
 
     public function weeklySchedules(Request $request)

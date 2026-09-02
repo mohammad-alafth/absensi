@@ -29,7 +29,13 @@ class PJShiftChangeController extends Controller
             ->latest()
             ->get();
 
-        $shifts = Shift::all();
+        // Filter shift: hanya tampilkan shift yang allowed_roles-nya
+        // mengandung salah satu role divisi PJ yang login
+        $shifts = Shift::where(function ($query) use ($divisionRoles) {
+            foreach ($divisionRoles as $divRole) {
+                $query->orWhereJsonContains('allowed_roles', $divRole);
+            }
+        })->get();
 
         return view('pj.shift-change.index', compact('shiftChangeRequests', 'divisionRoles', 'divisionRole', 'shifts'));
     }
@@ -57,7 +63,7 @@ class PJShiftChangeController extends Controller
                 'pj_approved_at' => now(),
             ]);
 
-            $targetDate = Carbon::parse($shiftChangeRequest->target_date)->format('Y-m-d');
+            $targetDate = Carbon::parse($shiftChangeRequest->shift_date)->format('Y-m-d');
             $year = Carbon::parse($targetDate)->year;
             $month = Carbon::parse($targetDate)->month;
 
@@ -97,7 +103,7 @@ class PJShiftChangeController extends Controller
     public function reject(Request $request, $id)
     {
         $request->validate([
-            'rejection_note' => 'required|string|max:500'
+            'note' => 'required|string|max:500'
         ]);
 
         $shiftChangeRequest = ShiftChangeRequest::findOrFail($id);
@@ -110,7 +116,7 @@ class PJShiftChangeController extends Controller
             'status' => 'rejected',
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
-            'rejection_note' => $request->rejection_note,
+            'pj_note' => $request->note,
         ]);
 
         return back()->with('success', 'Pengajuan perubahan shift ditolak.');
