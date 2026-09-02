@@ -203,6 +203,71 @@ class ShiftController extends Controller
         if (str_contains($name, 'siang')) return '#f59e0b'; // Amber/Orange
         if (str_contains($name, 'malam')) return '#6366f1'; // Indigo/Purple
         if (str_contains($name, 'libur')) return '#ef4444'; // Red
-        return '#1E40AF'; // Default Blue
+        return '#1E4
+        
+        0AF'; // Default Blue
+    }
+
+    public function weeklySchedules(Request $request)
+    {
+        $userIds = $request->input('user_ids', []);
+        $startDate = $request->input('start_date');
+
+        if (empty($userIds) || empty($startDate)) {
+            return response()->json([
+                'success' => true,
+                'schedules' => [],
+            ]);
+        }
+
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = $start->copy()->addDays(6)->endOfDay();
+
+        $rows = EmployeeShift::query()
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('shift_date', [
+                $start->toDateString(),
+                $end->toDateString(),
+            ])
+            ->get();
+
+        $schedules = [];
+
+        for ($i = 0; $i < 7; $i++) {
+
+            $date = $start->copy()
+                ->addDays($i)
+                ->toDateString();
+
+            $dayRows = $rows->filter(function ($row) use ($date) {
+                return Carbon::parse($row->shift_date)
+                    ->toDateString() === $date;
+            });
+
+            if ($dayRows->isEmpty()) {
+                $schedules[$date] = '';
+                continue;
+            }
+
+            $shiftIds = $dayRows
+                ->pluck('shift_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if (
+                $shiftIds->count() === 1 &&
+                $dayRows->pluck('user_id')->unique()->count() === count($userIds)
+            ) {
+                $schedules[$date] = (string) $shiftIds->first();
+            } else {
+                $schedules[$date] = '';
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'schedules' => $schedules,
+        ]);
     }
 }
