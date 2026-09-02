@@ -36,6 +36,16 @@
                 </div>
                 @endif
 
+                @if($errors->any())
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm font-medium">
+                    <ul>
+                        @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+
                 <!-- LIST SHIFT -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     @foreach($shifts as $shift)

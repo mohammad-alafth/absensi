@@ -54,7 +54,6 @@ class ShiftManagementController extends Controller
     {
         $shifts = Shift::all();
 
-        // Daftar role yang work_type-nya shift (sesuai feedback user)
         $shiftRoles = [
             'nurse', 'pj_nurse',
             'nurse_ok', 'pj_nurse_ok',
@@ -65,7 +64,6 @@ class ShiftManagementController extends Controller
             'administrasi', 'pj_administrasi',
         ];
 
-        // Ambil role unik dari database yang work_type-nya shift
         $dbRoles = User::where('work_type', 'shift')
             ->whereNotNull('role')
             ->distinct()
@@ -74,7 +72,6 @@ class ShiftManagementController extends Controller
 
         $roles = array_values(array_unique(array_merge($shiftRoles, $dbRoles)));
 
-        // Label untuk tampilan
         $roleLabels = [
             'nurse' => 'PERAWAT',
             'pj_nurse' => 'PENANGGUNG JAWAB PERAWAT',
