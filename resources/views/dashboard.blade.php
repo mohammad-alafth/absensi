@@ -151,29 +151,27 @@
 
             @php
 
-            $todayAttendance = \App\Models\Attendance::where('user_id', auth()->id())
-            ->whereDate('tanggal', now()->toDateString())
-            ->first();
-
+            // $todayAttendance sudah dihitung DashboardController berdasarkan
+            // shift_date (akurat untuk shift lintas hari / overnight),
+            // jadi di sini dipakai apa adanya, tidak di-query ulang pakai
+            // tanggal hari ini agar tombol check-in/check-out tetap benar
+            // untuk shift yang dimulai sehari sebelumnya.
             $alreadyCheckin = $todayAttendance && $todayAttendance->jam_masuk;
             $alreadyCheckout = $todayAttendance && $todayAttendance->jam_keluar;
 
             $canCheckout = false;
-            if ($scheduleData && isset($scheduleData['end_time']) && $scheduleData['end_time'] !== null) {
+            if ($scheduleData && !empty($scheduleData['shift_end'])) {
 
-            $shiftEnd = \Carbon\Carbon::parse($scheduleData['end_time']);
-
-            // jika shift malam
-            if (!empty($scheduleData['is_overnight'])) {
-            $shiftEnd->addDay();
-            }
+            // shift_end sudah dihitung ScheduleService (termasuk addDay untuk
+            // shift lintas hari / overnight), jadi langsung dipakai apa adanya.
+            $shiftEnd = $scheduleData['shift_end'];
 
             /*
             |--------------------------------------------------------------------------
-            | BOLEH CHECKOUT 30 MENIT SEBELUM PULANG
+            | TOMBOL CHECKOUT MUNCUL 5 MENIT SEBELUM JAM PULANG
             |--------------------------------------------------------------------------
             */
-            $checkoutTime = $shiftEnd->copy()->subMinutes(30);
+            $checkoutTime = $shiftEnd->copy()->subMinutes(5);
             $canCheckout = now()->gte($checkoutTime);
             }
 

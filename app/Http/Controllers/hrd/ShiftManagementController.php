@@ -94,49 +94,16 @@ class ShiftManagementController extends Controller
         ];
 
         // Ambil semua role dari database (tidak hanya work_type=shift)
-        $dbRoles = User::whereNotNull('role')
-            ->distinct()
-            ->pluck('role')
-            ->toArray();
+        $dbRoles = User::where('work_type', 'shift')
+    ->whereNotNull('role')
+    ->distinct()
+    ->pluck('role')
+    ->toArray();
 
         $roles = array_values(array_unique(array_merge($shiftRoles, $dbRoles)));
 
-        $roleLabels = [
-            'nurse' => 'PERAWAT',
-            'pj_nurse' => 'PENANGGUNG JAWAB PERAWAT',
-            'nurse_ok' => 'PERAWAT OK',
-            'pj_nurse_ok' => 'PENANGGUNG JAWAB PERAWAT OK',
-            'ro' => 'REFRAKSIONIS OPTISIEN',
-            'pj_ro' => 'PENANGGUNG JAWAB REFRAKSIONIS OPTISIEN',
-            'security' => 'SECURITY',
-            'pj_security' => 'PENANGGUNG JAWAB SECURITY',
-            'pharmacist' => 'APOTEKER',
-            'pj_pharmacist' => 'PENANGGUNG JAWAB APOTEKER',
-            'finance' => 'KEUANGAN',
-            'pj_finance' => 'PENANGGUNG JAWAB KEUANGAN',
-            'administrasi' => 'ADMINISTRASI',
-            'pj_administrasi' => 'PENANGGUNG JAWAB ADMINISTRASI',
-            'cs' => 'CUSTOMER SERVICE',
-            'pj_cs' => 'PENANGGUNG JAWAB CUSTOMER SERVICE',
-            'ipsrs' => 'IPSRS',
-            'pj_ipsrs' => 'PENANGGUNG JAWAB IPSRS',
-            'it' => 'IT',
-            'hrd' => 'HRD',
-            'head_pegawai' => 'KEPALA PEGAWAI',
-            'pj_casemix' => 'PENANGGUNG JAWAB CASEMIX',
-            'casemix' => 'CASEMIX',
-            'medical_record' => 'REKAM MEDIS',
-            'director' => 'DIREKTUR',
-            'medical_service' => 'LAYANAN MEDIK',
-            'pipp' => 'PIPP',
-            'marketing' => 'MARKETING',
-            'pj_marketing' => 'PENANGGUNG JAWAB MARKETING',
-            'nutrition' => 'NUTRISI',
-            'kasir' => 'KASIR',
-            'creator' => 'CREATOR',
-            'karyawan' => 'KARYAWAN',
-        ];
 
-        return view('hrd.shifts.index', compact('shifts', 'roles', 'roleLabels'));
+        return view('hrd.shifts.index', compact('shifts', 'roles'));
     }
 }
+

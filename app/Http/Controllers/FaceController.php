@@ -136,8 +136,10 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         | CHECKIN WINDOW
         |--------------------------------------------------------------------------
+        | Check-in diperbolehkan paling awal 60 menit (1 jam) sebelum jam masuk
+        | shift, dan paling lambat 2 jam setelah jam masuk shift.
         */
-        $checkinStart = $shiftStart->copy()->subHours(2);
+        $checkinStart = $shiftStart->copy()->subMinutes(60);
         $checkinEnd   = $shiftStart->copy()->addHours(2);
 
         /*
@@ -231,13 +233,15 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         | VALIDASI CHECKOUT
         |--------------------------------------------------------------------------
+        | Tombol/aksi check-out baru boleh dilakukan mulai 5 menit sebelum
+        | jam selesai shift (end_time).
         */
-        $checkoutTime = $shiftEnd->copy()->subMinutes(30);
+        $checkoutTime = $shiftEnd->copy()->subMinutes(5);
 
         if ($now->lt($checkoutTime)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Checkout hanya bisa mendekati jam pulang'
+                'message' => 'Checkout baru bisa dilakukan 5 menit sebelum jam pulang shift'
             ], 403);
         }
 

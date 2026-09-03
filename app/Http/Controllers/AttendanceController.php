@@ -98,7 +98,9 @@ class AttendanceController extends Controller
                 $lateMinutes = $lateLimit->diffInMinutes($now);
             }
 
-            $checkinStart = $shiftStart->copy()->subHours(2);
+            // Check-in diperbolehkan paling awal 60 menit (1 jam) sebelum jam
+            // masuk shift, dan paling lambat 2 jam setelah jam masuk shift.
+            $checkinStart = $shiftStart->copy()->subMinutes(60);
             $checkinEnd = $shiftStart->copy()->addHours(2);
 
             if (!$now->between($checkinStart, $checkinEnd)) {
@@ -145,15 +147,16 @@ class AttendanceController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | BELUM WAKTU PULANG (Toleransi checkout awal 30 menit sebelum shift berakhir)
+        | BELUM WAKTU PULANG
         |--------------------------------------------------------------------------
+        | Check-out baru diperbolehkan mulai 5 menit sebelum jam selesai shift.
         */
-        $checkoutLimit = $shiftEnd->copy()->subMinutes(30);
+        $checkoutLimit = $shiftEnd->copy()->subMinutes(5);
 
         if ($now->lt($checkoutLimit)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Belum waktu checkout'
+                'message' => 'Belum waktu checkout (baru bisa 5 menit sebelum jam pulang)'
             ]);
         }
 
