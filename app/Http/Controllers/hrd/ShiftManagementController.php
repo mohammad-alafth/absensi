@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\HRD;
 
@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ShiftManagementController extends Controller
 {
@@ -19,13 +21,27 @@ class ShiftManagementController extends Controller
             'role'       => 'required|string'
         ]);
 
-        Shift::create([
-            'name'          => $request->name,
-            'start_time'    => $request->start_time,
-            'end_time'      => $request->end_time,
-            'is_overnight'  => $request->has('is_overnight'),
-            'allowed_roles' => [$request->role]
-        ]);
+        // Gunakan explicit assignment (bukan mass assignment) untuk memastikan
+        // allowed_roles tersimpan meskipun ada perbedaan versi model di production
+        $shift = new Shift();
+        $shift->name = $request->name;
+        $shift->start_time = $request->start_time;
+        $shift->end_time = $request->end_time;
+        $shift->is_overnight = $request->has('is_overnight');
+        $shift->allowed_roles = [$request->role];
+        $shift->save();
+
+        // Fallback: pastikan allowed_roles tersimpan via DB facade
+        // (mengatasi kasus OPcache/model version mismatch di production)
+        if (empty($shift->allowed_roles) || $shift->allowed_roles !== [$request->role]) {
+            Log::warning('ShiftManagement: allowed_roles tidak tersimpan via model, menggunakan DB fallback', [
+                'shift_id' => $shift->id,
+                'role' => $request->role
+            ]);
+            DB::table('shifts')
+                ->where('id', $shift->id)
+                ->update(['allowed_roles' => json_encode([$request->role])]);
+        }
 
         return back()->with('success', 'Shift baru berhasil ditambahkan');
     }
@@ -40,12 +56,24 @@ class ShiftManagementController extends Controller
 
         $shift = Shift::findOrFail($id);
 
-        $shift->update([
-            'start_time'    => $request->start_time,
-            'end_time'      => $request->end_time,
-            'is_overnight'  => $request->has('is_overnight'),
-            'allowed_roles' => [$request->role]
-        ]);
+        // Gunakan explicit assignment (bukan mass assignment) untuk memastikan
+        // allowed_roles tersimpan
+        $shift->start_time = $request->start_time;
+        $shift->end_time = $request->end_time;
+        $shift->is_overnight = $request->has('is_overnight');
+        $shift->allowed_roles = [$request->role];
+        $shift->save();
+
+        // Fallback: pastikan allowed_roles tersimpan via DB facade
+        if (empty($shift->allowed_roles) || $shift->allowed_roles !== [$request->role]) {
+            Log::warning('ShiftManagement: allowed_roles tidak tersimpan via model, menggunakan DB fallback', [
+                'shift_id' => $shift->id,
+                'role' => $request->role
+            ]);
+            DB::table('shifts')
+                ->where('id', $shift->id)
+                ->update(['allowed_roles' => json_encode([$request->role])]);
+        }
 
         return back()->with('success', 'Shift berhasil diupdate');
     }
@@ -62,10 +90,11 @@ class ShiftManagementController extends Controller
             'pharmacist', 'pj_pharmacist',
             'finance', 'pj_finance',
             'administrasi', 'pj_administrasi',
+            'cs', 'pj_cs',
         ];
 
-        $dbRoles = User::where('work_type', 'shift')
-            ->whereNotNull('role')
+        // Ambil semua role dari database (tidak hanya work_type=shift)
+        $dbRoles = User::whereNotNull('role')
             ->distinct()
             ->pluck('role')
             ->toArray();
@@ -87,6 +116,25 @@ class ShiftManagementController extends Controller
             'pj_finance' => 'PENANGGUNG JAWAB KEUANGAN',
             'administrasi' => 'ADMINISTRASI',
             'pj_administrasi' => 'PENANGGUNG JAWAB ADMINISTRASI',
+            'cs' => 'CUSTOMER SERVICE',
+            'pj_cs' => 'PENANGGUNG JAWAB CUSTOMER SERVICE',
+            'ipsrs' => 'IPSRS',
+            'pj_ipsrs' => 'PENANGGUNG JAWAB IPSRS',
+            'it' => 'IT',
+            'hrd' => 'HRD',
+            'head_pegawai' => 'KEPALA PEGAWAI',
+            'pj_casemix' => 'PENANGGUNG JAWAB CASEMIX',
+            'casemix' => 'CASEMIX',
+            'medical_record' => 'REKAM MEDIS',
+            'director' => 'DIREKTUR',
+            'medical_service' => 'LAYANAN MEDIK',
+            'pipp' => 'PIPP',
+            'marketing' => 'MARKETING',
+            'pj_marketing' => 'PENANGGUNG JAWAB MARKETING',
+            'nutrition' => 'NUTRISI',
+            'kasir' => 'KASIR',
+            'creator' => 'CREATOR',
+            'karyawan' => 'KARYAWAN',
         ];
 
         return view('hrd.shifts.index', compact('shifts', 'roles', 'roleLabels'));
