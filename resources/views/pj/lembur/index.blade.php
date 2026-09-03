@@ -59,7 +59,7 @@
                 <div
                     x-show="showDetail"
                     x-transition
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm p-4"
                     style="display:none;">
 
                     <div
@@ -344,12 +344,12 @@
                             <div
                                 x-show="approveModal"
                                 x-transition
-                                class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                                class="fixed inset-0 z-[999] overflow-y-auto bg-black/60 backdrop-blur-sm p-4"
                                 style="display:none;">
 
                                 <div
                                     @click.away="approveModal = false"
-                                    class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
+                                    class="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 mx-auto my-8">
 
                                     <div class="flex justify-between items-center mb-3">
                                         <div class="flex items-center gap-2">
@@ -439,12 +439,12 @@
                             <div
                                 x-show="rejectModal"
                                 x-transition
-                                class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4"
+                                class="fixed inset-0 z-[999] overflow-y-auto bg-black/50 p-4"
                                 style="display:none;">
 
                                 <div
                                     @click.away="rejectModal = false"
-                                    class="bg-white rounded-3xl p-6 w-full max-w-md">
+                                    class="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto mx-auto my-8">
 
                                     <h2 class="text-xl font-bold text-red-500 mb-4">
                                         Catatan Penolakan PJ

@@ -141,8 +141,8 @@
     </div>
 
     <!-- MODAL TAMBAH -->
-    <div id="modal-tambah" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <form action="{{ route('hrd.shifts.store') }}" method="POST" class="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl border border-gray-100">
+    <div id="modal-tambah" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm hidden overflow-y-auto p-4 z-50">
+        <form action="{{ route('hrd.shifts.store') }}" method="POST" class="bg-white p-8 rounded-3xl w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 mx-auto my-8">
             @csrf
 
             <div class="mb-6">

@@ -28,12 +28,7 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         */
         $schedule = ScheduleService::getTodaySchedule($user);
-        if (!empty($schedule['invalid_window'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Diluar jam absensi'
-            ], 403);
-        }
+
         if (!$schedule) {
             return response()->json([
                 'success' => false,
@@ -41,13 +36,21 @@ class AttendanceController extends Controller
             ], 403);
         }
 
+        if (!empty($schedule['invalid_window'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Diluar jam absensi'
+            ], 403);
+        }
+
         /*
         |--------------------------------------------------------------------------
-        | BUILD SHIFT DATETIME
+        | BUILD SHIFT DATETIME (dari ScheduleService - sudah handle cross-day)
         |--------------------------------------------------------------------------
         */
         $shiftStart = $schedule['shift_start'];
         $shiftEnd = $schedule['shift_end'];
+        $shiftDate = $schedule['shift_date'];
 
         /*
         |--------------------------------------------------------------------------
@@ -59,14 +62,14 @@ class AttendanceController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ATTENDANCE TODAY
+        | ATTENDANCE - Cari berdasarkan shift_date (bukan today)
+        |--------------------------------------------------------------------------
+        | Untuk cross-day shift, shift_date adalah tanggal mulai shift (kemarin).
+        | Jadi kita cari attendance berdasarkan shift_date dari schedule.
         |--------------------------------------------------------------------------
         */
         $attendance = Attendance::where('user_id', $user->id)
-            ->whereBetween('jam_masuk', [
-                $shiftStart,
-                $shiftEnd
-            ])
+            ->whereDate('tanggal', $shiftDate)
             ->orderByDesc('jam_masuk')
             ->first();
 
@@ -107,7 +110,7 @@ class AttendanceController extends Controller
 
             Attendance::create([
                 'user_id' => $user->id,
-                'tanggal' => $shiftStart->copy()->format('Y-m-d'),
+                'tanggal' => $shiftDate,
                 'jam_masuk' => $now,
                 'latitude' => $request->latitude,
                 'longitude' => $request->longitude,

@@ -29,7 +29,7 @@
     <!-- LOADING SCREEN -->
     <div
         id="loading-screen"
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]"> <!-- Glow -->
+        class="fixed inset-0 z-[9999] overflow-y-auto bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]"> <!-- Glow -->
         <div class="absolute w-[500px] h-[500px] bg-indigo-500/20 blur-3xl rounded-full"></div>
 
         <div class="relative w-80 h-48 flex items-center justify-center">

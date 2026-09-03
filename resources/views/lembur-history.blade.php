@@ -97,8 +97,8 @@
                             @endif
                         </div>
 
-                        <div x-show="showDetail" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs" style="display:none;">
-                            <div @click.away="showDetail = false" class="bg-white rounded-3xl w-full max-w-lg p-6 relative shadow-2xl modal-animate border">
+                        <div x-show="showDetail" x-transition.opacity class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 backdrop-blur-xs" style="display:none;">
+                            <div @click.away="showDetail = false" class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
                                 <button @click="showDetail = false" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
                                 
                                 <h2 class="text-xl font-black text-cyan-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Perintah Kerja Lembur</h2>

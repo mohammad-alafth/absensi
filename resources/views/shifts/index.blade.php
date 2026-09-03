@@ -127,10 +127,10 @@
             x-show="showWeeklyModal"
             x-cloak
             class="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm
-           flex items-center justify-center p-2 sm:p-4">
+           overflow-y-auto p-2 sm:p-4">
             <div
                 @click.away="closeWeeklyModal()"
-                class="bg-white rounded-2xl sm:rounded-3xl
+                class="bg-white rounded-2xl sm:rounded-3xl max-h-[90vh] overflow-y-auto
                w-full max-w-2xl
                h-[calc(100vh-16px)] sm:h-auto
                sm:max-h-[calc(100vh-32px)]

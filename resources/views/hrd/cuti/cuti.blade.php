@@ -41,7 +41,7 @@
                     <div
                         x-show="showDetail"
                         x-transition
-                        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                        class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
                         style="display:none;">
 
                         <div
@@ -349,12 +349,12 @@
                                     <div
                                         x-show="rejectModal"
                                         x-transition
-                                        class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 p-4"
+                                        class="fixed inset-0 z-[999] overflow-y-auto bg-black/50 p-4"
                                         style="display:none;">
 
                                         <div
                                             @click.away="rejectModal = false"
-                                            class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+                                            class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 mx-auto my-8">
 
                                             <h2 class="text-xl font-bold text-red-500 mb-2">
                                                 Reject Pengajuan
@@ -441,9 +441,9 @@
                 @endforelse
                 <div
                     id="hrdSignatureModal"
-                    class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+                    class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] overflow-y-auto p-4">
 
-                    <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-100 modal-animate">
+                    <div class="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 modal-animate mx-auto my-8">
 
                         <div class="flex justify-between items-center mb-3">
                             <div class="flex items-center gap-2">

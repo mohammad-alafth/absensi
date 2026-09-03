@@ -20,11 +20,22 @@ class DashboardController extends Controller
 
         /*
     |------------------------------------------------------------------
-    | ATTENDANCE TODAY
+    | SCHEDULE TODAY (ambil lebih awal untuk dapat shift_date)
     |------------------------------------------------------------------
     */
+        $scheduleData = ScheduleService::getTodaySchedule($user);
+
+        /*
+    |------------------------------------------------------------------
+    | ATTENDANCE TODAY (gunakan shift_date dari schedule untuk cross-day)
+    |------------------------------------------------------------------
+    */
+        $attendanceDate = $scheduleData && isset($scheduleData['shift_date'])
+            ? $scheduleData['shift_date']
+            : today()->format('Y-m-d');
+
         $todayAttendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', today())
+            ->whereDate('tanggal', $attendanceDate)
             ->first();
 
         /*
@@ -42,8 +53,6 @@ class DashboardController extends Controller
     | SCHEDULE TODAY (SINKRONISASI & AMANKAN DATA LIBUR)
     |------------------------------------------------------------------
     */
-        $scheduleData = ScheduleService::getTodaySchedule($user);
-
         // PERBAIKAN UTAMA: Pastikan variabel berupa array/object DAN memiliki key 'shift_name'
         if ($scheduleData && isset($scheduleData['shift_name'])) {
             $schedule = $scheduleData['shift_name']

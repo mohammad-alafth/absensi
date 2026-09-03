@@ -297,7 +297,7 @@
                 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                 <!-- MODAL SHIFT CALENDAR -->
                 <div id="shiftModal"
-                    class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-0 md:p-4">
+                    class="fixed inset-0 bg-black/50 z-[100] hidden overflow-y-auto p-0 md:p-4">
 
                     <div class="bg-white rounded-3xl w-full max-w-[1600px] h-[95vh] shadow-xl flex flex-col">
 

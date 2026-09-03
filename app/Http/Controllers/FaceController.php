@@ -90,11 +90,10 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         */
         $now = Carbon::now();
-        $today = Carbon::today();
 
         /*
         |--------------------------------------------------------------------------
-        | AMBIL SCHEDULE
+        | AMBIL SCHEDULE (sudah handle cross-day shift)
         |--------------------------------------------------------------------------
         */
         $schedule = ScheduleService::getTodaySchedule($user);
@@ -106,35 +105,31 @@ class FaceController extends Controller
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SHIFT TIME
-        |--------------------------------------------------------------------------
-        */
-        $startTime = $schedule['start_time'] ?? null;
-        $endTime   = $schedule['end_time'] ?? null;
-
-        if (!$startTime || !$endTime) {
+        if (!empty($schedule['invalid_window'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Jadwal shift tidak valid'
+                'message' => 'Diluar jam absensi'
             ], 403);
         }
 
-        $shiftStart = Carbon::today()->setTimeFromTimeString($startTime);
-        $shiftEnd   = Carbon::today()->setTimeFromTimeString($endTime);
-
-        if (!empty($schedule['is_overnight']) && $schedule['is_overnight']) {
-            $shiftEnd->addDay();
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | SHIFT TIME (gunakan dari schedule, bukan Carbon::today())
+        |--------------------------------------------------------------------------
+        | ScheduleService sudah menghitung shift_start dan shift_end dengan
+        | benar untuk cross-day shift (overnight).
+        |--------------------------------------------------------------------------
+        */
+        $shiftStart = $schedule['shift_start'];
+        $shiftEnd   = $schedule['shift_end'];
+        $shiftDate  = $schedule['shift_date'];
 
         /*
         |--------------------------------------------------------------------------
         | GRACE PERIOD (15 MENIT)
         |--------------------------------------------------------------------------
         */
-        $graceMinutes =  $schedule['grace_minutes'] ?? 15;
-
+        $graceMinutes = $schedule['grace_minutes'] ?? 15;
         $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
 
         /*
@@ -165,11 +160,14 @@ class FaceController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | CEK ABSENSI
+        | CEK ABSENSI - gunakan shift_date dari schedule
+        |--------------------------------------------------------------------------
+        | Untuk cross-day shift, shift_date adalah tanggal mulai shift (kemarin).
+        | Jadi attendance yang dibuat kemarin malam masih bisa ditemukan pagi ini.
         |--------------------------------------------------------------------------
         */
         $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', $today)
+            ->whereDate('tanggal', $shiftDate)
             ->first();
 
         /*
@@ -177,96 +175,43 @@ class FaceController extends Controller
         | CHECK IN
         |--------------------------------------------------------------------------
         */
-        /*
-|--------------------------------------------------------------------------
-| CHECK IN
-|--------------------------------------------------------------------------
-*/
         if (!$attendance) {
-
-            /*
-    |--------------------------------------------------------------
-    | VALIDASI JAM MASUK
-    |--------------------------------------------------------------
-    */
-
             if ($now->lt($checkinStart)) {
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Belum masuk jam absensi'
                 ], 403);
             }
 
-            /*
-    |--------------------------------------------------------------
-    | STATUS ABSENSI
-    |--------------------------------------------------------------
-    */
-
             $status = 'hadir';
-
             $lateMinutes = 0;
 
-            /*
-    |--------------------------------------------------------------
-    | CEK KETERLAMBATAN
-    |--------------------------------------------------------------
-    */
-
             if ($now->gt($lateLimit)) {
-
                 $status = 'terlambat';
-
-                /*
-        |----------------------------------------------------------
-        | HITUNG KETERLAMBATAN
-        |----------------------------------------------------------
-        */
-
                 $lateMinutes = (int) round($lateLimit->diffInMinutes($now));
             }
 
-            /*
-    |--------------------------------------------------------------
-    | CREATE ATTENDANCE
-    |--------------------------------------------------------------
-    */
-
             Attendance::create([
-
                 'user_id'      => $user->id,
-
-                'tanggal'      => $today,
-
+                'tanggal'      => $shiftDate,
                 'jam_masuk'    => $now,
-
                 'latitude'     => $request->latitude,
-
                 'longitude'    => $request->longitude,
-
                 'status'       => $status,
-
-                'late_minutes' => $lateMinutes
-
+                'late_minutes' => $lateMinutes,
+                'scheduled_checkin' => $shiftStart,
+                'scheduled_checkout' => $shiftEnd,
             ]);
 
             return response()->json([
-
                 'success' => true,
-
                 'type' => 'checkin',
-
                 'message' => $status === 'terlambat'
                     ? 'Check In berhasil (Terlambat ' . $lateMinutes . ' menit)'
                     : 'Check In berhasil',
-
                 'status' => $status,
-
                 'late_minutes' => (int) round($lateMinutes),
-
                 'distance' => round($distance, 2) . ' meter'
-
             ]);
         }
 
@@ -296,16 +241,14 @@ class FaceController extends Controller
             ], 403);
         }
 
-
         /*
-|--------------------------------------------------------------------------
-| HITUNG OVERTIME
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | HITUNG OVERTIME
+        |--------------------------------------------------------------------------
+        */
         $overtimeMinutes = 0;
 
         if ($now->gt($shiftEnd)) {
-
             $overtimeMinutes = $shiftEnd->diffInMinutes($now);
         }
 
@@ -315,27 +258,18 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         */
         $attendance->update([
-
             'jam_keluar'       => $now,
-
             'overtime_minutes' => $overtimeMinutes
-
         ]);
 
         return response()->json([
-
             'success' => true,
-
             'type'    => 'checkout',
-
             'message' => $overtimeMinutes > 0
                 ? 'Check Out berhasil (Lembur ' . $overtimeMinutes . ' menit)'
                 : 'Check Out berhasil',
-
             'overtime_minutes' => $overtimeMinutes,
-
             'distance' => round($distance, 2) . ' meter'
-
         ]);
     }
 

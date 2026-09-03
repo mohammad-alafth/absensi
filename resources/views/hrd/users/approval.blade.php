@@ -68,8 +68,8 @@
                 </div>
             </div>
 
-            <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/30 backdrop-blur-sm">
-                <div @click.away="showModal = false" class="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl border border-gray-100">
+            <div x-show="showModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto p-4 bg-gray-900/30 backdrop-blur-sm">
+                <div @click.away="showModal = false" class="bg-white rounded-[2rem] p-8 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 mx-auto my-8">
                     <div class="mb-6 text-center">
                         <h3 class="font-extrabold text-xl text-gray-900 mb-1">Setujui User</h3>
                         <p class="text-sm text-gray-500">Memberikan hak akses untuk <span class="font-bold text-indigo-600" x-text="selectedUser?.name"></span></p>

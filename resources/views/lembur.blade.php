@@ -172,8 +172,8 @@ $pjUsers = \App\Models\User::where('role', $pjRole)->get();
         </div>
     </div>
 
-    <div id="signatureModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-        <div class="bg-white rounded-3xl w-full max-w-sm p-5 shadow-2xl modal-animate border border-gray-100">
+    <div id="signatureModal" class="hidden fixed inset-0 bg-black/50 z-50 overflow-y-auto p-4 backdrop-blur-xs">
+        <div class="bg-white rounded-3xl w-full max-w-sm max-h-[90vh] overflow-y-auto p-5 shadow-2xl modal-animate border border-gray-100 mx-auto my-8">
             <div class="flex justify-between items-center mb-3">
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="closeSignatureModal()" class="text-xs font-bold text-gray-500 hover:text-indigo-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1">

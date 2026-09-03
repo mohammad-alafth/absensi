@@ -95,8 +95,8 @@
                                 </div>
                             </div>
 
-                            <div id="leave-{{ $leave->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-                                <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative shadow-2xl modal-animate border">
+                            <div id="leave-{{ $leave->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+                                <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
                                     <button onclick="closeModal('leave-{{ $leave->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
                                     <h2 class="text-xl font-black text-[#1E40AF] border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Dokumen Cuti</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
@@ -190,8 +190,8 @@
                                 </div>
                             </div>
 
-                            <div id="permission-{{ $permission->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-                                <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative shadow-2xl modal-animate border">
+                            <div id="permission-{{ $permission->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+                                <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
                                     <button onclick="closeModal('permission-{{ $permission->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
                                     <h2 class="text-xl font-black text-indigo-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Surat Keperluan Izin</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
@@ -287,8 +287,8 @@
                                 </div>
                             </div>
 
-                            <div id="overtime-{{ $overtime->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-                                <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative shadow-2xl modal-animate border">
+                            <div id="overtime-{{ $overtime->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+                                <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
                                     <button onclick="closeModal('overtime-{{ $overtime->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
                                     <h2 class="text-xl font-black text-cyan-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Perintah Kerja Lembur</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">

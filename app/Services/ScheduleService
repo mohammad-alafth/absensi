@@ -55,14 +55,13 @@ class ScheduleService
             $now = Carbon::now();
 
             /*
-            |------------------------------------------------------------------
+            |----------------------------------------------------------------------
             | PRIORITAS 1: Cek shift overnight dari kemarin yang masih aktif
-            |------------------------------------------------------------------
-            | Jika user punya shift overnight kemarin (mis. 22:00 - 06:00),
-            | dan sekarang masih dalam window shift (2 jam sebelum mulai
-            | sampai 6 jam setelah selesai), return shift tersebut.
-            | Ini memastikan user bisa checkout pagi hari.
-            |------------------------------------------------------------------
+            |----------------------------------------------------------------------
+            | Untuk cross-day shift (cekin malam, ceklog pagi):
+            | Shift dimulai kemarin malam dan berakhir pagi hari ini.
+            | Kita perlu mencari shift ini agar user bisa ceklog di pagi hari.
+            |----------------------------------------------------------------------
             */
             $yesterdayShift = EmployeeShift::with('shift')
                 ->where('user_id', $user->id)
@@ -76,9 +75,10 @@ class ScheduleService
                 );
                 $shiftEnd = Carbon::parse(
                     $yesterdayShift->shift_date . ' ' . $yesterdayShift->end_time
-                );
-                $shiftEnd->addDay(); // overnight
+                )->addDay();
 
+                // Cek apakah kita masih dalam window shift ini
+                // (dari 2 jam sebelum mulai sampai 6 jam setelah selesai)
                 $maxCheckin  = $shiftStart->copy()->subHours(2);
                 $maxCheckout = $shiftEnd->copy()->addHours(6);
 
@@ -100,48 +100,55 @@ class ScheduleService
             }
 
             /*
-            |------------------------------------------------------------------
+            |----------------------------------------------------------------------
             | PRIORITAS 2: Cek shift hari ini
-            |------------------------------------------------------------------
+            |----------------------------------------------------------------------
             */
-            $todayShift = EmployeeShift::with('shift')
+            $employeeShift = EmployeeShift::with('shift')
                 ->where('user_id', $user->id)
                 ->whereDate('shift_date', $now->format('Y-m-d'))
+                ->orderByDesc('start_time')
                 ->first();
 
-            if ($todayShift) {
-                $shiftStart = Carbon::parse(
-                    $todayShift->shift_date . ' ' . $todayShift->start_time
-                );
-                $shiftEnd = Carbon::parse(
-                    $todayShift->shift_date . ' ' . $todayShift->end_time
-                );
-
-                if ($todayShift->is_overnight) {
-                    $shiftEnd->addDay();
-                }
-
-                $maxCheckin  = $shiftStart->copy()->subHours(2);
-                $maxCheckout = $shiftEnd->copy()->addHours(6);
-
-                $isValidWindow = $now->between($maxCheckin, $maxCheckout);
-
-                return [
-                    'type' => 'shift',
-                    'shift_id' => $todayShift->shift->id,
-                    'shift_name' => optional($todayShift->shift)->name ?? 'Shift',
-                    'start_time' => $todayShift->start_time,
-                    'end_time'   => $todayShift->end_time,
-                    'grace_minutes' => 15,
-                    'is_overnight' => $todayShift->is_overnight,
-                    'shift_start' => $shiftStart,
-                    'shift_end'   => $shiftEnd,
-                    'shift_date'  => $todayShift->shift_date,
-                    'invalid_window' => !$isValidWindow,
-                ];
+            if (!$employeeShift) {
+                return null;
             }
 
-            return null;
+            $shiftStart = Carbon::parse(
+                $employeeShift->shift_date . ' ' . $employeeShift->start_time
+            );
+
+            $shiftEnd = Carbon::parse(
+                $employeeShift->shift_date . ' ' . $employeeShift->end_time
+            );
+
+            if ($employeeShift->is_overnight) {
+                $shiftEnd->addDay();
+            }
+
+            $maxCheckin  = $shiftStart->copy()->subHours(2);
+            $maxCheckout = $shiftEnd->copy()->addHours(6);
+
+            $isValidWindow = $now->between($maxCheckin, $maxCheckout);
+
+            return [
+                'type' => 'shift',
+                'shift_id' => $employeeShift->shift->id,
+                'shift_name' => optional($employeeShift->shift)->name ?? 'Shift',
+
+                // jadwal masuk & keluar
+                'start_time' => $employeeShift->start_time,
+                'end_time'   => $employeeShift->end_time,
+
+                'grace_minutes' => 15,
+                'is_overnight' => $employeeShift->is_overnight,
+
+                'shift_start' => $shiftStart,
+                'shift_end'   => $shiftEnd,
+                'shift_date'  => $employeeShift->shift_date,
+
+                'invalid_window' => !$isValidWindow,
+            ];
         }
 
         /*
