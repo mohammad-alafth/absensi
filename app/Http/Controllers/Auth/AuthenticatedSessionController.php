@@ -53,7 +53,12 @@ class AuthenticatedSessionController extends Controller
         // 4. Jika sudah di-approve, lanjutkan proses normal
         $request->session()->regenerate();
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Buat token Sanctum & simpan ID-nya di session, supaya saat logout /
+        // auto-logout (idle 30 menit) token ikut di-revoke (reset token session)
+        $tokenRecord = $user->createToken('auth_token');
+        $request->session()->put('auth_access_token_id', $tokenRecord->accessToken->id);
+
+        $token = $tokenRecord->plainTextToken;
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -70,6 +75,15 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
+        // Revoke token Sanctum yang dibuat saat login web (reset token session)
+        $accessTokenId = $request->session()->pull('auth_access_token_id');
+
+        if ($user && $accessTokenId) {
+            $user->tokens()->where('id', $accessTokenId)->delete();
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

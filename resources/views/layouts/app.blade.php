@@ -90,34 +90,178 @@
 
     </div>
 
-    <!-- AUTO LOGOUT -->
+    <!-- AUTO LOGOUT / RESET SESSION -->
+    <!--
+    |--------------------------------------------------------------------------
+    | RESET SESSION OTOMATIS (IDLE 30 MENIT)
+    |--------------------------------------------------------------------------
+    | - Jika TIDAK ADA AKTIVITAS selama 30 menit, sistem otomatis logout.
+    | - 30 detik sebelum logout, muncul peringatan "Tetap Login".
+    | - Logout dilakukan sungguhan (POST /logout): session web dihapus dan
+    |   token Sanctum yang dibuat saat login ikut di-revoke (reset token).
+    |--------------------------------------------------------------------------
+    -->
     <!-- SweetAlert2 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        let timeout;
+        (function () {
+            // Durasi idle sebelum logout otomatis (menit)
+            const IDLE_MINUTES = 30;
+            // Durasi peringatan sebelum logout (detik)
+            const WARNING_SECONDS = 30;
 
-        function resetTimer() {
-            clearTimeout(timeout);
+            const IDLE_MS = IDLE_MINUTES * 60 * 1000;
+            const WARNING_MS = WARNING_SECONDS * 1000;
 
-            timeout = setTimeout(() => {
+            let logoutTimer = null;
+            let warningTimer = null;
+            let countdownInterval = null;
+            let isLoggingOut = false;
+            let warningOpen = false;
+            let suppressResult = false;
+
+            function clearTimers() {
+                if (logoutTimer) clearTimeout(logoutTimer);
+                if (warningTimer) clearTimeout(warningTimer);
+                logoutTimer = null;
+                warningTimer = null;
+            }
+
+            // Jadwalkan peringatan + waktu logout otomatis
+            function armTimers() {
+                clearTimers();
+                clearInterval(countdownInterval);
+
+                // Peringatan muncul 30 detik sebelum waktu logout
+                warningTimer = setTimeout(showWarning, IDLE_MS - WARNING_MS);
+                logoutTimer = setTimeout(forceLogout, IDLE_MS);
+            }
+
+            // Dipanggil setiap kali ada aktivitas user -> reset hitung mundur
+            function resetActivity() {
+                if (isLoggingOut) return;
+
+                // Jika peringatan sedang terbuka lalu user kembali aktif, tutup
+                if (warningOpen && typeof Swal !== 'undefined') {
+                    suppressResult = true;
+                    warningOpen = false;
+                    Swal.close();
+                }
+
+                armTimers();
+            }
+
+            function showWarning() {
+                if (isLoggingOut) return;
+
+                if (typeof Swal === 'undefined') {
+                    forceLogout();
+                    return;
+                }
+
+                let remaining = WARNING_SECONDS;
+                warningOpen = true;
+                clearInterval(countdownInterval);
+
+                countdownInterval = setInterval(function () {
+                    remaining--;
+                    const el = document.getElementById('session-countdown');
+                    if (el) el.textContent = Math.max(remaining, 0);
+                }, 1000);
+
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Session habis',
-                    text: 'Login ulang untuk melanjutkan',
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    window.location.href = "/login";
+                    title: 'Sesi Akan Berakhir',
+                    html: 'Tidak ada aktivitas selama <b>' + IDLE_MINUTES +
+                        ' menit</b>.<br><br>' +
+                        'Sistem akan logout otomatis dalam <b id="session-countdown">' +
+                        remaining + '</b> detik.',
+                    confirmButtonText: 'Tetap Login',
+                    showCancelButton: true,
+                    cancelButtonText: 'Logout Sekarang',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    timer: WARNING_MS,
+                    timerProgressBar: true,
+                    willClose: function () {
+                        clearInterval(countdownInterval);
+                    }
+                }).then(function (result) {
+                    if (suppressResult) {
+                        suppressResult = false;
+                        return;
+                    }
+
+                    warningOpen = false;
+
+                    if (result.isConfirmed) {
+                        // User memilih "Tetap Login"
+                        resetActivity();
+                    } else if (result.dismiss) {
+                        // Tombol "Logout Sekarang" / waktu peringatan habis
+                        forceLogout();
+                    }
                 });
-            }, 1800000); // 30 menit
-        }
+            }
 
-        window.onload = resetTimer;
+            // Logout sungguhan: hapus session web + revoke token Sanctum
+            function forceLogout() {
+                if (isLoggingOut) return;
+                isLoggingOut = true;
 
-        document.onmousemove = resetTimer;
-        document.onkeypress = resetTimer;
-        document.onclick = resetTimer;
-        document.onscroll = resetTimer;
+                clearTimers();
+                clearInterval(countdownInterval);
+
+                // Hapus token API (Sanctum) dari localStorage browser
+                try {
+                    localStorage.removeItem('token');
+                } catch (e) {
+                    // abaikan bila localStorage tidak tersedia
+                }
+
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+                fetch('/logout', {
+                    method: 'POST',
+                    redirect: 'manual',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ _token: csrfToken })
+                })
+                    .catch(function () {
+                        // Session di server mungkin sudah kedaluwarsa;
+                        // tetap arahkan ke halaman login.
+                    })
+                    .finally(function () {
+                        window.location.href = '/login?session_expired=1';
+                    });
+            }
+
+            // Event aktivitas user yang me-reset timer idle
+            const ACTIVITY_EVENTS = [
+                'mousemove', 'mousedown', 'keydown', 'keypress',
+                'click', 'dblclick', 'scroll', 'wheel',
+                'touchstart', 'touchmove', 'pointerdown'
+            ];
+
+            ACTIVITY_EVENTS.forEach(function (evt) {
+                document.addEventListener(evt, resetActivity, { passive: true });
+            });
+
+            // Kembali ke tab / halaman dianggap aktif kembali
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden) resetActivity();
+            });
+
+            // Mulai hitung mundur begitu halaman selesai dimuat
+            armTimers();
+        })();
     </script>
 
     <!-- ANIME JS -->

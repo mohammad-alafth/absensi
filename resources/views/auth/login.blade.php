@@ -1,4 +1,11 @@
 <x-guest-layout>
+    @if(request()->query('session_expired') === '1')
+    <div class="mb-6 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm font-medium shadow-sm">
+        ⏰ Sesi Anda berakhir karena tidak ada aktivitas selama 30 menit.
+        Silakan login kembali untuk melanjutkan.
+    </div>
+    @endif
+
     <div id="login-error" class="hidden mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-sm font-medium shadow-sm">
     </div>
 
