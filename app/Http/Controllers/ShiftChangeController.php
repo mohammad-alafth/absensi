@@ -80,7 +80,7 @@ class ShiftChangeController extends Controller
 
         $request->validate([
             'shift_date' => 'required|date|after_or_equal:today',
-            'requested_shift_id' => 'required|exists:shifts,id',
+            'requested_shift_id' => 'required',
             'reason' => 'required|string|min:5',
         ], [
             'shift_date.required' => 'Tanggal shift wajib diisi.',
@@ -100,6 +100,12 @@ class ShiftChangeController extends Controller
             return back()->with('error', 'Anda sudah memiliki pengajuan perubahan shift yang pending pada tanggal tersebut.')->withInput();
         }
 
+        // Nilai 'off' = minta libur / tidak ada shift (jadwal kosong), disimpan sebagai NULL
+        $requestedShiftId = $request->input('requested_shift_id');
+        if ($requestedShiftId !== 'off' && !Shift::whereKey($requestedShiftId)->exists()) {
+            return back()->withErrors(['requested_shift_id' => 'Shift yang dipilih tidak valid.'])->withInput();
+        }
+
         // Cari shift saat ini
         $currentShift = EmployeeShift::where('user_id', $user->id)
             ->whereDate('shift_date', $request->shift_date)
@@ -109,7 +115,7 @@ class ShiftChangeController extends Controller
             'user_id' => $user->id,
             'shift_date' => $request->shift_date,
             'current_shift_id' => $currentShift ? $currentShift->shift_id : null,
-            'requested_shift_id' => $request->requested_shift_id,
+            'requested_shift_id' => $requestedShiftId === 'off' ? null : $requestedShiftId,
             'reason' => $request->reason,
             'status' => 'pending',
         ]);

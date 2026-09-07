@@ -188,6 +188,11 @@ Route::middleware([
         'index'
     ])->name('history');
 
+    Route::get('/history/rekap', [
+        HistoryController::class,
+        'rekap'
+    ])->name('history.rekap');
+
     /*
     |--------------------------------------------------------------------------
     | PROFILE

@@ -169,16 +169,28 @@
                 `;
             },
             (err) => {
+                console.error('Geolocation error:', err.code, err.message);
+                let title = 'GPS Tidak Aktif';
+                let text = 'Nyalakan GPS lokasi pada perangkat Anda.';
+                if (err.code === 1) {
+                    title = 'Izin Lokasi Ditolak';
+                    text = 'Buka Settings -> Privacy & Security -> Location Services -> Chrome -> "While Using the App", lalu muat ulang. Catatan: iOS memblokir GPS di alamat http://, gunakan https://.';
+                } else if (err.code === 2) {
+                    title = 'Sinyal Lokasi Lemah';
+                    text = 'Pindah ke area terbuka / dekat jendela agar GPS mengunci, lalu tunggu.';
+                } else if (err.code === 3) {
+                    title = 'Masih Mengunci GPS';
+                    text = 'Sinyal GPS belum didapat dalam 20 detik. Coba lagi di area terbuka.';
+                }
                 Swal.fire({
                     icon: 'error',
-                    title: 'GPS Tidak Aktif',
-                    text: 'Nyalakan GPS lokasi pada perangkat Anda.'
+                    title: title,
+                    text: text
                 });
-                console.error(err);
             }, {
                 enableHighAccuracy: true,
                 maximumAge: 0,
-                timeout: 10000
+                timeout: 20000
             }
         );
 

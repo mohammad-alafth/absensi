@@ -27,12 +27,17 @@
 
         <div class="w-full max-w-6xl mx-auto">
 
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
                 <a href="{{ route('dashboard') }}" class="text-[#1E40AF] font-semibold text-sm flex items-center gap-1 hover:underline">
                     ← Kembali
                 </a>
-                <div class="bg-gradient-to-r from-[#1E40AF] to-blue-500 text-white px-5 py-2 rounded-2xl shadow-lg text-sm font-semibold tracking-wide">
-                    Riwayat Pengajuan Personel
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('history.rekap') }}" class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl shadow-md transition text-sm font-bold whitespace-nowrap">
+                        📊 Rekap Absen
+                    </a>
+                    <div class="bg-gradient-to-r from-[#1E40AF] to-blue-500 text-white px-5 py-2 rounded-2xl shadow-lg text-sm font-semibold tracking-wide whitespace-nowrap">
+                        Riwayat Pengajuan Personel
+                    </div>
                 </div>
             </div>
 

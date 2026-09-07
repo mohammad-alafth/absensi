@@ -73,12 +73,16 @@
 
                                 <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3">
                                     <p class="text-[11px] font-semibold text-indigo-400 uppercase">Shift Yang Diminta</p>
+                                    @if($item->requested_shift_id)
                                     <p class="text-sm font-bold text-indigo-800 mt-0.5">
                                         {{ $item->requestedShift->name ?? '-' }}
                                         <span class="text-xs font-normal text-indigo-600">
                                             ({{ \Carbon\Carbon::parse($item->requestedShift->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($item->requestedShift->end_time)->format('H:i') }})
                                         </span>
                                     </p>
+                                    @else
+                                    <p class="text-sm font-bold text-amber-700 mt-0.5">🏖️ Hari Libur / Tidak Ada Shift</p>
+                                    @endif
                                 </div>
                             </div>
 

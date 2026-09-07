@@ -98,10 +98,14 @@
                                 </div>
                                 <div>
                                     <p class="text-gray-500">Shift Yang Diminta</p>
+                                    @if($item->requested_shift_id)
                                     <p class="font-semibold text-indigo-700">
                                         {{ $item->requestedShift->name ?? '-' }}
                                         <span class="text-xs font-normal">({{ \Carbon\Carbon::parse($item->requestedShift->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($item->requestedShift->end_time)->format('H:i') }})</span>
                                     </p>
+                                    @else
+                                    <p class="font-semibold text-amber-700">🏖️ Hari Libur / Tidak Ada Shift</p>
+                                    @endif
                                 </div>
                             </div>
 
@@ -139,12 +143,16 @@
 
                                     <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3">
                                         <p class="text-xs text-indigo-400 font-medium">Shift Yang Diminta:</p>
+                                        @if($item->requested_shift_id)
                                         <p class="text-sm font-bold text-indigo-800">
                                             {{ $item->requestedShift->name ?? '-' }}
                                             <span class="text-xs font-normal text-indigo-600">
                                                 ({{ \Carbon\Carbon::parse($item->requestedShift->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($item->requestedShift->end_time)->format('H:i') }})
                                             </span>
                                         </p>
+                                        @else
+                                        <p class="text-sm font-bold text-amber-700">🏖️ Hari Libur / Tidak Ada Shift</p>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -195,6 +203,9 @@
                                 <div class="mb-4">
                                     <label class="block text-xs font-bold text-gray-700 mb-1.5">Setujui / Ubah Ke Shift:</label>
                                     <select name="requested_shift_id" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-4 focus:ring-green-500/10 focus:border-green-500 outline-none">
+                                        <option value="off" {{ $item->requested_shift_id === null ? 'selected' : '' }} class="font-semibold text-amber-700">
+                                            🏖️ Hari Libur / Tidak Ada Shift (Jadwal Kosong)
+                                        </option>
                                         @foreach($shifts as $sf)
                                         <option value="{{ $sf->id }}" {{ $sf->id == $item->requested_shift_id ? 'selected' : '' }}>
                                             {{ $sf->name }} ({{ \Carbon\Carbon::parse($sf->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($sf->end_time)->format('H:i') }})

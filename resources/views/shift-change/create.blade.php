@@ -100,6 +100,9 @@
                             required
                             class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition text-sm bg-gray-50/50">
                             <option value="" disabled selected>-- Pilih Shift Baru --</option>
+                            <option value="off" {{ old('requested_shift_id') == 'off' ? 'selected' : '' }} class="font-semibold text-amber-700">
+                                Hari Libur / Tidak Ada Shift (Jadwal Kosong)
+                            </option>
                             @foreach($availableShifts as $shift)
                             <option value="{{ $shift->id }}" {{ old('requested_shift_id') == $shift->id ? 'selected' : '' }}>
                                 {{ $shift->name }} ({{ \Carbon\Carbon::parse($shift->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($shift->end_time)->format('H:i') }}) {{ $shift->is_overnight ? '🌙' : '☀️' }}
