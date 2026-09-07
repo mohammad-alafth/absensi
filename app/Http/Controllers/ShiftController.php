@@ -114,6 +114,7 @@ class ShiftController extends Controller
                             'assigned_by'  => auth()->id(),
                             'start_time'   => $shift->start_time,
                             'end_time'     => $shift->end_time,
+                            'is_overnight' => (bool) $shift->is_overnight,
                         ]
                     );
                     $curr->addDay();
@@ -156,6 +157,7 @@ class ShiftController extends Controller
                             'assigned_by'  => auth()->id(),
                             'start_time'   => $shift->start_time,
                             'end_time'     => $shift->end_time,
+                            'is_overnight' => (bool) $shift->is_overnight,
                         ]
                     );
                 }

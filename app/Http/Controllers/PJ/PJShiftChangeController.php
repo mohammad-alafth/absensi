@@ -94,6 +94,7 @@ class PJShiftChangeController extends Controller
                     'shift_id' => $requestedShift->id,
                     'start_time' => $requestedShift->start_time,
                     'end_time' => $requestedShift->end_time,
+                    'is_overnight' => (bool) $requestedShift->is_overnight,
                 ]);
             } else {
                 EmployeeShift::create([
@@ -104,6 +105,7 @@ class PJShiftChangeController extends Controller
                     'shift_date' => $targetDate,
                     'start_time' => $requestedShift->start_time,
                     'end_time' => $requestedShift->end_time,
+                    'is_overnight' => (bool) $requestedShift->is_overnight,
                 ]);
             }
 

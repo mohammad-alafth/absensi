@@ -36,13 +36,6 @@ class AttendanceController extends Controller
             ], 403);
         }
 
-        if (!empty($schedule['invalid_window'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Diluar jam absensi'
-            ], 403);
-        }
-
         /*
         |--------------------------------------------------------------------------
         | BUILD SHIFT DATETIME (dari ScheduleService - sudah handle cross-day)
@@ -98,15 +91,26 @@ class AttendanceController extends Controller
                 $lateMinutes = $lateLimit->diffInMinutes($now);
             }
 
-            // Check-in diperbolehkan paling awal 60 menit (1 jam) sebelum jam
-            // masuk shift, dan paling lambat 2 jam setelah jam masuk shift.
-            $checkinStart = $shiftStart->copy()->subMinutes(60);
-            $checkinEnd = $shiftStart->copy()->addHours(2);
+            // Check-in diperbolehkan paling awal 2 jam sebelum jam masuk shift
+            // dan paling lambat 2 jam setelah jam masuk shift.
+            // (diubah dari 1 jam -> 2 jam agar karyawan yang datang lebih awal
+            // tidak ditolak / kena error "diluar jam absensi" saat jadwal aktif)
+            $checkinStart = $shiftStart->copy()->subHours(ScheduleService::EARLY_CHECKIN_HOURS);
+            $checkinEnd   = $shiftStart->copy()->addHours(ScheduleService::LATE_CHECKIN_HOURS);
 
-            if (!$now->between($checkinStart, $checkinEnd)) {
+            if ($now->lt($checkinStart)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Diluar jam checkin'
+                    'message' => 'Belum masuk jam absensi (absensi dibuka mulai '
+                        . ScheduleService::EARLY_CHECKIN_HOURS . ' jam sebelum jam masuk)'
+                ], 403);
+            }
+
+            if ($now->gt($checkinEnd)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Diluar jam checkin (maksimal '
+                        . ScheduleService::LATE_CHECKIN_HOURS . ' jam setelah jam masuk)'
                 ], 403);
             }
 
@@ -151,7 +155,7 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         | Check-out baru diperbolehkan mulai 5 menit sebelum jam selesai shift.
         */
-        $checkoutLimit = $shiftEnd->copy()->subMinutes(5);
+        $checkoutLimit = $shiftEnd->copy()->subMinutes(ScheduleService::CHECKOUT_GRACE_MINUTES);
 
         if ($now->lt($checkoutLimit)) {
             return response()->json([

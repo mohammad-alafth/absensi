@@ -105,13 +105,6 @@ class FaceController extends Controller
             ], 403);
         }
 
-        if (!empty($schedule['invalid_window'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Diluar jam absensi'
-            ], 403);
-        }
-
         /*
         |--------------------------------------------------------------------------
         | SHIFT TIME (gunakan dari schedule, bukan Carbon::today())
@@ -136,11 +129,13 @@ class FaceController extends Controller
         |--------------------------------------------------------------------------
         | CHECKIN WINDOW
         |--------------------------------------------------------------------------
-        | Check-in diperbolehkan paling awal 60 menit (1 jam) sebelum jam masuk
-        | shift, dan paling lambat 2 jam setelah jam masuk shift.
+        | Check-in diperbolehkan paling awal 2 jam sebelum jam masuk shift dan
+        | paling lambat 2 jam setelah jam masuk shift.
+        | (diubah dari 1 jam -> 2 jam agar karyawan yang datang lebih awal
+        | tidak kena error "diluar jam absensi" saat jadwal masih aktif)
         */
-        $checkinStart = $shiftStart->copy()->subMinutes(60);
-        $checkinEnd   = $shiftStart->copy()->addHours(2);
+        $checkinStart = $shiftStart->copy()->subHours(ScheduleService::EARLY_CHECKIN_HOURS);
+        $checkinEnd   = $shiftStart->copy()->addHours(ScheduleService::LATE_CHECKIN_HOURS);
 
         /*
         |--------------------------------------------------------------------------
@@ -181,7 +176,16 @@ class FaceController extends Controller
             if ($now->lt($checkinStart)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Belum masuk jam absensi'
+                    'message' => 'Belum masuk jam absensi (absensi dibuka mulai '
+                        . ScheduleService::EARLY_CHECKIN_HOURS . ' jam sebelum jam masuk)'
+                ], 403);
+            }
+
+            if ($now->gt($checkinEnd)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Diluar jam checkin (maksimal '
+                        . ScheduleService::LATE_CHECKIN_HOURS . ' jam setelah jam masuk)'
                 ], 403);
             }
 
@@ -236,7 +240,7 @@ class FaceController extends Controller
         | Tombol/aksi check-out baru boleh dilakukan mulai 5 menit sebelum
         | jam selesai shift (end_time).
         */
-        $checkoutTime = $shiftEnd->copy()->subMinutes(5);
+        $checkoutTime = $shiftEnd->copy()->subMinutes(ScheduleService::CHECKOUT_GRACE_MINUTES);
 
         if ($now->lt($checkoutTime)) {
             return response()->json([
