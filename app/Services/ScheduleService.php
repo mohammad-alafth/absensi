@@ -32,26 +32,35 @@ class ScheduleService
     // Batas toleransi keterlambatan default (15 menit).
     public const DEFAULT_GRACE_MINUTES = 15;
 
-    public static function getTodaySchedule($user)
+    /**
+     * Ambil jadwal kerja hari ini (atau pada tanggal $forDate bila diisi,
+     * mis. untuk keperluan export kalender per user di modul HRD).
+     *
+     * @param \App\Models\User|\stdClass $user user dengan properti work_type
+     * @param string|\Carbon\Carbon|null $forDate tanggal jadwal yang diminta (opsional)
+     */
+    public static function getTodaySchedule($user, $forDate = null)
     {
-        $today = now()->format('Y-m-d');
+        $base = $forDate === null
+            ? Carbon::today()
+            : Carbon::parse($forDate)->startOfDay();
 
         /*
         |--------------------------------------------------------------------------
-        | OFFICE 5
+        | OFFICE 5 (SENIN - JUMAT)
         |--------------------------------------------------------------------------
         */
-        $shiftStart = Carbon::today()->setTimeFromTimeString('08:00:00');
-        $shiftEnd   = Carbon::today()->setTimeFromTimeString('17:00:00');
-
         if ($user->work_type === 'office_5') {
 
-            $day = Carbon::now()->dayOfWeekIso;
+            $day = $base->dayOfWeekIso;
 
             // sabtu minggu libur
             if ($day >= 6) {
                 return null;
             }
+
+            $shiftStart = $base->copy()->setTimeFromTimeString('08:00:00');
+            $shiftEnd   = $base->copy()->setTimeFromTimeString('17:00:00');
 
             return [
                 'type' => 'office',
@@ -66,7 +75,7 @@ class ScheduleService
 
                 'shift_start' => $shiftStart,
                 'shift_end'   => $shiftEnd,
-                'shift_date'  => today()->format('Y-m-d'),
+                'shift_date'  => $base->format('Y-m-d'),
             ];
         }
 
@@ -192,20 +201,26 @@ class ScheduleService
 
         /*
         |--------------------------------------------------------------------------
-        | OFFICE 6
+        | OFFICE 6 (SENIN - SABTU)
+        |--------------------------------------------------------------------------
+        | Senin - Jumat : 08.00 - 16.00
+        | Sabtu         : 08.00 - 13.00 (setengah hari)
         |--------------------------------------------------------------------------
         */
-        $shiftStart = Carbon::today()->setTimeFromTimeString('08:00:00');
-        $shiftEnd   = Carbon::today()->setTimeFromTimeString('16:00:00');
-
         if ($user->work_type === 'office_6') {
 
-            $day = Carbon::now()->dayOfWeekIso;
+            $day = $base->dayOfWeekIso;
 
-            // minggu libur
+            // Minggu libur
             if ($day == 7) {
                 return null;
             }
+
+            // Sabtu jam kerja setengah hari 08.00 - 13.00
+            $endTime = ($day == 6) ? '13:00:00' : '16:00:00';
+
+            $shiftStart = $base->copy()->setTimeFromTimeString('08:00:00');
+            $shiftEnd   = $base->copy()->setTimeFromTimeString($endTime);
 
             return [
                 'type' => 'office',
@@ -213,14 +228,14 @@ class ScheduleService
 
                 // jadwal masuk & keluar
                 'start_time' => '08:00:00',
-                'end_time'   => '16:00:00',
+                'end_time'   => $endTime,
 
                 'grace_minutes' => 15,
                 'is_overnight' => false,
 
                 'shift_start' => $shiftStart,
                 'shift_end'   => $shiftEnd,
-                'shift_date'  => today()->format('Y-m-d'),
+                'shift_date'  => $base->format('Y-m-d'),
             ];
         }
 

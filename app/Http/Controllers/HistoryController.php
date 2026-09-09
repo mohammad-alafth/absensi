@@ -384,7 +384,7 @@ class HistoryController extends Controller
     | Tentukan jadwal kerja untuk satu tanggal tertentu.
     | - work_type 'shift'    : bersumber dari tabel employee_shifts.
     | - work_type 'office_5' : Senin-Jumat 08.00-17.00.
-    | - work_type 'office_6' : Senin-Sabtu 08.00-16.00.
+    | - work_type 'office_6' : Senin-Jumat 08.00-16.00, Sabtu 08.00-13.00.
     | - null berarti libur / off (tidak ada jadwal).
     |--------------------------------------------------------------------------
     */
@@ -427,10 +427,13 @@ class HistoryController extends Controller
                 return null;
             }
 
+            // Sabtu jam kerja setengah hari (08.00 - 13.00)
+            $end = $dayOfWeekIso === 6 ? '13:00:00' : '16:00:00';
+
             return [
                 'name'      => 'Office',
                 'start'     => '08:00:00',
-                'end'       => '16:00:00',
+                'end'       => $end,
                 'type'      => 'office',
                 'overnight' => false,
             ];

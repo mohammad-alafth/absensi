@@ -105,4 +105,42 @@ class RekapAbsenHistoryTest extends TestCase
         $response->assertDontSee('13:13');
         $response->assertDontSee('User Lain Rekap Test');
     }
+
+    public function test_rekap_office6_sabtu_menampilkan_jadwal_08_00_sampai_13_00(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-09 10:00:00')); // Rabu
+        $user = $this->makeUser();
+
+        try {
+            $this->actingAs($user)
+                ->get(route('history.rekap', [
+                    'mode'    => 'tanggal',
+                    'tanggal' => '2026-09-05', // Sabtu
+                ]))
+                ->assertOk()
+                ->assertSee('Sabtu')
+                ->assertSee('08:00 - 13:00');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_rekap_office6_hari_kerja_menampilkan_jadwal_08_00_sampai_16_00(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-09 10:00:00')); // Rabu
+        $user = $this->makeUser();
+
+        try {
+            $this->actingAs($user)
+                ->get(route('history.rekap', [
+                    'mode'    => 'tanggal',
+                    'tanggal' => '2026-09-08', // Selasa
+                ]))
+                ->assertOk()
+                ->assertSee('Selasa')
+                ->assertSee('08:00 - 16:00');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
 }
