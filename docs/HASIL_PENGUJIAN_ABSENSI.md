@@ -119,3 +119,37 @@ Semua test milik fitur absensi (8 test baru + 6 test terkait) **lolos**.
 3. Pesan error dibedakan dengan jelas: terlalu pagi → *"Belum masuk jam absensi..."*,
    melewati batas → *"Diluar jam checkin..."*.
 4. Tidak ada regresi pada suite absensi/rekap/perubahan shift.
+
+---
+
+## 7. Pengujian Ulang: Pengajuan Change Shift "Hari Libur" (2026-09-11)
+
+Konteks: pengajuan libur/tidak ada shift menyimpan `requested_shift_id = NULL`, dan pada DB
+yang belum menjalankan migration alter kolom tersebut masih `NOT NULL` sehingga muncul
+`SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'requested_shift_id' cannot be null`.
+
+### 7.1 Reproduksi bug (kolom dibuat NOT NULL seperti kondisi awal)
+
+```text
+FAIL  Tests\Feature\ShiftChangeOffRequestTest
+  SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'requested_shift_id' cannot be null
+  insert into `shift_change_requests` (`user_id`, `shift_date`, `current_shift_id`,
+  `requested_shift_id`, `reason`, `status`, `updated_at`, `created_at`) values (...)
+
+Tests:    4, Assertions: 27, Failures: 2
+```
+
+### 7.2 Setelah `php artisan migrate` (migration nullable di-restore)
+
+```text
+PASS  Tests\Feature\ShiftChangeOffRequestTest   (4 passed, 32 assertions)
+PASS  Tests\Unit\ScheduleServiceOffice6Test     (5 passed, 18 assertions)
+
+Tests:    9 passed (50 assertions)
+Duration: 0.63s
+```
+
+Kolom terverifikasi: `requested_shift_id bigint unsigned DEFAULT NULL` dengan
+FK `ON DELETE SET NULL`. Migration bersifat idempotent (dilewati bila kolom sudah nullable)
+dan `migrate:rollback --step=1` → `migrate` juga berjalan sukses.
+

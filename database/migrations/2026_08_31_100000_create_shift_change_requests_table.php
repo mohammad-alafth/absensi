@@ -16,7 +16,10 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->date('shift_date');
             $table->foreignId('current_shift_id')->nullable()->constrained('shifts')->nullOnDelete();
-            $table->foreignId('requested_shift_id')->constrained('shifts')->onDelete('cascade');
+
+            // requested_shift_id boleh NULL = karyawan mengajukan LIBUR / tidak ada shift
+            // (jadwal kosong) pada tanggal tersebut, bukan pindah ke shift lain.
+            $table->foreignId('requested_shift_id')->nullable()->constrained('shifts')->nullOnDelete();
             $table->text('reason');
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->text('pj_note')->nullable();

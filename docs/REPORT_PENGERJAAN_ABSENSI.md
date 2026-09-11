@@ -150,3 +150,50 @@ Hasil pengujian lengkap (termasuk bukti test gagal pada kode lama) dapat dilihat
 | `docs/HASIL_PENGUJIAN_ABSENSI.md` | Laporan hasil pengujian |
 | `docs/REPORT_PENGERJAAN_ABSENSI.md` | Report pengerjaan ini |
 
+
+---
+
+## 8. Perbaikan Lanjutan: Pengajuan Change Shift "Hari Libur" / Tidak Ada Shift
+
+### Gejala
+
+Karyawan `work_type = shift` memilih opsi **"Hari Libur / Tidak Ada Shift (Jadwal Kosong)"**
+pada form pengajuan perubahan shift, lalu muncul error:
+
+```text
+SQLSTATE[23000]: Integrity constraint violation: 1048
+Column 'requested_shift_id' cannot be null (Connection: mysql, Database: absensi_rs,
+SQL: insert into `shift_change_requests` (...) values (114, 2026-09-13, 26, ?, Perubahan jadwal, pending, ...))
+```
+
+### Akar Masalah
+
+1. Fitur pengajuan libur memang menyimpan `requested_shift_id = NULL`
+   (`ShiftChangeController::store()` menerjemahkan nilai `off` → `null`).
+2. Commit `c6085f5` membuat kolom tersebut nullable, **tetapi** commit `5d9cbd6`
+   ("hapus migration") menghapus file migration-nya tanpa memindahkan perubahan ke
+   migration `create_shift_change_requests_table`.
+3. Akibatnya DB.local yang sempat menjalankan alter tetap nullable, tetapi DB yang
+   **belum** pernah menjalankannya (mis. server hasil deploy, atau `migrate:fresh`)
+   tetap `NOT NULL` dan tidak bisa diperbaiki karena file migration-nya sudah tidak ada
+   di repo → pengajuan libur selalu gagal.
+
+### Perbaikan
+
+| File | Perubahan |
+| --- | --- |
+| `database/migrations/2026_08_31_100000_create_shift_change_requests_table.php` | `requested_shift_id` kini `nullable()->constrained('shifts')->nullOnDelete()` (fresh install benar sejak awal) |
+| `database/migrations/2026_09_11_120000_alter_shift_change_requests_make_requested_shift_id_nullable.php` | **Baru** — alter kolom menjadi nullable untuk DB yang sudah ada; idempotent (dilewati bila sudah nullable) dengan guard `Schema::getColumns()` |
+| `tests/Feature/ShiftChangeOffRequestTest.php` | +2 test regresi: kolom wajib nullable & pengajuan libur oleh karyawan yang belum punya shift (current & requested sama-sama NULL) |
+
+### Cara Menerapkan di Environment Lain
+
+```bash
+php artisan migrate --force
+```
+
+Cukup satu langkah: migration baru akan mengubah kolom menjadi
+`bigint unsigned DEFAULT NULL` + FK `ON DELETE SET NULL`.
+Alur approval PJ (`PJShiftChangeController::approve()`) sudah benar: saat pengajuan
+libur disetujui, jadwal `employee_shifts` pada tanggal tersebut dihapus.
+

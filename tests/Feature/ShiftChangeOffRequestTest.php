@@ -8,6 +8,7 @@ use App\Models\ShiftChangeRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class ShiftChangeOffRequestTest extends TestCase
@@ -155,5 +156,54 @@ class ShiftChangeOffRequestTest extends TestCase
             'shift_date' => $targetDate,
             'shift_id' => $shift->id,
         ]);
+    }
+
+    /**
+     * Regresi: kolom requested_shift_id WAJIB nullable, kalau tidak pengajuan
+     * libur akan gagal dengan SQLSTATE[23000] Column 'requested_shift_id' cannot be null.
+     */
+    public function test_kolom_requested_shift_id_harus_nullable(): void
+    {
+        $column = collect(Schema::getColumns('shift_change_requests'))
+            ->firstWhere('name', 'requested_shift_id');
+
+        $this->assertNotNull($column, 'Kolom requested_shift_id tidak ditemukan.');
+        $this->assertTrue(
+            (bool) $column['nullable'],
+            'requested_shift_id harus nullable. Jalankan `php artisan migrate` untuk memperbaiki skema.'
+        );
+    }
+
+    /**
+     * Karyawan yang pada tanggal tsb memang belum punya shift tetap boleh
+     * mengajukan libur (current_shift_id NULL + requested_shift_id NULL).
+     */
+    public function test_employee_tanpa_shift_tetap_bisa_mengajukan_libur(): void
+    {
+        $employee = $this->makeEmployee();
+
+        $targetDate = Carbon::tomorrow()->addDays(3)->format('Y-m-d');
+
+        $this->assertDatabaseMissing('employee_shifts', [
+            'user_id' => $employee->id,
+            'shift_date' => $targetDate,
+        ]);
+
+        $this->actingAs($employee)
+            ->post(route('shift-change.store'), [
+                'shift_date' => $targetDate,
+                'requested_shift_id' => 'off',
+                'reason' => 'Ajukan libur pada tanggal tersebut (belum ada jadwal shift).',
+            ])
+            ->assertRedirect(route('shift-change.history'));
+
+        $request = ShiftChangeRequest::where('user_id', $employee->id)
+            ->whereDate('shift_date', $targetDate)
+            ->first();
+
+        $this->assertNotNull($request);
+        $this->assertNull($request->current_shift_id);
+        $this->assertNull($request->requested_shift_id);
+        $this->assertEquals('pending', $request->status);
     }
 }
