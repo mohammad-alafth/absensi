@@ -26,47 +26,6 @@
 
 <body class="font-sans antialiased">
 
-    <!-- LOADING SCREEN -->
-    <!-- <div id="loading-screen" class="fixed inset-0 z-[9999] overflow-y-auto bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]">  -->
-        <!-- <div class="absolute w-[500px] h-[500px] bg-indigo-500/20 blur-3xl rounded-full"></div> -->
-
-        <!-- <div class="relative w-80 h-48 flex items-center justify-center"> -->
-
-            <!-- Triangle -->
-            <!-- <div
-                class="triangle absolute left-0 w-0 h-0
-                   border-l-[40px] border-r-[40px]
-                   border-b-[70px]
-                   border-l-transparent
-                   border-r-transparent
-                   border-b-cyan-400 drop-shadow-[0_0_25px_rgba(34,211,238,0.9)]">
-            </div> -->
-
-            <!-- Square -->
-            <!-- <div
-                class="square absolute left-0 w-16 h-16 bg-fuchsia-500 rounded-2xl shadow-[0_0_35px_rgba(217,70,239,0.9)]">
-            </div> -->
-
-            <!-- Circle -->
-            <!-- <div
-                class="circle absolute left-0 w-16 h-16 bg-emerald-400 rounded-full shadow-[0_0_35px_rgba(52,211,153,0.9)]">
-            </div> -->
-
-            <!-- Text -->
-            <!-- <div class="absolute -bottom-16 text-center"> -->
-                <!-- <h1 class="text-3xl font-bold text-white tracking-[6px]">
-                    PBEC
-                </h1>
-
-                <p class="text-indigo-200 text-sm mt-2 tracking-widest">
-                    LOADING....
-                </p> -->
-            <!-- </div> -->
-
-        <!-- </div> -->
-
-    <!-- </div> -->
-
     <!-- Background -->
     <div class="min-h-screen flex flex-col justify-center items-center relative px-4 overflow-hidden">
 
@@ -93,78 +52,6 @@
         </div>
 
     </div>
-
-    <!-- ANIME JS -->
-    <script type="module">
-        import {
-            createTimeline
-        } from 'https://esm.sh/animejs';
-
-        /*
-        |--------------------------------------------------------------------------
-        | Animation Timeline
-        |--------------------------------------------------------------------------
-        */
-
-        const tl = createTimeline({
-            defaults: {
-                ease: 'inOutExpo',
-                duration: 2000, // 2 detik
-                loop: true,
-                alternate: true,
-            }
-        });
-
-        tl
-            .add('.triangle', {
-                x: '13rem',
-                rotate: '2turn',
-                scale: [0.8, 1.2],
-            })
-
-            .add('.square', {
-                x: '13rem',
-                rotate: '-2turn',
-                borderRadius: ['1rem', '3rem'],
-                scale: [1, 1.3],
-            }, '-=1500')
-
-            .add('.circle', {
-                x: '13rem',
-                scale: [1, 1.5],
-            }, '-=1500');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hide Loader
-        |--------------------------------------------------------------------------
-        */
-
-        window.addEventListener('load', function() {
-
-            const loader =
-                document.getElementById(
-                    'loading-screen'
-                );
-
-            // tampil minimal 2 detik
-            setTimeout(() => {
-
-                loader.classList.add(
-                    'opacity-0'
-                );
-
-                setTimeout(() => {
-
-                    loader.style.display =
-                        'none';
-
-                }, 1000);
-
-            }, 2000);
-
-        });
-    </script>
 
 </body>
 

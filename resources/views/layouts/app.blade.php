@@ -264,76 +264,60 @@
         })();
     </script>
 
-    <!-- ANIME JS -->
-    <script type="module">
-        import {
-            createTimeline
-        } from 'https://esm.sh/animejs';
+    <!--
+    |--------------------------------------------------------------------------
+    | HIDE LOADING SCREEN (ADAPTIF JARINGAN)
+    |--------------------------------------------------------------------------
+    | - Loader hilang SEGERA setelah halaman (termasuk asset) selesai dimuat
+    |   (event `load`), bukan berdasarkan timer tetap 2 detik seperti sebelumnya.
+    | - MIN_DISPLAY_MS  : tampil minimal 300ms agar tidak berkedip (flash)
+    |                     pada jaringan cepat.
+    | - MAX_WAIT_MS     : jaring pengaman 6 detik — bila `load` macet karena
+    |                     asset lambat/gagal, loader tetap hilang agar user
+    |                     tidak terjebak di layar loading.
+    | - Animasi loader ditangani resources/js/loading.js (bundle Vite,
+    |   animejs lokal — tanpa CDN eksternal).
+    |--------------------------------------------------------------------------
+    -->
+    <script>
+        (function () {
+            var loader = document.getElementById('loading-screen');
+            if (!loader) return;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Animation Timeline
-        |--------------------------------------------------------------------------
-        */
+            var MIN_DISPLAY_MS = 300;
+            var MAX_WAIT_MS = 6000;
+            var FADE_MS = 400;
 
-        const tl = createTimeline({
-            defaults: {
-                ease: 'inOutExpo',
-                duration: 2000, // 2 detik
-                loop: true,
-                alternate: true,
+            var shownAt = Date.now();
+            var hidden = false;
+
+            function hideLoader() {
+                if (hidden) return;
+                hidden = true;
+
+                var remaining = Math.max(0, MIN_DISPLAY_MS - (Date.now() - shownAt));
+
+                setTimeout(function () {
+                    loader.style.transition = 'opacity ' + FADE_MS + 'ms ease';
+                    loader.classList.add('opacity-0');
+
+                    setTimeout(function () {
+                        loader.style.display = 'none';
+                    }, FADE_MS);
+                }, remaining);
             }
-        });
 
-        tl
-            .add('.triangle', {
-                x: '13rem',
-                rotate: '2turn',
-                scale: [0.8, 1.2],
-            })
+            // Halaman + asset selesai dimuat -> loader hilang secepat mungkin
+            window.addEventListener('load', hideLoader);
 
-            .add('.square', {
-                x: '13rem',
-                rotate: '-2turn',
-                borderRadius: ['1rem', '3rem'],
-                scale: [1, 1.3],
-            }, '-=1500')
+            // Jaring pengaman: asset lambat/gagal -> loader tetap hilang
+            setTimeout(hideLoader, MAX_WAIT_MS);
 
-            .add('.circle', {
-                x: '13rem',
-                scale: [1, 1.5],
-            }, '-=1500');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Hide Loader
-        |--------------------------------------------------------------------------
-        */
-
-        window.addEventListener('load', function() {
-
-            const loader =
-                document.getElementById(
-                    'loading-screen'
-                );
-
-            // tampil minimal 2 detik
-            setTimeout(() => {
-
-                loader.classList.add(
-                    'opacity-0'
-                );
-
-                setTimeout(() => {
-
-                    loader.style.display =
-                        'none';
-
-                }, 1000);
-
-            }, 2000);
-
-        });
+            // Bila dokumen ternyata sudah selesai dimuat sebelum script ini jalan
+            if (document.readyState === 'complete') {
+                hideLoader();
+            }
+        })();
     </script>
 
     <!-- Mobile Bottom Navbar -->
