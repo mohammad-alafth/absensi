@@ -153,3 +153,55 @@ Kolom terverifikasi: `requested_shift_id bigint unsigned DEFAULT NULL` dengan
 FK `ON DELETE SET NULL`. Migration bersifat idempotent (dilewati bila kolom sudah nullable)
 dan `migrate:rollback --step=1` → `migrate` juga berjalan sukses.
 
+---
+
+## 8. Pengujian: Kolom "DENDA KETERLAMBATAN" pada Export Rekap HRD (2026-09-16)
+
+### 8.1 Test Baru
+
+`tests/Feature/HRDRekapDendaColumnTest.php` (14 test, 32 assertion):
+
+| Test | Yang diverifikasi |
+| --- | --- |
+| `test_kolom_denda_ada_setelah_total_jam_kerja` | Kolom F = "TOTAL JAM KERJA", kolom G = "DENDA KETERLAMBATAN" (baris header 6) |
+| `test_kolom_denda_berisi_formula_per_baris_bukan_angka_statis` | G7/G8 berisi formula (`$E7`, `$E8`, `CEILING`, `10000`, `30`) bukan angka statis, plus format sel `"Rp"#,##0` |
+| `test_denda_dihitung_dari_akumulasi_keterlambatan_karyawan` | Absensi masuk 09:37 (jadwal 08:00-17:00) -> kolom E = `01:22` -> kolom G = 110000 |
+| `test_formula_denda_sesuai_ketentuan` (10 data set) | 00:00 -> 0; 00:30 -> 0; 00:34 -> 10.000; 00:35 -> 10.000; 00:40 -> 20.000; 00:45 -> 30.000; 00:50 -> 40.000; 01:20 -> 100.000; 02:35 -> 250.000; 120:30 -> 14.400.000 |
+| `test_hrd_dapat_mengunduh_rekap_yang_memuat_kolom_denda` | Unduh lewat route `hrd.export.excel` -> file `rekap-all-2026-09.xlsx` memuat header dan formula kolom G |
+
+Nilai denda diuji dengan **engine perhitungan PhpSpreadsheet**
+(`getCalculatedValue()`), jadi formulanya diuji seperti di Excel - bukan hanya
+dicek sebagai teks.
+
+### 8.2 Hasil
+
+```text
+PASS  Tests\Feature\HRDRekapDendaColumnTest
+Tests: 14, Assertions: 32
+OK (14 tests, 32 assertions)
+```
+
+Seluruh suite: `Tests: 64, Assertions: 202, Failures: 6` (lihat 8.3).
+
+### 8.3 Catatan: 6 kegagalan yang tersisa (sudah ada sebelum perubahan ini)
+
+Enam test scaffolding bawaan Laravel Breeze yang tidak cocok dengan alur aplikasi
+(login/registrasi/reset password kustom) dan **tidak berhubungan** dengan export:
+
+1. `Auth\AuthenticationTest::test_users_can_authenticate_using_the_login_screen`
+2. `Auth\PasswordResetTest::test_reset_password_link_can_be_requested`
+3. `Auth\PasswordResetTest::test_reset_password_screen_can_be_rendered`
+4. `Auth\PasswordResetTest::test_password_can_be_reset_with_valid_token`
+5. `Auth\RegistrationTest::test_new_users_can_register`
+6. `ExampleTest::test_the_application_returns_a_successful_response` (route `/` memang redirect ke login, bukan 200)
+
+Daftar kegagalan ini identik sebelum dan sesudah perubahan (bagian auth tidak diubah).
+
+### 8.4 Temuan: suite test menghapus database dev (sudah diperbaiki)
+
+Sebelum perbaikan, menjalankan seluruh suite **menghapus isi database dev
+`absensi_rs`** karena `RefreshDatabase` (ProfileTest + Auth) dan `phpunit.xml` masih
+menembak database dev. Sekarang test memakai database terpisah `absensi_rs_test`;
+setelah suite dijalankan, isi `absensi_rs` tidak berubah. Detail:
+`docs/REPORT_PENGERJAAN_ABSENSI.md` bagian 10.
+

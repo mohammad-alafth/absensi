@@ -27,7 +27,15 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
 
     public function headings(): array
     {
-        return ['NAMA PEGAWAI', 'UNIT / ROLE', 'TOTAL HADIR', 'TOTAL TELAT', 'TOTAL WAKTU TERLAMBAT', 'TOTAL JAM KERJA'];
+        return [
+            'NAMA PEGAWAI',
+            'UNIT / ROLE',
+            'TOTAL HADIR',
+            'TOTAL TELAT',
+            'TOTAL WAKTU TERLAMBAT',
+            'TOTAL JAM KERJA',
+            'DENDA KETERLAMBATAN',
+        ];
     }
 
     // Gunakan ukuran yang sudah pas menurut Anda
@@ -39,7 +47,8 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
             'C' => 15,
             'D' => 15,
             'E' => 30,
-            'F' => 20
+            'F' => 20,
+            'G' => 28,
         ];
     }
     private function normalizeRole($role)
@@ -236,6 +245,11 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
                     floor($totalWorkMinutes / 60),
                     $totalWorkMinutes % 60
                 ),
+
+                // Placeholder kolom formula denda.
+                // Formula-nya diisi pada event AfterSheet() setelah baris
+                // header di-insert, agar referensi baris (mis. $E7) selalu benar.
+                null,
             ];
         });
     }
@@ -255,28 +269,70 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
                 $sheet->setCellValue('B3', 'Telp. (0761) 7875191, 0811 7605191 Fax. (0761) 7875195');
                 $sheet->setCellValue('B4', 'www.pekanbarueyecenter.com');
 
-                $sheet->mergeCells('B1:E1');
-                $sheet->mergeCells('B2:E2');
-                $sheet->mergeCells('B3:E3');
-                $sheet->mergeCells('B4:E4');
+                $sheet->mergeCells('B1:F1');
+                $sheet->mergeCells('B2:F2');
+                $sheet->mergeCells('B3:F3');
+                $sheet->mergeCells('B4:F4');
                 $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('5a6ea8');
-                $sheet->getStyle('B1:E4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B1:F4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                 // Tambah Logo
                 $this->addLogo($sheet, 'A1', public_path('images/rsprofile.png'));
-                $this->addLogo($sheet, 'F1', public_path('images/Picture1.png'));
+                $this->addLogo($sheet, 'G1', public_path('images/Picture1.png'));
 
                 // Styling Heading Tabel (Baris 6)
-                $sheet->getStyle('A6:F6')->applyFromArray([
+                $sheet->getStyle('A6:G6')->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 12],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E40AF']],
                     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                 ]);
                 $sheet->getRowDimension(6)->setRowHeight(35);
 
-                // Border dan Vertical Alignment untuk data di bawah baris 6
                 $lastRow = $sheet->getHighestRow();
-                $sheet->getStyle('A6:F' . $lastRow)->applyFromArray([
+
+                /*
+                |--------------------------------------------------------------------------
+                | KOLOM G : FORMULA DENDA KETERLAMBATAN
+                |--------------------------------------------------------------------------
+                | Ketentuan: bila akumulasi keterlambatan dalam 1 bulan melebihi
+                | toleransi 30 menit, kelebihannya didenda Rp10.000 untuk SETIAP
+                | kelipatan 5 menit (dibulatkan ke atas ke kelipatan terdekat).
+                |
+                |   30 mnt -> Rp0       |  40 mnt -> Rp20.000
+                |   35 mnt -> Rp10.000  |  45 mnt -> Rp30.000
+                |   50 mnt -> Rp40.000  |  dst.
+                |
+                | Sumber: kolom E ("TOTAL WAKTU TERLAMBAT") berupa teks "HH:MM".
+                | Menit dihitung dengan FIND(":") + LEFT/MID (bukan TIMEVALUE agar
+                | tetap benar untuk akumulasi > 24 jam, mis. "120:30").
+                | Formula ditulis per baris di sini (bukan di collection()) agar
+                | referensi $E{row} selalu benar setelah header 5 baris di-insert.
+                |--------------------------------------------------------------------------
+                */
+                for ($row = 7; $row <= $lastRow; $row++) {
+                    // Ekspresi "total menit terlambat" dari teks kolom E.
+                    $lateMinutesFormula = sprintf(
+                        '(VALUE(LEFT($E%1$d,FIND(":",$E%1$d)-1))*60'
+                            . '+VALUE(MID($E%1$d,FIND(":",$E%1$d)+1,2)))',
+                        $row
+                    );
+
+                    $sheet->setCellValue(
+                        'G' . $row,
+                        sprintf(
+                            '=IF(%s<=30,0,CEILING((%s-30)/5,1)*10000)',
+                            $lateMinutesFormula,
+                            $lateMinutesFormula
+                        )
+                    );
+
+                    // Format tampilan Rupiah: nilai tetap numerik (bisa di-SUM),
+                    // hanya tampilannya diberi prefix "Rp" dan pemisah ribuan.
+                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+                }
+
+                // Border dan Vertical Alignment untuk data di bawah baris 6
+                $sheet->getStyle('A6:G' . $lastRow)->applyFromArray([
                     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
                     'alignment' => ['vertical' => Alignment::VERTICAL_CENTER]
                 ]);

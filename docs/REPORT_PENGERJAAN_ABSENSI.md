@@ -197,3 +197,110 @@ Cukup satu langkah: migration baru akan mengubah kolom menjadi
 Alur approval PJ (`PJShiftChangeController::approve()`) sudah benar: saat pengajuan
 libur disetujui, jadwal `employee_shifts` pada tanggal tersebut dihapus.
 
+---
+
+## 9. Fitur Baru: Kolom "DENDA KETERLAMBATAN" pada Export Rekap HRD (2026-09-16)
+
+### 9.1 Permintaan
+
+Pada export rekap HRD (`HRD > Export Excel`, route `hrd.export.excel`) ditambahkan
+**satu kolom setelah "TOTAL JAM KERJA"** yang berisi **formula** perhitungan denda
+keterlambatan.
+
+### 9.2 Ketentuan Denda
+
+- Toleransi akumulasi keterlambatan per bulan: **30 menit** (tidak terkena denda).
+- Kelebihan di atas 30 menit didenda **Rp10.000 untuk setiap kelipatan 5 menit**.
+- Kelebihan yang bukan kelipatan 5 menit dibulatkan **ke atas** ke kelipatan berikutnya.
+
+| Akumulasi | Kelebihan | Perhitungan | Denda |
+| --- | --- | --- | --- |
+| 30 menit | 0 | tidak ada kelebihan | Rp0 |
+| 34 menit | 4 | dibulatkan ke 5 -> 1 x Rp10.000 | Rp10.000 |
+| 35 menit | 5 | 1 x Rp10.000 | Rp10.000 |
+| 40 menit | 10 | 2 x Rp10.000 | Rp20.000 |
+| 45 menit | 15 | 3 x Rp10.000 | Rp30.000 |
+| 50 menit | 20 | 4 x Rp10.000 | Rp40.000 |
+| 82 menit | 52 | dibulatkan ke 55 -> 11 x Rp10.000 | Rp110.000 |
+
+### 9.3 Implementasi
+
+File: `app/Exports/HRDRekapExport.php`
+
+1. `headings()` menambah kolom ke-7 **"DENDA KETERLAMBATAN"**, `columnWidths()`
+   menambah `'G' => 28`.
+2. `collection()` mengisi elemen ke-7 dengan `null` (placeholder). Formula **tidak**
+   ditulis di sini karena saat `collection()` berjalan baris data masih berada di
+   baris 1; header 5 baris baru di-insert pada event `AfterSheet`, sehingga referensi
+   baris (`$E7`, `$E8`, ...) akan keliru.
+3. `registerEvents()` (`AfterSheet`) menulis formula untuk setiap baris data
+   (baris 7 s/d baris terakhir):
+
+   ```excel
+   =IF( <menit> <=30, 0, CEILING((<menit>-30)/5, 1) * 10000 )
+   ```
+
+   `<menit>` = total menit hasil parsing kolom **E** ("TOTAL WAKTU TERLAMBAT", teks
+   `HH:MM`) memakai `FIND(":")` + `LEFT`/`MID`:
+
+   ```excel
+   (VALUE(LEFT($E7,FIND(":",$E7)-1))*60+VALUE(MID($E7,FIND(":",$E7)+1,2)))
+   ```
+
+   `TIMEVALUE()` sengaja tidak dipakai karena salah untuk akumulasi lebih dari 24 jam
+   (mis. `120:30`).
+4. Format sel `"Rp"#,##0` supaya tampil `Rp10.000`; **nilai tetap numerik** sehingga
+   masih bisa di-`SUM`/filter di Excel.
+5. Layout disesuaikan karena kolom bertambah satu (tabel kini A-G): merge header
+   `B1:F1` s/d `B4:F4`, styling baris 6 `A6:G6`, border `A6:G{baris terakhir}`, dan
+   logo kanan dipindah dari `F1` ke `G1`.
+
+### 9.4 Pengujian
+
+Test baru: `tests/Feature/HRDRekapDendaColumnTest.php` (14 test, 32 assertion) -
+menguji header kolom G, keberadaan formula per baris (`$E7`, `$E8`), perhitungan
+akumulasi nyata dari absensi, seluruh contoh ketentuan denda, dan unduhan lewat
+route HRD. Detail hasil ada di `docs/HASIL_PENGUJIAN_ABSENSI.md` bagian 8.
+
+---
+
+## 10. Temuan Kritis: Suite Test Menghapus Database Dev (Sudah Diperbaiki)
+
+### 10.1 Gejala
+
+Saat menjalankan seluruh suite (`phpunit` / `php artisan test`), isi database dev
+`absensi_rs` **terhapus seluruhnya** (users, attendances, shifts, employee_shifts,
+shift_change_requests = 0 baris).
+
+### 10.2 Akar Masalah
+
+1. `tests/Feature/ProfileTest.php` dan `tests/Feature/Auth/*Test.php` memakai trait
+   `RefreshDatabase`, yang menjalankan `migrate:fresh` (menghapus semua tabel).
+2. `phpunit.xml` masih **mengomentari** baris `DB_CONNECTION=sqlite` /
+   `DB_DATABASE=:memory:`, sehingga test memakai database dari `.env`, yaitu
+   **database dev `absensi_rs`**.
+
+### 10.3 Perbaikan
+
+`phpunit.xml`: test diarahkan ke **database terpisah** `absensi_rs_test` (driver
+`mysql`). Dengan begitu `migrate:fresh` pada test tidak lagi menyentuh data dev.
+
+Persiapan sekali per environment:
+
+```bash
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS absensi_rs_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+DB_DATABASE=absensi_rs_test php artisan migrate
+```
+
+Catatan: opsi `sqlite` in-memory **tidak bisa dipakai** pada proyek ini karena
+migration memakai `->change()` (menghasilkan `MODIFY`, khusus MySQL) dan test
+`DatabaseTransactions` memerlukan skema yang sudah dimigrasi.
+
+### 10.4 Verifikasi
+
+- Sebelum perbaikan: `Tests: 64, Failures: 15` **dan** database dev terhapus.
+- Sesudah perbaikan: `Tests: 64, Assertions: 202, Failures: 6` (6 kegagalan adalah
+  test scaffolding bawaan yang sudah gagal sebelum perubahan ini - lihat
+  `docs/HASIL_PENGUJIAN_ABSENSI.md` bagian 8.3), dan isi database dev `absensi_rs`
+  **tidak berubah**.
+
