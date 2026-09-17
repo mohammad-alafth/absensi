@@ -265,20 +265,20 @@
                     </div>
 
                     <div
-                        onclick="showLateRanking()"
-                        class="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px] col-span-2 lg:col-span-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition">
+                        onclick="showFastestRanking()"
+                        class="bg-gradient-to-br from-sky-50 to-cyan-50/60 border border-sky-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px] col-span-2 lg:col-span-1 cursor-pointer hover:shadow-md hover:scale-[1.01] transition">
 
                         <div>
-                            <p class="text-[11px] text-amber-800 font-semibold tracking-wide">
-                                Total Kasus Keterlambatan
+                            <p class="text-[11px] text-sky-800 font-semibold tracking-wide">
+                                Absen Tercepat (Rata-rata Jam Masuk)
                             </p>
 
-                            <h2 class="text-xl font-black text-amber-950 mt-0.5">
-                                {{ collect($recaps)->sum('telat') }} Insiden
+                            <h2 class="text-xl font-black text-sky-950 mt-0.5">
+                                {{ $rankingCepat->first()['avg_checkin'] ?? '--:--' }}
                             </h2>
                         </div>
 
-                        <div class="text-2xl">⏰</div>
+                        <div class="text-2xl">⚡</div>
 
                     </div>
 
@@ -859,13 +859,13 @@
             }
         }
 
-        function showLateRanking() {
+        function showFastestRanking() {
 
             let html = `
         <div class="space-y-2 text-left">
     `;
 
-            @foreach($rankingTelat as $index => $item)
+            @foreach($rankingCepat as $index => $item)
 
             html += `
             <div style="
@@ -873,15 +873,15 @@
                 justify-content:space-between;
                 align-items:center;
                 padding:10px;
-                border:1px solid #fcd34d;
+                border:1px solid #7dd3fc;
                 border-radius:10px;
-                background:#fffaf0;
+                background:#f0f9ff;
             ">
 
                 <div>
                     <div style="
                         font-weight:700;
-                        color:#92400e;
+                        color:#075985;
                     ">
                         #{{ $index + 1 }}
                         {{ $item['employee']->name }}
@@ -897,10 +897,18 @@
 
                 <div style="
                     font-weight:800;
-                    color:#b45309;
+                    color:#0369a1;
+                    text-align:right;
                 ">
-                    {{ $item['telat'] }}x
-                    ({{ $item['late_formatted'] }})
+                    {{ $item['avg_checkin'] }}
+
+                    <div style="
+                        font-size:11px;
+                        font-weight:600;
+                        color:#64748b;
+                    ">
+                        rata-rata dari {{ $item['hadir'] + $item['telat'] }}x presensi
+                    </div>
                 </div>
 
             </div>
@@ -911,7 +919,7 @@
             html += `</div>`;
 
             Swal.fire({
-                title: '🏆 Top 5 Keterlambatan',
+                title: '⚡ Top 5 Absen Tercepat',
                 html: html,
                 width: 700,
                 confirmButtonText: 'Tutup'

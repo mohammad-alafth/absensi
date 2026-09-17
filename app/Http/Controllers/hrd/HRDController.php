@@ -465,6 +465,33 @@ class HRDController extends Controller
                     $finalOvertimeMinutes . ' Menit';
             }
 
+            /*
+        |--------------------------------------------------------------------------
+        | RATA-RATA JAM MASUK (UNTUK RANKING ABSEN TERCEPAT)
+        |--------------------------------------------------------------------------
+        */
+            $checkIns = $attendances->filter(fn($a) => $a->jam_masuk);
+
+            $avgCheckin = null;
+
+            if ($checkIns->isNotEmpty()) {
+                $totalCheckinMinutes = $checkIns->sum(
+                    fn($a) =>
+                    (int) Carbon::parse($a->jam_masuk)->format('H') * 60
+                        + (int) Carbon::parse($a->jam_masuk)->format('i')
+                );
+
+                $avgCheckinMinutes = (int) round(
+                    $totalCheckinMinutes / $checkIns->count()
+                );
+
+                $avgCheckin = sprintf(
+                    '%02d:%02d',
+                    intdiv($avgCheckinMinutes, 60),
+                    $avgCheckinMinutes % 60
+                );
+            }
+
             $recaps[] = [
                 'employee' => $employee,
                 'role' => $normalizedRole,
@@ -481,17 +508,18 @@ class HRDController extends Controller
                 'leave_quota' => $employee->leave_quota ?? 0,
                 'overtimes' => trim($overtimeFormatted),
                 'total_shift' => $totalShiftDays,
+                'avg_checkin' => $avgCheckin,
             ];
         }
 
         /*
         |--------------------------------------------------------------------------
-        | RANKING TELAT
+        | RANKING ABSEN TERCEPAT (RATA-RATA JAM MASUK PALING AWAL)
         |--------------------------------------------------------------------------
         */
-        $rankingTelat = collect($recaps)
-            ->filter(fn($item) => $item['telat'] > 0)
-            ->sortByDesc('telat')
+        $rankingCepat = collect($recaps)
+            ->filter(fn($item) => !empty($item['avg_checkin']))
+            ->sortBy('avg_checkin')
             ->take(5)
             ->values();
 
@@ -600,7 +628,7 @@ class HRDController extends Controller
                 'month',
                 'startDate',
                 'endDate',
-                'rankingTelat',
+                'rankingCepat',
                 'calendarEvents',
                 'roles',
                 'roleLabels'
