@@ -205,3 +205,25 @@ menembak database dev. Sekarang test memakai database terpisah `absensi_rs_test`
 setelah suite dijalankan, isi `absensi_rs` tidak berubah. Detail:
 `docs/REPORT_PENGERJAAN_ABSENSI.md` bagian 10.
 
+### 8.5 Filter periode rekap: tanggal mulai - tanggal selesai (2026-09-16)
+
+Filter rekap HRD diganti dari "satu bulan" menjadi **rentang bebas**: dua input
+`<input type="date">` (tanggal mulai `s/d` tanggal selesai), auto-submit saat
+berubah. Parameter `month` lama tetap diterima (kompatibilitas bookmark).
+
+Test baru `tests/Feature/HRDRekapDateRangeFilterTest.php` (5 test):
+
+```text
+PASS  filter_rentang_menghitung_presensi_dalam_periode
+PASS  presensi_di_luar_rentang_tidak_ikut_dihitung
+PASS  urutan_tanggal_yang_terbalik_ditukar_otomatis
+PASS  parameter_bulan_lama_masih_diterima
+PASS  export_mengikuti_rentang_dan_menampilkan_periode_di_header_excel
+Tests: 19 (gabungan dengan HRDRekapDendaColumnTest), Assertions: 45
+```
+
+Cakupan verifikasi: query rekap (attendance/shift/cuti), export Excel (nama file
+berisi rentang `rekap-all-20260901-20260930.xlsx`, header file menampilkan
+"Periode: 01/09/2026 s/d 30/09/2026"), dan seluruh suite: `Tests: 69, Assertions:
+215, Failures: 6` (6 kegagalan = scaffolding auth bawaan, identik baseline 8.3).
+

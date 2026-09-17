@@ -304,3 +304,28 @@ migration memakai `->change()` (menghasilkan `MODIFY`, khusus MySQL) dan test
   `docs/HASIL_PENGUJIAN_ABSENSI.md` bagian 8.3), dan isi database dev `absensi_rs`
   **tidak berubah**.
 
+---
+
+## 11. Filter Periode Rekap HRD: Tanggal Mulai - Tanggal Selesai (2026-09-16)
+
+### 11.1 Permintaan
+
+Filter rekap HRD yang sebelumnya hanya "satu bulan" diganti menjadi **rentang
+tanggal bebas** (tanggal bulan mulai s/d tanggal bulan selesai).
+
+### 11.2 Perubahan
+
+| File | Perubahan |
+| --- | --- |
+| `app/Http/Controllers/HRD/HRDController.php` | `index()` menerima `start_date` & `end_date` (fallback `month` untuk link lama, lalu bulan berjalan); input tidak valid -> bulan berjalan; urutan terbalik ditukar otomatis. Semua query (presensi, shift, cuti) `whereBetween` rentang. `exportExcel()` juga menerima rentang: nama file berisi rentang (`rekap-all-20260901-20260930.xlsx`). |
+| `resources/views/hrd/rekap/index.blade.php` | Dua `<input type="date">` dengan auto-submit + label "s/d"; `month` tetap dikirim sebagai hidden untuk fitur kalender shift yang memang per-bulan. |
+| `app/Exports/HRDRekapExport.php` | Constructor kompatibel: `($month, $role, $startDate, $endDate)`; `resolvePeriod()` memutuskan periode (rentang eksplisit > bulan); header Excel baris 5 menampilkan **"Periode: dd/mm/yyyy s/d dd/mm/yyyy"**. |
+
+### 11.3 Pengujian
+
+`tests/Feature/HRDRekapDateRangeFilterTest.php` (5 test): presensi dalam rentang
+dihitung, di luar rentang diabaikan, urutan terbalik ditukar otomatis, parameter
+`month` lama tetap jalan, dan export mengikuti rentang + periode tampil di header
+file. Gabungan dengan test denda: **19 test / 45 assertion OK**; suite penuh
+`Tests: 69, Assertions: 215, Failures: 6` (baseline 8.3, tanpa regresi).
+

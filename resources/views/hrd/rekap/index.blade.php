@@ -162,16 +162,22 @@
                         </div>
 
                         <div class="bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-center w-full sm:w-auto h-[38px]">
-                            <form method="GET" class="m-0 p-0">
-                                <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"
+                            <form method="GET" class="m-0 p-0 flex items-center gap-1">
+                                <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" onchange="this.form.submit()" title="Tanggal mulai"
                                     class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
+                                <span class="text-[10px] text-gray-400 font-bold">s/d</span>
+                                <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" onchange="this.form.submit()" title="Tanggal selesai"
+                                    class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
+                                {{-- Dipakai fitur kalender shift & export jadwal (tetap per bulan, mengikuti bulan tanggal mulai) --}}
+                                <input type="hidden" name="month" value="{{ $month }}">
                             </form>
 
                         </div>
 
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 w-full sm:w-auto flex items-center h-[38px]">
                             <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex gap-1 items-center m-0 w-full">
-                                <input type="hidden" name="month" value="{{ $month }}">
+                                <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
+                                <input type="hidden" name="end_date" value="{{ $endDate->format('Y-m-d') }}">
                                 <select name="role"
                                     class="rounded-lg border-gray-200 bg-white text-xs py-1 px-2">
 
@@ -251,7 +257,7 @@
 
                     <div class="bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px]">
                         <div>
-                            <p class="text-[11px] text-emerald-800 font-semibold tracking-wide">Akumulasi Hadir Bulan Ini</p>
+                            <p class="text-[11px] text-emerald-800 font-semibold tracking-wide">Akumulasi Hadir Periode Ini</p>
                             <h2 class="text-xl font-black text-emerald-950 mt-0.5">{{ collect($recaps)->sum('hadir') }} Presensi</h2>
                         </div>
                         <div class="text-2xl">✅</div>

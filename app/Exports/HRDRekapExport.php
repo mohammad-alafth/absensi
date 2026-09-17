@@ -17,12 +17,38 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithColumnWidths
 {
-    protected $month, $role;
+    protected $month, $role, $startDate, $endDate;
 
-    public function __construct($month, $role = 'all')
+    /**
+     * @param string|null          $month     'Y-m' — dipakai bila rentang tidak diberikan
+     * @param string               $role      'all' | role tertentu
+     * @param string|Carbon|null   $startDate batas awal periode (opsional)
+     * @param string|Carbon|null   $endDate   batas akhir periode (opsional)
+     */
+    public function __construct($month = null, $role = 'all', $startDate = null, $endDate = null)
     {
-        $this->month = $month;
+        $this->month = $month ?: now()->format('Y-m');
         $this->role = $role;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+    }
+
+    /**
+     * Menentukan periode rekap: rentang tanggal eksplisit bila diberikan,
+     * selain itu satu bulan penuh dari parameter $month.
+     *
+     * @return array{0: \Carbon\Carbon, 1: \Carbon\Carbon}
+     */
+    private function resolvePeriod(): array
+    {
+        return [
+            $this->startDate
+                ? Carbon::parse($this->startDate)->startOfDay()
+                : Carbon::parse($this->month . '-01')->startOfMonth(),
+            $this->endDate
+                ? Carbon::parse($this->endDate)->endOfDay()
+                : Carbon::parse($this->month . '-01')->endOfMonth(),
+        ];
     }
 
     public function headings(): array
@@ -62,8 +88,7 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
     }
     public function collection()
     {
-        $startDate = Carbon::parse($this->month . '-01')->startOfMonth();
-        $endDate   = Carbon::parse($this->month . '-01')->endOfMonth();
+        [$startDate, $endDate] = $this->resolvePeriod();
 
         $employees = User::whereNotIn('role', ['admin']);
 
@@ -269,12 +294,21 @@ class HRDRekapExport implements FromCollection, WithEvents, WithHeadings, WithCo
                 $sheet->setCellValue('B3', 'Telp. (0761) 7875191, 0811 7605191 Fax. (0761) 7875195');
                 $sheet->setCellValue('B4', 'www.pekanbarueyecenter.com');
 
+                // Keterangan periode rekap (rentang tanggal yang dipilih)
+                [$periodStart, $periodEnd] = $this->resolvePeriod();
+                $sheet->setCellValue(
+                    'B5',
+                    'Periode: ' . $periodStart->format('d/m/Y') . ' s/d ' . $periodEnd->format('d/m/Y')
+                );
+
                 $sheet->mergeCells('B1:F1');
                 $sheet->mergeCells('B2:F2');
                 $sheet->mergeCells('B3:F3');
                 $sheet->mergeCells('B4:F4');
+                $sheet->mergeCells('B5:F5');
                 $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('5a6ea8');
-                $sheet->getStyle('B1:F4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B5')->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('5a6ea8');
+                $sheet->getStyle('B1:F5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                 // Tambah Logo
                 $this->addLogo($sheet, 'A1', public_path('images/rsprofile.png'));

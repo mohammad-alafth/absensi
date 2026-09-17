@@ -38,13 +38,32 @@ class HRDController extends Controller
     {
         /*
             |--------------------------------------------------------------------------
-            | FILTER BULAN
+            | FILTER PERIODE (TANGGAL MULAI - TANGGAL SELESAI)
             |--------------------------------------------------------------------------
+            | Prioritas parameter: `start_date` & `end_date` (rentang bebas).
+            | Fallback: parameter `month` (kompatibilitas link/bookmark lama),
+            | lalu bulan berjalan. Input tanggal tidak valid -> bulan berjalan.
             */
-        $month = $request->month ?? now()->format('Y-m');
+        try {
+            $startDate = $request->filled('start_date')
+                ? Carbon::parse($request->start_date)->startOfDay()
+                : Carbon::parse(($request->month ?? now()->format('Y-m')) . '-01')->startOfMonth();
 
-        $startDate = Carbon::parse($month . '-01')->startOfMonth();
-        $endDate   = Carbon::parse($month . '-01')->endOfMonth();
+            $endDate = $request->filled('end_date')
+                ? Carbon::parse($request->end_date)->endOfDay()
+                : Carbon::parse(($request->month ?? now()->format('Y-m')) . '-01')->endOfMonth();
+        } catch (\Throwable $e) {
+            $startDate = now()->startOfMonth();
+            $endDate   = now()->endOfMonth();
+        }
+
+        // Bila pengguna membalik urutan tanggal, tukar otomatis.
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        // Dipakai fitur berbasis bulan (kalender shift / export jadwal).
+        $month = $startDate->format('Y-m');
 
         /*
             |--------------------------------------------------------------------------
@@ -571,6 +590,8 @@ class HRDController extends Controller
             compact(
                 'recaps',
                 'month',
+                'startDate',
+                'endDate',
                 'rankingTelat',
                 'calendarEvents',
                 'roles',
@@ -701,12 +722,38 @@ class HRDController extends Controller
     */
     public function exportExcel(Request $request)
     {
-        $month = $request->month ?? now()->format('Y-m');
         $role = $request->role ?? 'all';
+        $month = $request->month ?? now()->format('Y-m');
+
+        /*
+        | Rentang tanggal (start_date & end_date) dipakai bila keduanya/ salah
+        | satunya dikirim; tanpa itu, fallback ke parameter `month` (mode lama).
+        */
+        try {
+            $startDate = $request->filled('start_date')
+                ? Carbon::parse($request->start_date)->startOfDay()
+                : null;
+            $endDate = $request->filled('end_date')
+                ? Carbon::parse($request->end_date)->endOfDay()
+                : null;
+        } catch (\Throwable $e) {
+            $startDate = null;
+            $endDate = null;
+        }
+
+        if ($startDate && $endDate && $startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        $export = new HRDRekapExport($month, $role, $startDate, $endDate);
+
+        $suffix = ($startDate && $endDate)
+            ? $startDate->format('Ymd') . '-' . $endDate->format('Ymd')
+            : $month;
 
         return Excel::download(
-            new HRDRekapExport($month, $role),
-            "rekap-$role-$month.xlsx"
+            $export,
+            "rekap-$role-$suffix.xlsx"
         );
     }
 
