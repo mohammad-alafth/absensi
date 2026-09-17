@@ -162,22 +162,16 @@
                         </div>
 
                         <div class="bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-center w-full sm:w-auto h-[38px]">
-                            <form method="GET" class="m-0 p-0 flex items-center gap-1">
-                                <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" onchange="this.form.submit()" title="Tanggal mulai"
+                            <form method="GET" class="m-0 p-0">
+                                <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"
                                     class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
-                                <span class="text-[10px] text-gray-400 font-bold">s/d</span>
-                                <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" onchange="this.form.submit()" title="Tanggal selesai"
-                                    class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
-                                {{-- Dipakai fitur kalender shift & export jadwal (tetap per bulan, mengikuti bulan tanggal mulai) --}}
-                                <input type="hidden" name="month" value="{{ $month }}">
                             </form>
 
                         </div>
 
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 w-full sm:w-auto flex items-center h-[38px]">
                             <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex gap-1 items-center m-0 w-full">
-                                <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
-                                <input type="hidden" name="end_date" value="{{ $endDate->format('Y-m-d') }}">
+                                <input type="hidden" name="month" value="{{ $month }}">
                                 <select name="role"
                                     class="rounded-lg border-gray-200 bg-white text-xs py-1 px-2">
 
@@ -257,7 +251,7 @@
 
                     <div class="bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between shadow-2xs h-[75px]">
                         <div>
-                            <p class="text-[11px] text-emerald-800 font-semibold tracking-wide">Akumulasi Hadir Periode Ini</p>
+                            <p class="text-[11px] text-emerald-800 font-semibold tracking-wide">Akumulasi Hadir Bulan Ini</p>
                             <h2 class="text-xl font-black text-emerald-950 mt-0.5">{{ collect($recaps)->sum('hadir') }} Presensi</h2>
                         </div>
                         <div class="text-2xl">✅</div>
@@ -299,6 +293,7 @@
                     @endforeach
 
                 </div>
+
                 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                 <!-- MODAL SHIFT CALENDAR -->
                 <div id="shiftModal"
@@ -444,79 +439,12 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
     <script>
         const searchInput = document.getElementById('searchInput');
         const cards = document.querySelectorAll('.employee-card');
         const allEvents = @json($calendarEvents);
-
-        /*
-        |--------------------------------------------------------------------------
-        | FULLCALENDAR — LAZY LOAD (HANYA SAAT MODAL KALENDER DIBUKA)
-        |--------------------------------------------------------------------------
-        | Sebelumnya file FullCalendar dari cdn.jsdelivr.net dimuat secara SINKRON
-        | di dalam halaman rekap. Script sinkron memblokir parsing HTML dan ikut
-        | menunda event DOMContentLoaded/`load`, sehingga pada jaringan internal
-        | (tanpa akses internet) halaman rekap terasa "loading lama".
-        |
-        | Sekarang library baru diunduh saat pengguna benar-benar menekan tombol
-        | buka kalender. Bila CDN tidak terjangkau, muncul pesan yang jelas dan
-        | halaman rekap tetap berfungsi normal.
-        |--------------------------------------------------------------------------
-        */
-        let fullCalendarLoader = null;
-
-        function loadFullCalendar() {
-            if (window.FullCalendar) return Promise.resolve();
-            if (fullCalendarLoader) return fullCalendarLoader;
-
-            fullCalendarLoader = new Promise(function(resolve, reject) {
-                const script = document.createElement('script');
-                // Memakai aset lokal (public/vendor/fullcalendar) sehingga
-                // kalender tetap berfungsi di jaringan internal tanpa internet.
-                script.src = "{{ asset('vendor/fullcalendar/index.global.min.js') }}";
-                script.async = true;
-                script.onload = function() {
-                    resolve();
-                };
-                script.onerror = function() {
-                    reject(new Error('FullCalendar gagal dimuat'));
-                };
-                document.head.appendChild(script);
-            }).catch(function(error) {
-                // Izinkan percobaan ulang pada klik berikutnya
-                fullCalendarLoader = null;
-                throw error;
-            });
-
-            return fullCalendarLoader;
-        }
-
-        // Inisialisasi kalender. Aman dipanggil berulang kali (hanya sekali buat).
-        async function initShiftCalendar() {
-            if (window.calendar) {
-                window.calendar.updateSize();
-                return;
-            }
-
-            try {
-                await loadFullCalendar();
-            } catch (error) {
-                const container = document.getElementById('calendar');
-                if (container) {
-                    container.innerHTML =
-                        '<div style="padding:24px;text-align:center;color:#b91c1c;font-weight:600">' +
-                        'Kalender tidak dapat dimuat (koneksi ke CDN bermasalah). ' +
-                        'Periksa jaringan lalu coba lagi.</div>';
-                }
-                if (window.Swal && Swal.fire) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal memuat kalender',
-                        text: 'Koneksi ke server kalender bermasalah. Periksa jaringan lalu coba lagi.'
-                    });
-                }
-                return;
-            }
+        document.addEventListener('DOMContentLoaded', function() {
 
             const calendarEl = document.getElementById('calendar');
             window.calendar = new FullCalendar.Calendar(calendarEl, {
@@ -648,7 +576,7 @@
                     window.calendar.removeAllEvents();
                     window.calendar.addEventSource(filteredEvents);
                 });
-        }
+        });
 
         searchInput.addEventListener('keyup', function() {
 
@@ -994,13 +922,9 @@
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
 
-                // FullCalendar baru diunduh pada klik pertama tombol ini,
-                // sehingga halaman rekap tidak menunggu CDN saat dimuat.
-                initShiftCalendar().then(function() {
-                    setTimeout(function() {
-                        if (window.calendar) window.calendar.updateSize();
-                    }, 300);
-                });
+                setTimeout(() => {
+                    window.calendar.updateSize();
+                }, 300);
             });
 
             closeBtn.addEventListener('click', function() {
