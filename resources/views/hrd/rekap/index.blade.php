@@ -294,7 +294,6 @@
 
                 </div>
 
-                <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                 <!-- MODAL SHIFT CALENDAR -->
                 <div id="shiftModal"
                     class="fixed inset-0 bg-black/50 z-[100] hidden overflow-y-auto p-0 md:p-4">
@@ -439,12 +438,79 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
     <script>
         const searchInput = document.getElementById('searchInput');
         const cards = document.querySelectorAll('.employee-card');
         const allEvents = @json($calendarEvents);
-        document.addEventListener('DOMContentLoaded', function() {
+
+        /*
+        |--------------------------------------------------------------------------
+        | FULLCALENDAR — LAZY LOAD (HANYA SAAT MODAL KALENDER DIBUKA)
+        |--------------------------------------------------------------------------
+        | Sebelumnya file FullCalendar dari cdn.jsdelivr.net dimuat secara SINKRON
+        | di dalam halaman rekap. Script sinkron memblokir parsing HTML dan ikut
+        | menunda event DOMContentLoaded/`load`, sehingga pada jaringan internal
+        | (tanpa akses internet) halaman rekap terasa "loading lama".
+        |
+        | Sekarang library baru diunduh saat pengguna benar-benar menekan tombol
+        | buka kalender. Bila CDN tidak terjangkau, muncul pesan yang jelas dan
+        | halaman rekap tetap berfungsi normal.
+        |--------------------------------------------------------------------------
+        */
+        let fullCalendarLoader = null;
+
+        function loadFullCalendar() {
+            if (window.FullCalendar) return Promise.resolve();
+            if (fullCalendarLoader) return fullCalendarLoader;
+
+            fullCalendarLoader = new Promise(function(resolve, reject) {
+                const script = document.createElement('script');
+                // Memakai aset lokal (public/vendor/fullcalendar) sehingga
+                // kalender tetap berfungsi di jaringan internal tanpa internet.
+                script.src = "{{ asset('vendor/fullcalendar/index.global.min.js') }}";
+                script.async = true;
+                script.onload = function() {
+                    resolve();
+                };
+                script.onerror = function() {
+                    reject(new Error('FullCalendar gagal dimuat'));
+                };
+                document.head.appendChild(script);
+            }).catch(function(error) {
+                // Izinkan percobaan ulang pada klik berikutnya
+                fullCalendarLoader = null;
+                throw error;
+            });
+
+            return fullCalendarLoader;
+        }
+
+        // Inisialisasi kalender. Aman dipanggil berulang kali (hanya sekali buat).
+        async function initShiftCalendar() {
+            if (window.calendar) {
+                window.calendar.updateSize();
+                return;
+            }
+
+            try {
+                await loadFullCalendar();
+            } catch (error) {
+                const container = document.getElementById('calendar');
+                if (container) {
+                    container.innerHTML =
+                        '<div style="padding:24px;text-align:center;color:#b91c1c;font-weight:600">' +
+                        'Kalender tidak dapat dimuat (koneksi ke CDN bermasalah). ' +
+                        'Periksa jaringan lalu coba lagi.</div>';
+                }
+                if (window.Swal && Swal.fire) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal memuat kalender',
+                        text: 'Koneksi ke server kalender bermasalah. Periksa jaringan lalu coba lagi.'
+                    });
+                }
+                return;
+            }
 
             const calendarEl = document.getElementById('calendar');
             window.calendar = new FullCalendar.Calendar(calendarEl, {
@@ -576,7 +642,7 @@
                     window.calendar.removeAllEvents();
                     window.calendar.addEventSource(filteredEvents);
                 });
-        });
+        }
 
         searchInput.addEventListener('keyup', function() {
 
@@ -922,9 +988,13 @@
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
 
-                setTimeout(() => {
-                    window.calendar.updateSize();
-                }, 300);
+                // FullCalendar baru diunduh pada klik pertama tombol ini,
+                // sehingga halaman rekap tidak menunggu CDN saat dimuat.
+                initShiftCalendar().then(function() {
+                    setTimeout(function() {
+                        if (window.calendar) window.calendar.updateSize();
+                    }, 300);
+                });
             });
 
             closeBtn.addEventListener('click', function() {

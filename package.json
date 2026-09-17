@@ -21,7 +21,11 @@
         "@tensorflow/tfjs": "^4.22.0",
         "animejs": "^4.4.1",
         "face-api.js": "^0.20.0",
-        "net": "^1.0.2"
+        "flatpickr": "^4.6.13",
+        "fullcalendar": "^6.1.17",
+        "net": "^1.0.2",
+        "signature_pad": "^4.1.1",
+        "sweetalert2": "^11.26.25"
     },
     "name": "absensi",
     "version": "1.0.0",

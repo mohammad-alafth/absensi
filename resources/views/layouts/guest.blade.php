@@ -14,11 +14,79 @@
         href="{{ asset('storage/pbec/pbec.png') }}">
 
     <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
+    <!--
+    |--------------------------------------------------------------------------
+    | FONT EKSTERNAL — DIBUAT NON-BLOCKING
+    |--------------------------------------------------------------------------
+    | Stylesheet fonts.bunny.net sebelumnya render-blocking: browser menahan
+    | render (dan event `load`) sampai file font selesai diunduh. Pada jaringan
+    | internal / tanpa internet (kasus production), permintaan ini bisa
+    | menggantung sehingga halaman login terasa "loading lama".
+    |
+    | media="print" -> dianggap tidak relevan untuk layar (tidak memblokir)
+    | onload         -> segera ditukar ke media="all" setelah selesai dimuat
+    |--------------------------------------------------------------------------
+    -->
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 
     <link
+        rel="stylesheet"
         href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap"
-        rel="stylesheet" />
+        media="print"
+        onload="this.media='all'">
+
+    <noscript>
+        <link
+            rel="stylesheet"
+            href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap">
+    </noscript>
+
+    <!--
+    |--------------------------------------------------------------------------
+    | HELPER: TUNGGU LIBRARY EKSTERNAL TANPA MEMBLOKIR HALAMAN
+    |--------------------------------------------------------------------------
+    | Library pihak ketiga (face-api, dsb) dimuat dengan `async` supaya tidak
+    | menunda DOMContentLoaded/`load` pada jaringan internal tanpa internet.
+    | Kode yang membutuhkan library tersebut dibungkus helper ini:
+
+    |   absensiWaitFor(function () { return window.faceapi; }, function () {
+    |       faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+    |   });
+
+    | Bila library tidak terjangkau (CDN diblokir), callback tetap dipanggil
+    | dengan argumen `true` (mode terbatas) agar halaman tidak terkunci.
+    |--------------------------------------------------------------------------
+    -->
+    <script>
+        window.absensiWaitFor = function (isReady, callback, options) {
+            var opts = options || {};
+            var timeoutMs = opts.timeoutMs || 8000;
+            var intervalMs = opts.intervalMs || 50;
+            var startedAt = Date.now();
+
+            (function check() {
+                var ok = false;
+
+                try {
+                    ok = !!isReady();
+                } catch (e) {
+                    ok = false;
+                }
+
+                if (ok) {
+                    callback(false);
+                    return;
+                }
+
+                if (Date.now() - startedAt >= timeoutMs) {
+                    callback(true); // library tidak terjangkau -> lanjut apa adanya
+                    return;
+                }
+
+                window.setTimeout(check, intervalMs);
+            })();
+        };
+    </script>
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])

@@ -14,11 +14,147 @@
         href="{{ asset('storage/pbec/pbec.png') }}">
 
     <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
+    <!--
+    |--------------------------------------------------------------------------
+    | FONT EKSTERNAL — DIBUAT NON-BLOCKING
+    |--------------------------------------------------------------------------
+    | Sebelumnya stylesheet fonts.bunny.net dimuat secara render-blocking:
+    | browser menahan render (dan event `load`) sampai file font selesai
+    | diunduh. Pada jaringan internal / tanpa akses internet (kasus
+    | production), host ini bisa menggantung puluhan detik sehingga halaman
+    | terasa "loading lama".
+    |
+    | Pola berikut memuat CSS font tanpa memblokir:
+    |   media="print" -> browser menganggapnya tidak relevan untuk layar
+    |   onload         -> langsung ditukar menjadi media="all" saat selesai
+    | <noscript> menjaga tampilan tetap benar bila JavaScript dimatikan.
+    |--------------------------------------------------------------------------
+    -->
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 
     <link
+        rel="stylesheet"
         href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap"
-        rel="stylesheet" />
+        media="print"
+        onload="this.media='all'">
+
+    <noscript>
+        <link
+            rel="stylesheet"
+            href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap">
+    </noscript>
+
+    <!--
+    |--------------------------------------------------------------------------
+    | HELPER: TUNGGU LIBRARY EKSTERNAL TANPA MEMBLOKIR HALAMAN
+    |--------------------------------------------------------------------------
+    | Library pihak ketiga (flatpickr, signature_pad, face-api, dsb) dimuat
+    | dengan `async` supaya tidak menunda event DOMContentLoaded/`load` -
+    | penting pada jaringan internal tanpa akses internet (kasus production),
+    | karena script sinkron yang menggantung akan menahan seluruh halaman.
+
+    | Konsekuensinya library bisa belum tersedia saat kode halaman berjalan,
+    | sehingga kode yang membutuhkannya dibungkus helper ini:
+
+    |   absensiWaitFor(
+    |       function () { return window.flatpickr; },
+    |       function () { flatpickr('#jam_mulai', {...}); }
+    |   );
+
+    | Bila library tidak pernah datang (CDN diblokir), callback tetap dipanggil
+    | dengan argumen `true` (mode terbatas) supaya halaman tidak terkunci.
+    |--------------------------------------------------------------------------
+    -->
+    <script>
+        window.absensiWaitFor = function (isReady, callback, options) {
+            var opts = options || {};
+            var timeoutMs = opts.timeoutMs || 8000;
+            var intervalMs = opts.intervalMs || 50;
+            var startedAt = Date.now();
+
+            (function check() {
+                var ok = false;
+
+                try {
+                    ok = !!isReady();
+                } catch (e) {
+                    ok = false;
+                }
+
+                if (ok) {
+                    callback(false);
+                    return;
+                }
+
+                if (Date.now() - startedAt >= timeoutMs) {
+                    callback(true); // library tidak terjangkau -> lanjut apa adanya
+                    return;
+                }
+
+                window.setTimeout(check, intervalMs);
+            })();
+        };
+    </script>
+
+    <!--
+    |--------------------------------------------------------------------------
+    | JARING PENGAMAN LOADING SCREEN (ADAPTIF KUALITAS JARINGAN)
+    |--------------------------------------------------------------------------
+    | Ditulis di <head>, SEBELUM aset apa pun, dengan alasan penting:
+
+    | Script ini tidak menunggu unduhan apa pun, jadi timer-nya selalu terpasang
+    | lebih dulu. Sebelumnya timer pengaman dipasang di akhir <body> dan
+    | "disarm" oleh resources/js/loading.js (module hasil build Vite). Bila
+    | bundle JS lambat diunduh (jaringan lambat), timer itu belum sempat
+    | terpasang / belum sempat memutus dirinya sehingga loading screen bisa
+    | menggantung sampai batas maksimum pada setiap halaman.
+
+    | Batas waktu mengikuti kualitas jaringan (Network Information API):
+    |   2G / slow-2g : 5000 ms  (perangkat/jaringan sangat lambat)
+    |   3G           : 3000 ms
+    |   lainnya/4G   : 2000 ms
+    | Node yang tidak mendukung API ini memakai nilai default 2000 ms.
+
+    | Timer TIDAK dibatalkan oleh script di <body>. Bila halaman ternyata sudah
+    | siap lebih dulu, loader sudah disembunyikan dan pemanggilan berikutnya
+    | tidak berpengaruh (idempotent). Sebaliknya - bila ada aset yang benar-benar
+    | macet - loader tetap dipaksa hilang tepat waktu.
+    |--------------------------------------------------------------------------
+    -->
+    <script>
+        (function () {
+            var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+            var type = String(conn.effectiveType || conn.type || '').toLowerCase();
+
+            var maxWait = 2000;                  // jaringan normal
+            if (type === '3g') maxWait = 3000;   // jaringan sedang
+            if (type === '2g' || type === 'slow-2g') maxWait = 5000; // jaringan sangat lambat
+
+            var state = window.__absensiLoader = {
+                network: type || 'unknown',
+                maxWait: maxWait,
+                shownAt: Date.now(),
+                hide: null,
+                escaped: false
+            };
+
+            state.timer = window.setTimeout(function () {
+                // Script di <body> sudah siap -> pakai jalur normal (dengan fade).
+                if (typeof state.hide === 'function') {
+                    state.hide();
+                    return;
+                }
+
+                // Script di <body> belum jalan (aset menggantung) -> paksa hilang
+                // secepatnya tanpa animasi agar pengguna tidak terjebak.
+                var el = document.getElementById('loading-screen');
+                if (el) {
+                    state.escaped = true;
+                    el.style.display = 'none';
+                }
+            }, maxWait);
+        })();
+    </script>
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -29,7 +165,8 @@
     <!-- LOADING SCREEN -->
     <div
         id="loading-screen"
-        class="fixed inset-0 z-[9999] overflow-y-auto bg-black/20 backdrop-blur-[2px] transition-opacity duration-[2000ms]"> <!-- Glow -->
+        class="fixed inset-0 z-[9999] overflow-y-auto bg-black/20 backdrop-blur-[2px]">
+        <!-- Glow -->
         <div class="absolute w-[500px] h-[500px] bg-indigo-500/20 blur-3xl rounded-full"></div>
 
         <div class="relative w-80 h-48 flex items-center justify-center">
@@ -101,8 +238,34 @@
     |   token Sanctum yang dibuat saat login ikut di-revoke (reset token).
     |--------------------------------------------------------------------------
     -->
-    <!-- SweetAlert2 CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!--
+    |--------------------------------------------------------------------------
+    | SWEETALERT2 — NON-BLOCKING + STUB ANTI-ERROR
+    |--------------------------------------------------------------------------
+    | Sebelumnya script ini dimuat secara SINKRON sehingga memblokir parsing
+    | HTML dan menunda event DOMContentLoaded/`load`. Pada jaringan internal
+    | tanpa akses ke cdn.jsdelivr.net, permintaan menggantung sampai timeout
+    | dan membuat loading screen tertahan lama di SEMUA halaman.
+    |
+    | `async` : tidak memblokir parsing maupun DOMContentLoaded.
+    | Stub    : bila CDN belum/lambat/tidak tersedia, pemanggilan Swal tidak
+    |           memicu "Swal is not defined" (halaman tetap berfungsi, dialog
+    |           dilewati). Saat library asli selesai dimuat, stub ditimpa.
+    |--------------------------------------------------------------------------
+    -->
+    <script>
+        window.Swal = window.Swal || {
+            fire: function () {
+                return Promise.resolve({ isConfirmed: false, isDismissed: true });
+            },
+            close: function () {},
+            mixin: function () { return window.Swal; }
+        };
+    </script>
+
+    <!-- SweetAlert2 asli dibundel LOKAL lewat resources/js/vendor-sweetalert.js
+         (di-import oleh app.js) - tidak ada lagi permintaan ke cdn.jsdelivr.net,
+         sehingga halaman tetap cepat dan berfungsi di jaringan internal. -->
 
     <script>
         (function () {
@@ -268,15 +431,31 @@
     |--------------------------------------------------------------------------
     | HIDE LOADING SCREEN (ADAPTIF JARINGAN)
     |--------------------------------------------------------------------------
-    | - Loader hilang SEGERA setelah halaman (termasuk asset) selesai dimuat
-    |   (event `load`), bukan berdasarkan timer tetap 2 detik seperti sebelumnya.
-    | - MIN_DISPLAY_MS  : tampil minimal 300ms agar tidak berkedip (flash)
-    |                     pada jaringan cepat.
-    | - MAX_WAIT_MS     : jaring pengaman 6 detik — bila `load` macet karena
-    |                     asset lambat/gagal, loader tetap hilang agar user
-    |                     tidak terjebak di layar loading.
-    | - Animasi loader ditangani resources/js/loading.js (bundle Vite,
-    |   animejs lokal — tanpa CDN eksternal).
+    | Masalah sebelumnya: loader HANYA menghilang pada event `load`. Event itu
+    | baru menyala setelah SELURUH aset selesai diunduh — termasuk aset pihak
+    | ketiga (fonts/CDN) yang pada jaringan internal tanpa internet akan
+    | menggantung sampai daftar tunggu berikutnya.
+
+    | Akibatnya loader bertahan lama di setiap halaman. Ditambah lagi, sebuah
+    | <script>/<link> yang MACET karena tidak pernah menerima respons
+    | (DNS tidak terjawab) bahkan BUKAN hanya menunda
+    | `load` selamanya — `load` bisa tidak pernah menyala.
+
+    | Strategi baru — loader hilang saat halaman SUDAH BISA DILIHAT:
+    |   1. `DOMContentLoaded` : struktur HTML + CSS + JS bundle selesai
+    |      (aset eksternal async/print tidak dihitung) -> loader hilang.
+    |   2. `load`             : bila ternyata selesai lebih dulu (semua aset
+    |      lokal cepat) -> loader hilang lebih awal lagi.
+    |   3. `pageshow`         : menangani pemulihan dari bfcache (tombol Back).
+    |
+    | Batas waktu (jaring pengaman) TIDAK dipasang di sini, tetapi di <head>
+    | sebelum aset apa pun dimuat, agar tidak bisa tertunda oleh unduhan.
+    | Nilainya mengikuti kualitas jaringan (lihat blok di <head>):
+    | 2 detik jaringan normal, 3 detik 3G, 5 detik 2G/slow-2g.
+    |
+    | Timer tidak dipasang berulang: `hidden` menjamin aksi hanya sekali.
+    | Animasi animejs dihentikan saat loader disembunyikan supaya tidak
+    | membebani CPU di background (resources/js/loading.js).
     |--------------------------------------------------------------------------
     -->
     <script>
@@ -284,37 +463,69 @@
             var loader = document.getElementById('loading-screen');
             if (!loader) return;
 
-            var MIN_DISPLAY_MS = 300;
-            var MAX_WAIT_MS = 6000;
-            var FADE_MS = 400;
+            var state = window.__absensiLoader || {
+                network: 'unknown',
+                maxWait: 2000,
+                shownAt: Date.now(),
+                escaped: false
+            };
+            window.__absensiLoader = state;
 
-            var shownAt = Date.now();
+            var MIN_DISPLAY_MS = 250;
+            var FADE_MS = 250;
+
             var hidden = false;
+
+            function stopAnimation() {
+                // Hentikan animasi animejs agar tidak membebani CPU saat
+                // loader sudah tidak terlihat (resources/js/loading.js).
+                if (window.absensiLoading) {
+                    window.absensiLoading.stop();
+                }
+            }
+
+            function finish() {
+                loader.style.display = 'none';
+                stopAnimation();
+            }
 
             function hideLoader() {
                 if (hidden) return;
                 hidden = true;
 
-                var remaining = Math.max(0, MIN_DISPLAY_MS - (Date.now() - shownAt));
+                var remaining = Math.max(0, MIN_DISPLAY_MS - (Date.now() - state.shownAt));
 
                 setTimeout(function () {
                     loader.style.transition = 'opacity ' + FADE_MS + 'ms ease';
                     loader.classList.add('opacity-0');
 
-                    setTimeout(function () {
-                        loader.style.display = 'none';
-                    }, FADE_MS);
+                    setTimeout(finish, FADE_MS);
                 }, remaining);
             }
 
-            // Halaman + asset selesai dimuat -> loader hilang secepat mungkin
+            // Jaring pengaman di <head> memakai fungsi ini bila sudah tersedia.
+            state.hide = hideLoader;
+
+            // Kasus ekstrem: jaring pengaman di <head> sudah menutup loader
+            // sebelum script ini jalan (aset menggantung sangat lama).
+            if (state.escaped) {
+                hidden = true;
+                finish();
+
+                return;
+            }
+
+            // 1 & 2. Halaman sudah bisa dilihat -> hilangkan loader
+            document.addEventListener('DOMContentLoaded', hideLoader);
             window.addEventListener('load', hideLoader);
 
-            // Jaring pengaman: asset lambat/gagal -> loader tetap hilang
-            setTimeout(hideLoader, MAX_WAIT_MS);
+            // 3. Kembali dari bfcache (tombol Back) -> pastikan loader hilang
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) hideLoader();
+            });
 
-            // Bila dokumen ternyata sudah selesai dimuat sebelum script ini jalan
-            if (document.readyState === 'complete') {
+            // Dokumen ternyata sudah siap sebelum script ini dieksekusi
+            if (document.readyState !== 'loading') {
                 hideLoader();
             }
         })();

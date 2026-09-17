@@ -82,8 +82,7 @@
         }
     </style>
 
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    @vite('resources/js/vendor-fullcalendar.js')
 
     <div x-data="shiftPage()" class="min-h-screen p-3 sm:p-5 pb-24">
         <div class="w-full max-w-[98%] mx-auto space-y-4">

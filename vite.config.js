@@ -4,7 +4,13 @@ import laravel from 'laravel-vite-plugin';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                'resources/js/vendor-flatpickr.js',
+                'resources/js/vendor-signature-pad.js',
+                'resources/js/vendor-fullcalendar.js',
+            ],
             refresh: true,
         }),
     ],

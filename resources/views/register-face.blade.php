@@ -4,7 +4,12 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Wajah</title>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- face-api.js dari server LOKAL (public/vendor/face-api) dengan `defer`:
+         tidak memblokir parsing HTML, dan pasti sudah tersedia sebelum event
+         DOMContentLoaded dipicu (script halaman memakainya di dalam listener
+         DOMContentLoaded). Sebelumnya dari cdn.jsdelivr.net yang menggantung
+         di jaringan internal tanpa internet. -->
+    <script src="{{ asset('vendor/face-api/face-api.min.js') }}" defer></script>
 
     <style>
         body {

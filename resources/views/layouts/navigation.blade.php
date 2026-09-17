@@ -22,11 +22,21 @@
                     </div>
 
                     <div
-                        class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 shadow-lg">
+                        class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center select-none">
 
-                        <img
-                            src="https://ui-avatars.com/api/?name={{ Auth::user()->name }}"
-                            class="w-full h-full object-cover">
+                        @php
+                            $avatarInitials = collect(explode(' ', trim(Auth::user()->name)))
+                                ->filter()
+                                ->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+                                ->take(2)
+                                ->implode('');
+                        @endphp
+
+                        {{-- Inisial dirender lokal (tanpa request ke ui-avatars.com,
+                             yang bisa menggantung di jaringan internal) --}}
+                        <span class="text-white font-bold text-base tracking-wide">
+                            {{ $avatarInitials !== '' ? $avatarInitials : 'U' }}
+                        </span>
 
                     </div>
 
