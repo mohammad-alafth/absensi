@@ -503,21 +503,29 @@ class HRDController extends Controller
         */
         $calendarEvents = [];
 
-        foreach ($employeeShifts as $shift) {
-            $attendances = Attendance::whereBetween('tanggal', [
-                $employeeShifts->min('shift_date'),
-                $employeeShifts->max('shift_date')
-
+        /*
+        |--------------------------------------------------------------------------
+        | QUERY ATTENDANCE SEKALI (OPTIMASI)
+        |--------------------------------------------------------------------------
+        | Sebelumnya query Attendance berada DI DALAM loop foreach ($employeeShifts)
+        | sehingga dijalankan ulang untuk SETIAP baris shift (N+1 query).
+        | Dengan ratusan/ribuan shift per bulan, halaman rekap menjadi sangat lambat.
+        | Sekarang data attendance dimuat SEKALI di luar loop.
+        */
+        $attendanceMap = Attendance::whereBetween('tanggal', [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d')
             ])
-                ->get()
-                ->keyBy(fn($a) => $a->user_id . '_' . $a->tanggal);
+            ->get()
+            ->keyBy(fn($a) => $a->user_id . '_' . $a->tanggal);
 
+        foreach ($employeeShifts as $shift) {
             if (!$shift->user) {
                 continue;
             }
             $key = $shift->user_id . '_' .
                 Carbon::parse($shift->shift_date)->format('Y-m-d');
-            $attendance = $attendances->get($key);
+            $attendance = $attendanceMap->get($key);
             $role = strtolower($shift->user->role);
 
             if (str_starts_with($role, 'pj_')) {
