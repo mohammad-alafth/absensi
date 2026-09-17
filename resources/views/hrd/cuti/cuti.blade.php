@@ -305,33 +305,33 @@
                                 </a>
                                 @endif
 
-                                    <div x-data="{ approveModal:false }">
+                                <div x-data="{ approveModal:false }">
 
-                                        <button
-                                            type="button"
-                                            onclick="openHRDSignatureModal({{ $leave->id }})"
-                                            class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl w-full">
+                                    <button
+                                        type="button"
+                                        onclick="openHRDSignatureModal({{ $leave->id }})"
+                                        class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl w-full">
 
-                                            Approve
+                                        Approve
 
-                                        </button>
+                                    </button>
 
-                                        <form
-                                            id="hrdApproveForm{{ $leave->id }}"
-                                            method="POST"
-                                            action="{{ route('hrd.cuti.approve', $leave->id) }}"
-                                            class="hidden">
+                                    <form
+                                        id="hrdApproveForm{{ $leave->id }}"
+                                        method="POST"
+                                        action="{{ route('hrd.cuti.approve', $leave->id) }}"
+                                        class="hidden">
 
-                                            @csrf
+                                        @csrf
 
-                                            <input
-                                                type="hidden"
-                                                name="signature"
-                                                id="hrdSignatureInput{{ $leave->id }}">
+                                        <input
+                                            type="hidden"
+                                            name="signature"
+                                            id="hrdSignatureInput{{ $leave->id }}">
 
-                                        </form>
+                                    </form>
 
-                                    </div>
+                                </div>
 
                                 <div x-data="{ rejectModal:false }">
 
@@ -502,7 +502,8 @@
         </div>
 
     </div>
-    @vite('resources/js/vendor-signature-pad.js')
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+
 
     <script>
         let currentHRDLeaveId = null;

@@ -299,7 +299,7 @@
                     @endforeach
 
                 </div>
-
+                <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                 <!-- MODAL SHIFT CALENDAR -->
                 <div id="shiftModal"
                     class="fixed inset-0 bg-black/50 z-[100] hidden overflow-y-auto p-0 md:p-4">

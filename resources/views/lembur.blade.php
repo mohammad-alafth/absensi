@@ -202,7 +202,11 @@ $pjUsers = \App\Models\User::where('role', $pjRole)->get();
         </div>
     </div>
 
-    @vite(['resources/js/vendor-flatpickr.js', 'resources/js/vendor-signature-pad.js'])
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {

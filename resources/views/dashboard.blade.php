@@ -87,7 +87,7 @@
                 </div>
 
             </div>
-            
+
             @if(auth()->user()->role === 'hrd' && isset($pendingUsers) && $pendingUsers->count() > 0)
             <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
                 <p class="text-sm text-amber-800">
@@ -579,7 +579,7 @@
         </div>
 
     </div>
-
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         function checkoutNotAllowedAlert() {
             Swal.fire({
