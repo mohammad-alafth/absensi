@@ -161,17 +161,24 @@
                                 class="border-0 bg-transparent focus:ring-0 text-xs w-full p-0 text-gray-700 placeholder-gray-400">
                         </div>
 
-                        <div class="bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-center w-full sm:w-auto h-[38px]">
-                            <form method="GET" class="m-0 p-0">
-                                <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"
+                        <div class="bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-center gap-1 w-full sm:w-auto h-[38px]">
+                            <form method="GET" action="{{ route('hrd.rekap') }}" class="m-0 p-0 flex items-center gap-1">
+                                <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal Mulai" onchange="this.form.submit()"
                                     class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
-                            </form>
+                                <span class="text-[10px] text-gray-400 font-bold">s/d</span>
+                                <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal Selesai" onchange="this.form.submit()"
+                                    class="border-0 rounded-xl text-xs py-1 px-1 focus:ring-0 text-gray-700 font-semibold cursor-pointer">
 
+                                {{-- Tetap dikirim: fitur kalender shift & export jadwal berbasis bulan membaca input ini --}}
+                                <input type="hidden" name="month" value="{{ $month }}">
+                            </form>
                         </div>
 
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-1 w-full sm:w-auto flex items-center h-[38px]">
                             <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex gap-1 items-center m-0 w-full">
-                                <input type="hidden" name="month" value="{{ $month }}">
+                                {{-- Export mengikuti rentang filter yang sedang aktif di halaman --}}
+                                <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
+                                <input type="hidden" name="end_date" value="{{ $endDate->format('Y-m-d') }}">
                                 <select name="role"
                                     class="rounded-lg border-gray-200 bg-white text-xs py-1 px-2">
 
