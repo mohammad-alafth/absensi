@@ -29,10 +29,9 @@ class PermissionController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'tanggal' => 'required|date',
             'jenis' => 'required|string',
-            'jam_mulai' => 'nullable|required_with:jam_selesai',
-            'jam_selesai' => 'nullable|required_with:jam_mulai',
+            'tanggal' => 'required|date',
+            'tanggal_selesai' => 'nullable|date|after_or_equal:tanggal',
             'alasan' => 'required|string|min:2',
             'lampiran' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
             // 'employee_signature' => 'required|string',
@@ -40,10 +39,33 @@ class PermissionController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | VALIDASI JAM (Dipindahkan ke atas agar aman sebelum proses simpan)
+        | RENTANG TANGGAL IZIN
         |--------------------------------------------------------------------------
+        | Tanggal selesai kosong / sama dengan tanggal mulai = izin 1 hari.
+        | Izin 1 hari  -> wajib mengisi jam mulai & jam selesai.
+        | Izin >1 hari -> jam tidak digunakan (dikosongkan).
         */
-        if ($request->jam_mulai && $request->jam_selesai) {
+        $tanggalSelesai = $request->filled('tanggal_selesai')
+            ? $request->tanggal_selesai
+            : $request->tanggal;
+
+        $isSingleDay = $tanggalSelesai === $request->tanggal;
+
+        $jamMulai = null;
+        $jamSelesai = null;
+
+        if ($isSingleDay) {
+
+            $request->validate([
+                'jam_mulai' => 'required',
+                'jam_selesai' => 'required',
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDASI JAM (Dipindahkan ke atas agar aman sebelum proses simpan)
+            |--------------------------------------------------------------------------
+            */
             $start = Carbon::parse($request->jam_mulai);
             $end = Carbon::parse($request->jam_selesai);
 
@@ -60,6 +82,9 @@ class PermissionController extends Controller
                     ])
                     ->withInput();
             }
+
+            $jamMulai = $request->jam_mulai;
+            $jamSelesai = $request->jam_selesai;
         }
 
         /*
@@ -96,9 +121,10 @@ class PermissionController extends Controller
         $permission = Permission::create([
             'user_id' => auth()->id(),
             'tanggal' => $request->tanggal,
+            'tanggal_selesai' => $tanggalSelesai,
             'jenis' => $request->jenis,
-            'jam_mulai' => $request->jam_mulai,
-            'jam_selesai' => $request->jam_selesai,
+            'jam_mulai' => $jamMulai,
+            'jam_selesai' => $jamSelesai,
             'alasan' => $request->alasan,
             'lampiran' => $lampiran,
             'status' => $status,

@@ -81,7 +81,7 @@
                                 </div>
                                 <div>
                                     <p class="text-gray-500">Tanggal Diajukan</p>
-                                    <p class="font-semibold text-gray-800">{{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}</p>
+                                    <p class="font-semibold text-gray-800">{{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}@if($item->tanggal_selesai && $item->tanggal_selesai != $item->tanggal) s/d {{ \Carbon\Carbon::parse($item->tanggal_selesai)->translatedFormat('d F Y') }}@endif</p>
                                 </div>
                                 @if($item->jam_mulai)
                                 <div>
@@ -121,7 +121,7 @@
                                 <div class="mt-4 space-y-2">
                                     <p class="text-sm text-gray-700">
                                         <span class="font-semibold text-gray-500">Tanggal:</span>
-                                        {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}
+                                        {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}@if($item->tanggal_selesai && $item->tanggal_selesai != $item->tanggal) s/d {{ \Carbon\Carbon::parse($item->tanggal_selesai)->translatedFormat('d F Y') }}@endif
                                     </p>
                                     @if($item->jam_mulai || $item->jam_selesai)
                                     <p class="text-sm text-gray-700">

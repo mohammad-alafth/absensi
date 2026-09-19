@@ -41,7 +41,7 @@
 
                 <div class="p-5 md:p-6 space-y-5">
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-50 pb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-50 pb-4">
                         <div>
                             <label class="block text-xs font-medium text-slate-500 mb-1.5">Nama Karyawan</label>
                             <input type="text" value="{{ auth()->user()->name }}" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 cursor-not-allowed">
@@ -49,10 +49,6 @@
                         <div>
                             <label class="block text-xs font-medium text-slate-500 mb-1.5">Departemen</label>
                             <input type="text" value="{{ auth()->user()->role_label }}" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 cursor-not-allowed">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Izin</label>
-                            <input type="date" name="tanggal" value="{{ old('tanggal') }}" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500">
                         </div>
                     </div>
 
@@ -78,7 +74,31 @@
                         </div>
                     </div>
 
-                    <div class="bg-[#f8f9ff] p-3.5 rounded-xl border border-blue-50/50">
+                    {{-- SECTION TANGGAL: muncul setelah memilih jenis izin --}}
+                    <div id="section_tanggal" class="hidden bg-[#f8f9ff] p-3.5 rounded-xl border border-blue-50/50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                            <div class="flex flex-col justify-between">
+                                <label class="block text-[11px] font-medium text-slate-700 mb-1">Tanggal Mulai</label>
+                                <input type="date" id="tanggal" name="tanggal" value="{{ old('tanggal') }}"
+                                    class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 bg-white">
+                            </div>
+
+                            <div class="flex flex-col justify-between">
+                                <label class="block text-[11px] font-medium text-slate-700 mb-1">Tanggal Selesai</label>
+                                <input type="date" id="tanggal_selesai" name="tanggal_selesai" value="{{ old('tanggal_selesai') }}"
+                                    class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 bg-white">
+                            </div>
+
+                            <p class="md:col-span-2 text-[10px] text-slate-400 -mt-1">
+                                Pilih rentang tanggal izin. Jika izin hanya 1 hari, kolom jam akan muncul otomatis.
+                            </p>
+
+                        </div>
+                    </div>
+
+                    {{-- SECTION JAM: hanya muncul bila izin 1 hari --}}
+                    <div id="section_jam" class="hidden bg-[#f8f9ff] p-3.5 rounded-xl border border-blue-50/50">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
                             
                             <div class="flex flex-col justify-between">
@@ -176,6 +196,81 @@
                 output.className = "font-black text-slate-800 text-xs";
                 output.innerText = `${hasilJam} Jam ${hasilMenit} Menit`;
             }
+
+            /*
+            |----------------------------------------------------------------------
+            | TAMPIL/SEMBUNYI SECTION SESUAI PILIHAN
+            |----------------------------------------------------------------------
+            | 1. Tanggal (mulai & selesai) baru muncul setelah memilih jenis izin.
+            | 2. Jika rentang hanya 1 hari -> kolom Jam muncul.
+            | 3. Jika lebih dari 1 hari -> kolom Jam disembunyikan.
+            */
+            const jenisInputs = document.querySelectorAll('input[name="jenis"]');
+            const sectionTanggal = document.getElementById('section_tanggal');
+            const sectionJam = document.getElementById('section_jam');
+            const tanggalMulai = document.getElementById('tanggal');
+            const tanggalSelesai = document.getElementById('tanggal_selesai');
+            const jamMulaiInput = document.getElementById('jam_mulai');
+            const jamSelesaiInput = document.getElementById('jam_selesai');
+
+            function isSingleDay() {
+                return tanggalMulai.value &&
+                    tanggalSelesai.value &&
+                    tanggalMulai.value === tanggalSelesai.value;
+            }
+
+            function updateJamSection() {
+                if (!tanggalMulai.value || !tanggalSelesai.value) {
+                    sectionJam.classList.add('hidden');
+                    return;
+                }
+
+                if (isSingleDay()) {
+                    sectionJam.classList.remove('hidden');
+                } else {
+                    // Izin lebih dari 1 hari: jam tidak digunakan
+                    sectionJam.classList.add('hidden');
+                    jamMulaiInput.value = '';
+                    jamSelesaiInput.value = '';
+                    document.getElementById('durasi_output').innerText = "0 Jam 0 Menit";
+                }
+            }
+
+            function updateTanggalSection() {
+                const jenisDipilih = Array.from(jenisInputs).some(input => input.checked);
+
+                if (jenisDipilih) {
+                    sectionTanggal.classList.remove('hidden');
+                } else {
+                    sectionTanggal.classList.add('hidden');
+                }
+
+                updateJamSection();
+            }
+
+            // 1. Memilih jenis izin -> tampilkan tanggal mulai & selesai
+            jenisInputs.forEach(function(input) {
+                input.addEventListener('change', updateTanggalSection);
+            });
+
+            // 2. Tanggal mulai dipilih -> isi default tanggal selesai (1 hari)
+            tanggalMulai.addEventListener('change', function() {
+                if (tanggalMulai.value) {
+                    tanggalSelesai.min = tanggalMulai.value;
+
+                    if (!tanggalSelesai.value || tanggalSelesai.value < tanggalMulai.value) {
+                        tanggalSelesai.value = tanggalMulai.value;
+                    }
+                }
+
+                updateJamSection();
+            });
+
+            // 3. Tanggal selesai berubah -> 1 hari tampilkan jam, >1 hari sembunyikan
+            tanggalSelesai.addEventListener('change', updateJamSection);
+
+            // Inisialisasi awal (mendukung old() setelah validasi gagal)
+            updateTanggalSection();
         });
     </script>
 

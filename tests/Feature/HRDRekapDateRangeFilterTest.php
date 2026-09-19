@@ -105,7 +105,19 @@ class HRDRekapDateRangeFilterTest extends TestCase
         $response->assertDownload('rekap-all-20260901-20260930.xlsx');
 
         $spreadsheet = IOFactory::load($response->baseResponse->getFile()->getPathname());
-        $sheet = $spreadsheet->getActiveSheet();
+
+        // Export multi-sheet: cari sheet unit/role tempat pegawai berada
+        $sheet = null;
+        foreach ($spreadsheet->getAllSheets() as $candidate) {
+            for ($row = 7; $row <= $candidate->getHighestRow(); $row++) {
+                if ($candidate->getCell('A' . $row)->getValue() === $user->name) {
+                    $sheet = $candidate;
+                    break 2;
+                }
+            }
+        }
+
+        $this->assertNotNull($sheet, "Sheet berisi pegawai {$user->name} tidak ditemukan.");
 
         $this->assertSame(
             'Periode: 01/09/2026 s/d 30/09/2026',
@@ -113,8 +125,7 @@ class HRDRekapDateRangeFilterTest extends TestCase
         );
 
         // Presensi dalam rentang harus masuk rekap export
-        // (baris 7 = data pertama; kolom E = total waktu terlambat)
-        $this->assertSame($user->name, $sheet->getCell('A7')->getValue());
+        // (kolom E = total waktu terlambat)
         $this->assertSame('00:00', $sheet->getCell('E7')->getValue());
 
         $spreadsheet->disconnectWorksheets();

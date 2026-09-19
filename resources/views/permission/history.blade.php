@@ -62,7 +62,7 @@
                                         {{ $item->jenis }}
                                     </h3>
                                     <p class="text-[11px] text-gray-400 font-medium mt-1 bg-white border px-2 py-0.5 rounded-lg inline-block">
-                                        📅 {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d M Y') }}
+                                        📅 {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d M Y') }}@if($item->tanggal_selesai && $item->tanggal_selesai != $item->tanggal) s/d {{ \Carbon\Carbon::parse($item->tanggal_selesai)->translatedFormat('d M Y') }}@endif
                                     </p>
                                 </div>
 
@@ -113,7 +113,7 @@
                                 <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
                                     <div class="bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Hari / Tanggal Izin</p>
-                                        <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}</p>
+                                        <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}@if($item->tanggal_selesai && $item->tanggal_selesai != $item->tanggal) s/d {{ \Carbon\Carbon::parse($item->tanggal_selesai)->translatedFormat('d F Y') }}@endif</p>
                                     </div>
                                     <div class="bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Jenis Klasifikasi Pengajuan</p>

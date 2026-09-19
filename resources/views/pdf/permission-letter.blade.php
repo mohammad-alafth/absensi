@@ -104,7 +104,7 @@
         </tr>
         <tr>
             <td>Tanggal</td>
-            <td>: {{ \Carbon\Carbon::parse($permission->jam_mulai)->format('d-m-Y') }} s/d {{ \Carbon\Carbon::parse($permission->jam_selesai)->format('d-m-Y') }}</td>
+            <td>: {{ \Carbon\Carbon::parse($permission->tanggal)->format('d-m-Y') }}@if($permission->tanggal_selesai && $permission->tanggal_selesai != $permission->tanggal) s/d {{ \Carbon\Carbon::parse($permission->tanggal_selesai)->format('d-m-Y') }}@endif</td>
         </tr>
         <tr>
             <td>Alasan</td>

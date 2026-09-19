@@ -10,19 +10,59 @@ return new class extends Migration
     {
         Schema::table('permissions', function (Blueprint $table) {
 
+            /*
+            |----------------------------------------------------------------------
+            | PJ (kolom pj_* wajib ada untuk alur approval PJ -> HRD).
+            |----------------------------------------------------------------------
+            */
+            if (!Schema::hasColumn('permissions', 'pj_status')) {
+                $table->string('pj_status')
+                    ->default('pending')
+                    ->after('status');
+            }
+
+            if (!Schema::hasColumn('permissions', 'pj_approved_by')) {
+                $table->unsignedBigInteger('pj_approved_by')
+                    ->nullable()
+                    ->after('status');
+            }
+
+            if (!Schema::hasColumn('permissions', 'pj_approved_at')) {
+                $table->timestamp('pj_approved_at')
+                    ->nullable()
+                    ->after('status');
+            }
+
+            if (!Schema::hasColumn('permissions', 'pj_note')) {
+                $table->text('pj_note')
+                    ->nullable()
+                    ->after('status');
+            }
 
             // HRD
-            $table->string('hrd_status')
-                ->default('pending');
+            if (!Schema::hasColumn('permissions', 'hrd_status')) {
+                $table->string('hrd_status')
+                    ->default('pending')
+                    ->after('status');
+            }
 
-            $table->unsignedBigInteger('hrd_approved_by')
-                ->nullable();
+            if (!Schema::hasColumn('permissions', 'hrd_approved_by')) {
+                $table->unsignedBigInteger('hrd_approved_by')
+                    ->nullable()
+                    ->after('status');
+            }
 
-            $table->timestamp('hrd_approved_at')
-                ->nullable();
+            if (!Schema::hasColumn('permissions', 'hrd_approved_at')) {
+                $table->timestamp('hrd_approved_at')
+                    ->nullable()
+                    ->after('status');
+            }
 
-            $table->text('hrd_note')
-                ->nullable();
+            if (!Schema::hasColumn('permissions', 'hrd_note')) {
+                $table->text('hrd_note')
+                    ->nullable()
+                    ->after('status');
+            }
         });
     }
 

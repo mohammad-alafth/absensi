@@ -11,6 +11,7 @@ class Permission extends Model
         'user_id',
 
         'tanggal',
+        'tanggal_selesai',
         'jenis',
 
         'jam_mulai',

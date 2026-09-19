@@ -14,7 +14,9 @@ class PJDashboardController extends Controller
     public static function getDivisionRolesForUser($role)
     {
         if ($role === 'pj_nurse') {
-            return ['nurse', 'pj_nurse'];
+            // Unit gizi (nutrition) dibawahkan PJ Perawat:
+            // pengajuan gizi disetujui pj_nurse dahulu, lalu diteruskan ke HRD.
+            return ['nurse', 'pj_nurse', 'nutrition'];
         }
         if ($role === 'pj_nurse_ok') {
             return ['nurse_ok', 'pj_nurse_ok'];
