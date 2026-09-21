@@ -120,48 +120,7 @@ class DashboardController extends Controller
             ->where('status', 'pending')
             ->count();
 
-        /*
-    |------------------------------------------------------------------
-    | REMINDER SHIFT UNTUK PJ
-    |------------------------------------------------------------------
-    */
-        $showShiftReminder = false;
-        $shiftReminderMessage = null;
-
-        if (str_starts_with($user->role, 'pj_')) {
-            $today = Carbon::today();
-            $period = $this->getShiftPeriod($today);
-            $periodEnd = Carbon::parse($period['end_date']);
-            $reminderStart = $periodEnd->copy()->subDays(6); // Tanggal 20
-
-            $nextPeriod = $this->getShiftPeriod($periodEnd->copy()->addDay());
-
-            // 1. Cek jumlah data shift untuk periode depan
-            $shiftCount = EmployeeShift::whereDate('start_date', $nextPeriod['start_date'])
-                ->where('assigned_by', $user->id)
-                ->count();
-
-            // 2. Ambil waktu update terakhir dari periode depan
-            $lastUpdated = EmployeeShift::whereDate('start_date', $nextPeriod['start_date'])
-                ->where('assigned_by', $user->id)
-                ->max('updated_at');
-
-            // 3. Cek apakah sudah diupdate di rentang reminder (tgl 20 ke atas)
-            $isUpdated = $lastUpdated && Carbon::parse($lastUpdated)->gte($reminderStart);
-
-            // 4. Munculkan notif jika dalam rentang 20-26 dan shift belum ada atau belum diupdate
-            if ($today->gte($reminderStart) && $today->lte($periodEnd)) {
-                if ($shiftCount === 0 || !$isUpdated) {
-                    $showShiftReminder = true;
-                    $shiftReminderMessage = 'Periode shift akan berakhir pada ' . $periodEnd->translatedFormat('d F Y') . '. Segera update jadwal shift periode berikutnya.';
-                }
-                
-            }
-            
-        }
-        
-
-        return view('dashboard', compact(
+                return view('dashboard', compact(
             'user',
             'todayAttendance',
             'histories',
@@ -174,36 +133,9 @@ class DashboardController extends Controller
             'pendingLeaveCount',
             'pendingOvertimeCount',
             'pendingShiftChangeCount',
-            'showShiftReminder',
-            'shiftReminderMessage',
             'isHoliday'
         ));
     }
-
-    /*
-    |------------------------------------------------------------------
-    | GET SHIFT PERIOD
-    |------------------------------------------------------------------
-    */
-    private function getShiftPeriod($date)
-    {
-        $date = Carbon::parse($date);
-        $payrollDay = 26;
-
-        if ($date->day >= $payrollDay) {
-            $startDate = $date->copy()->day($payrollDay);
-            $endDate = $startDate->copy()->addMonth()->subDay();
-        } else {
-            $startDate = $date->copy()->subMonth()->day($payrollDay);
-            $endDate = $startDate->copy()->addMonth()->subDay();
-        }
-
-        return [
-            'start_date' => $startDate->format('Y-m-d'),
-            'end_date'   => $endDate->format('Y-m-d'),
-        ];
-    }
-    // Tambahkan di dalam DashboardController.php
 
     private function isHoliday($date)
     {
