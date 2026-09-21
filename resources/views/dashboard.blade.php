@@ -642,27 +642,27 @@
         }
 
         // SHIFT REMINDER
-        const showShiftReminder = @json($showShiftReminder);
-        const shiftReminderMessage = @json($shiftReminderMessage);
+        // const showShiftReminder = @json($showShiftReminder);
+        // const shiftReminderMessage = @json($shiftReminderMessage);
 
-        if (showShiftReminder) {
-            window.addEventListener('load', function() {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Jadwal Shift Akan Berakhir',
-                    html: `<div style="font-size:15px; line-height:1.7">${shiftReminderMessage}</div>`,
-                    confirmButtonText: 'Atur Shift Sekarang',
-                    confirmButtonColor: '#2563EB',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    background: '#ffffff'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = "{{ route('shift.index') }}";
-                    }
-                });
-            });
-        }
+        // if (showShiftReminder) {
+        //     window.addEventListener('load', function() {
+        //         Swal.fire({
+        //             icon: 'warning',
+        //             title: 'Jadwal Shift Akan Berakhir',
+        //             html: `<div style="font-size:15px; line-height:1.7">${shiftReminderMessage}</div>`,
+        //             confirmButtonText: 'Atur Shift Sekarang',
+        //             confirmButtonColor: '#2563EB',
+        //             allowOutsideClick: false,
+        //             allowEscapeKey: false,
+        //             background: '#ffffff'
+        //         }).then((result) => {
+        //             if (result.isConfirmed) {
+        //                 window.location.href = "{{ route('shift.index') }}";
+        //             }
+        //         });
+        //     });
+        // }
     </script>
 
     <script>
