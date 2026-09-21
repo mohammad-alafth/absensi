@@ -812,137 +812,223 @@ class HRDController extends Controller
     public function exportReport(Request $request)
     {
         $type = $request->type;
-        $date = $request->date;
-        $month = $request->month;
-
-        if ($type === 'absent') {
-            $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
-            return Excel::download(
-                new HRDAbsentExport($startDate, $endDate),
-                "Laporan_Tidak_Hadir_" . $startDate . "_sd_" . $endDate . ".xlsx"
-            );
-        }
-
+        $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+        $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
+        
         $statusList = [
-            'pending',
-            'waiting_head',
-            'waiting_director',
-            'waiting_medical_service',
-            'waiting_hrd',
-            'approved',
-            'rejected'
+            'pending', 'waiting_head', 'waiting_director',
+            'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'
         ];
-
-        // 1. Ambil data berdasarkan rentang tanggal
+        
+        $data = collect();
         switch ($type) {
             case 'attendance':
-                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
                 $data = Attendance::whereBetween('tanggal', [$startDate, $endDate])->with('user')->get();
                 break;
             case 'leave':
-                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
                 $data = Leave::whereIn('status', $statusList)
                     ->where(function ($q) use ($startDate, $endDate) {
                         $q->where('start_date', '<=', $endDate)
                           ->where('end_date', '>=', $startDate);
-                    })
-                    ->with('user')
-                    ->latest()
-                    ->get();
+                    })->with('user')->latest()->get();
                 break;
             case 'permission':
-                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
                 $data = Permission::whereIn('status', $statusList)
                     ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->with('user')
-                    ->latest()
-                    ->get();
+                    ->with('user')->latest()->get();
                 break;
             case 'overtime':
-                $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
-                $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
                 $data = Overtime::whereIn('status', $statusList)
                     ->whereBetween('overtime_date', [$startDate, $endDate])
-                    ->with('user')
-                    ->latest()
-                    ->get();
+                    ->with('user')->latest()->get();
                 break;
-            default:
-                $data = collect([]);
         }
-
+        
         if ($data->isEmpty()) {
             return back()->with('error', 'Tidak ada data untuk diekspor.');
+        }        
+        // Pre-process: group per user, jabarkan per tanggal/durasi
+        $processedData = collect();
+        
+        switch ($type) {
+            // Format: Nama, Tanggal Mulai, Tanggal Selesai, Durasi, Keterangan, Total Hari
+            case 'leave':
+                foreach ($data->groupBy('user_id') as $userId => $userRows) {
+                    $userName = $userRows->first()->user->name ?? 'N/A';
+                    $totalDays = 0;
+                    foreach ($userRows as $row) {
+                        $start = Carbon::parse($row->start_date);
+                        $end = Carbon::parse($row->end_date);
+                        $days = $start->diffInDays($end) + 1;
+                        $totalDays += $days;
+                        $processedData->push([
+                            'name' => $userName,
+                            'start_date' => $start->format('d/m/Y'),
+                            'end_date' => $end->format('d/m/Y'),
+                            'durasi' => $days . ' Hari',
+                            'keterangan' => $row->reason ?? $row->alasan ?? '-',
+                            'total_hari' => ''
+                        ]);
+                    }
+                    $processedData->push([
+                        'name' => $userName,
+                        'start_date' => '', 'end_date' => '',
+                        'durasi' => 'TOTAL', 'keterangan' => '',
+                        'total_hari' => $totalDays . ' Hari'
+                    ]);
+                }
+                break;                
+            // Format: Nama, Tanggal, Jam Mulai, Jam Selesai, Total Jam/Hari, Keterangan, Total Jam
+            case 'overtime':
+                foreach ($data->groupBy('user_id') as $userId => $userRows) {
+                    $userName = $userRows->first()->user->name ?? 'N/A';
+                    $totalHours = 0;
+                    foreach ($userRows as $row) {
+                        $start = Carbon::parse($row->overtime_date);
+                        $jamMulai = $row->start_time ?? '-';
+                        $jamSelesai = $row->end_time ?? '-';
+                        $hours = floatval($row->total_hours ?? 0);
+                        $totalHours += $hours;
+                        $hoursFormatted = floor($hours) . ' Jam ' . round(($hours - floor($hours)) * 60) . ' Menit';
+                        $processedData->push([
+                            'name' => $userName,
+                            'tanggal' => $start->format('d/m/Y'),
+                            'jam_mulai' => $jamMulai,
+                            'jam_selesai' => $jamSelesai,
+                            'total_jam_hari' => $hoursFormatted,
+                            'keterangan' => $row->reason ?? $row->hrd_note ?? '-',
+                            'total_jam' => ''
+                        ]);
+                    }
+                    $totalHoursFormatted = floor($totalHours) . ' Jam ' . round(($totalHours - floor($totalHours)) * 60) . ' Menit';
+                    $processedData->push([
+                        'name' => $userName,
+                        'tanggal' => '', 'jam_mulai' => '', 'jam_selesai' => '',
+                        'total_jam_hari' => 'TOTAL', 'keterangan' => '',
+                        'total_jam' => $totalHoursFormatted
+                    ]);
+                }
+                break;                
+            // Format: Nama, Tanggal Mulai, Tanggal Selesai, Jam Mulai, Jam Selesai, Durasi, Keterangan, Total Jam
+            case 'permission':
+                foreach ($data->groupBy('user_id') as $userId => $userRows) {
+                    $userName = $userRows->first()->user->name ?? 'N/A';
+                    $totalMinutes = 0;
+                    foreach ($userRows as $row) {
+                        $start = Carbon::parse($row->tanggal);
+                        $end = isset($row->tanggal_selesai) ? Carbon::parse($row->tanggal_selesai) : $start->copy();
+                        $jamMulai = $row->jam_mulai ?? '-';
+                        $jamSelesai = $row->jam_selesai ?? '-';
+                        $rowMinutes = 0;
+                        if ($row->jam_mulai && $row->jam_selesai) {
+                            $begin = Carbon::parse($row->jam_mulai);
+                            $finish = Carbon::parse($row->jam_selesai);
+                            $rowMinutes = $finish->diffInMinutes($begin);
+                            $totalMinutes += $rowMinutes;
+                        }
+                        $hoursFormatted = floor($rowMinutes / 60) . ' Jam ' . ($rowMinutes % 60) . ' Menit';
+                        $processedData->push([
+                            'name' => $userName,
+                            'start_date' => $start->format('d/m/Y'),
+                            'end_date' => $end->isSameDay($start) ? '' : $end->format('d/m/Y'),
+                            'jam_mulai' => $jamMulai,
+                            'jam_selesai' => $jamSelesai,
+                            'durasi' => $hoursFormatted,
+                            'keterangan' => $row->alasan ?? $row->reason ?? '-',
+                            'total_jam' => ''
+                        ]);
+                    }
+                    $totalHoursFormatted = floor($totalMinutes / 60) . ' Jam ' . ($totalMinutes % 60) . ' Menit';
+                    $processedData->push([
+                        'name' => $userName, 'start_date' => '', 'end_date' => '',
+                        'jam_mulai' => '', 'jam_selesai' => '', 'durasi' => 'TOTAL',
+                        'keterangan' => '', 'total_jam' => $totalHoursFormatted
+                    ]);
+                }
+                break;                
+            default:
+                // attendance - format lama
+                $processedData = $data;
         }
-
-        // 2. Ekspor dengan Class Anonim yang sudah Disamakan Formatnya
-        return Excel::download(new class($data) implements FromCollection, WithHeadings, WithMapping, WithEvents, WithColumnWidths {
+        
+        // Export dengan Class Anonim yang sudah Disamakan Formatnya
+        return Excel::download(new class($processedData, $type) implements FromCollection, WithHeadings, WithMapping, WithEvents, WithColumnWidths {
             protected $data;
-            public function __construct($data)
+            protected $type;
+            public function __construct($data, $type)
             {
                 $this->data = $data;
+                $this->type = $type;
             }
             public function collection()
             {
                 return $this->data;
             }
-
+            
             public function headings(): array
             {
-                return ['NAMA PEGAWAI', 'TANGGAL / WAKTU', 'STATUS', 'KETERANGAN'];
-            }
-
+                switch ($this->type) {
+                    case 'leave':
+                        return ['NAMA PEGAWAI', 'TANGGAL MULAI', 'TANGGAL SELESAI', 'DURASI', 'KETERANGAN', 'TOTAL HARI'];
+                    case 'overtime':
+                        return ['NAMA PEGAWAI', 'TANGGAL', 'JAM MULAI', 'JAM SELESAI', 'TOTAL JAM/HARI', 'KETERANGAN', 'TOTAL JAM'];
+                    case 'permission':
+                        return ['NAMA PEGAWAI', 'TANGGAL MULA', 'TANGGAL SELESAI', 'JAM MULA', 'JAM SELESAI', 'DURASI', 'KETERANGAN', 'TOTAL JAM'];
+                    default:
+                        return ['NAMA PEGAWAI', 'TANGGAL / WAKTU', 'STATUS', 'KETERANGAN'];
+                }
+            }            
             public function map($item): array
             {
-                return [
-                    $item->user->name ?? 'N/A',
-                    $item->tanggal ?? $item->start_date ?? $item->overtime_date ?? 'N/A',
-                    ucwords(str_replace('_', ' ', $item->status ?? 'N/A')),
-                    $item->reason ?? $item->hrd_note ?? $item->alasan ?? '-'
-                ];
+                $name = $item['name'] ?? $item->user->name ?? 'N/A';
+                
+                if ($this->type === 'leave') {
+                    return [$name, $item['start_date'], $item['end_date'], $item['durasi'], $item['keterangan'], $item['total_hari']];
+                } elseif ($this->type === 'overtime') {
+                    return [$name, $item['tanggal'], $item['jam_mulai'], $item['jam_selesai'], $item['total_jam_hari'], $item['keterangan'], $item['total_jam']];
+                } elseif ($this->type === 'permission') {
+                    return [$name, $item['start_date'], $item['end_date'], $item['jam_mulai'], $item['jam_selesai'], $item['durasi'], $item['keterangan'], $item['total_jam']];
+                } else {
+                    return [
+                        $item->user->name ?? 'N/A',
+                        $item->tanggal ?? $item->start_date ?? $item->overtime_date ?? 'N/A',
+                        ucwords(str_replace('_', ' ', $item->status ?? 'N/A')),
+                        $item->reason ?? $item->hrd_note ?? $item->alasan ?? '-'
+                    ];
+                }
             }
-
+            
             public function columnWidths(): array
             {
-                // Disamakan lebar kolomnya agar proporsional
-                return [
-                    'A' => 30, // Nama
-                    'B' => 20, // Tanggal
-                    'C' => 30, // Status
-                    'D' => 45, // Keterangan (Dibuat lebar)
-                ];
-            }
-
+                switch ($this->type) {
+                    case 'leave': return ['A' => 30, 'B' => 20, 'C' => 20, 'D' => 15, 'E' => 45, 'F' => 15];
+                    case 'overtime': return ['A' => 30, 'B' => 18, 'C' => 15, 'D' => 15, 'E' => 18, 'F' => 40, 'G' => 18];
+                    case 'permission': return ['A' => 30, 'B' => 18, 'C' => 18, 'D' => 15, 'E' => 15, 'F' => 15, 'G' => 40, 'H' => 18];
+                    default: return ['A' => 30, 'B' => 20, 'C' => 30, 'D' => 45];
+                }
+            }            
             public function registerEvents(): array
             {
                 return [
                     AfterSheet::class => function (AfterSheet $event) {
                         $sheet = $event->sheet;
-
-                        // 1. Geser ke bawah 5 baris untuk Kop Surat
+                        
                         $sheet->insertNewRowBefore(1, 5);
-
-                        // 2. Teks Header (Ditaruh di B dan C agar di tengah A dan D)
+                        
                         $sheet->setCellValue('B1', 'RS MATA Pekanbaru Eye Center');
                         $sheet->setCellValue('B2', 'Jl. Soekarno Hatta No. 236 – Pekanbaru – Riau');
                         $sheet->setCellValue('B3', 'Telp. (0761) 7875191, 0811 7605191 Fax. (0761) 7875195');
                         $sheet->setCellValue('B4', 'www.pekanbarueyecenter.com');
-
+                        
                         $sheet->mergeCells('B1:C1');
                         $sheet->mergeCells('B2:C2');
                         $sheet->mergeCells('B3:C3');
                         $sheet->mergeCells('B4:C4');
-
-                        // 3. Styling Kop Surat
+                        
                         $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('5a6ea8');
                         $sheet->getStyle('B1:C4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                         $sheet->getStyle('B1:C4')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-
-                        // 4. Logo Kiri (A1) dan Logo Kanan (D1)
+                        
                         if (file_exists(public_path('images/rsprofile.png'))) {
                             $drawing1 = new Drawing();
                             $drawing1->setPath(public_path('images/rsprofile.png'));
@@ -958,35 +1044,35 @@ class HRDController extends Controller
                             $drawing2->setCoordinates('D1');
                             $drawing2->setWorksheet($sheet->getDelegate());
                         }
-
-                        // 5. Styling Heading Tabel (Baris 6)
+                        
                         $sheet->getRowDimension(6)->setRowHeight(35);
-                        $sheet->getStyle('A6:D6')->applyFromArray([
+                        
+                        $colCount = 'D';
+                        switch ($this->type) {
+                            case 'leave': $colCount = 'F'; break;
+                            case 'overtime': $colCount = 'G'; break;
+                            case 'permission': $colCount = 'H'; break;
+                            default: $colCount = 'D';
+                        }
+                        $sheet->getStyle('A6:' . $colCount . '6')->applyFromArray([
                             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 12],
                             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E40AF']],
-                            'alignment' => [
-                                'horizontal' => Alignment::HORIZONTAL_CENTER,
-                                'vertical' => Alignment::VERTICAL_CENTER,
-                            ],
+                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                         ]);
-
-                        // 6. Styling Data, Border, dan Wrap Text
+                        
                         $lastRow = $sheet->getHighestRow();
-                        $sheet->getStyle('A6:D' . $lastRow)->applyFromArray([
+                        $sheet->getStyle('A6:' . $colCount . $lastRow)->applyFromArray([
                             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
                             'alignment' => ['vertical' => Alignment::VERTICAL_CENTER]
                         ]);
-
-                        $sheet->getStyle('A7:D' . $lastRow)->getAlignment()->setWrapText(true);
-
-                        // 7. Fit to screen
+                        
+                        $sheet->getStyle('A7:' . $colCount . $lastRow)->getAlignment()->setWrapText(true);
                         $sheet->getPageSetup()->setFitToWidth(1);
                     },
                 ];
             }
-        }, "Laporan_" . ucfirst($type) . "_" . now()->format('Ymd_His') . ".xlsx");
+        }, "Laporan_" . ucfirst($type) . "_" . $startDate . "_sd_" . $endDate . ".xlsx");
     }
-
     public function reportAttendanceDaily(Request $request)
     {
         $date = $request->date ?? Carbon::today()->format('Y-m-d');

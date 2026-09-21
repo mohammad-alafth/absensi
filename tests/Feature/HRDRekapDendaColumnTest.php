@@ -338,15 +338,18 @@ class HRDRekapDendaColumnTest extends TestCase
         $sheet = $this->findSheetForUser($spreadsheet, $user->name);
         $row = $this->findRowByName($spreadsheet, $user->name);
 
-        $this->assertSame('TANGGAL IZIN', $sheet->getCell('H6')->getValue());
-        $this->assertSame('TANGGAL CUTI', $sheet->getCell('I6')->getValue());
-        $this->assertSame('JAM LEMBUR', $sheet->getCell('J6')->getValue());
+                $this->assertSame('TANGGAL IZIN', $sheet->getCell('H6')->getValue());
+        $this->assertSame('JAM IZIN', $sheet->getCell('I6')->getValue());
+        $this->assertSame('TANGGAL CUTI', $sheet->getCell('J6')->getValue());
+        $this->assertSame('TANGGAL LEMBUR', $sheet->getCell('K6')->getValue());
+        $this->assertSame('JAM LEMBUR', $sheet->getCell('L6')->getValue());
 
         $this->assertSame('10/09', $sheet->getCell('H' . $row)->getValue());
-        $this->assertSame('14/09, 15/09', $sheet->getCell('I' . $row)->getValue());
+        $this->assertSame('10/09', $sheet->getCell('I' . $row)->getValue());
+        $this->assertSame('14/09, 15/09', $sheet->getCell('J' . $row)->getValue());
 
         // Format jam lembur sesuai surat lembur: "X Jam"
-        $this->assertSame('3 Jam', $sheet->getCell('J' . $row)->getValue());
+        $this->assertSame('3 Jam', $sheet->getCell('L' . $row)->getValue());
 
         $spreadsheet->disconnectWorksheets();
     }
