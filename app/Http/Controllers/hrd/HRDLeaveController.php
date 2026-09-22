@@ -31,6 +31,10 @@ class HRDLeaveController extends Controller
             $leaves = Leave::where('status', 'waiting_director')->get();
         }
 
+        if ($role === 'medical_service') {
+            $leaves = Leave::where('status', 'waiting_medical_service')->get();
+        }
+
         return view('hrd.cuti.cuti', compact('leaves'));
     }
 
@@ -66,6 +70,19 @@ class HRDLeaveController extends Controller
             $this->regenerateLeavePdf($leave);
 
             return back()->with('success', 'Disetujui Final oleh Direktur');
+        }
+
+        if ($role === 'medical_service') {
+            $leave->update([
+                'status' => 'waiting_hrd',
+                'medical_service_status' => 'approved',
+                'medical_service_signature' => $request->signature, // Menyimpan TTD Medical Service
+                'medical_service_approved_by' => auth()->id(),
+                'medical_service_approved_at' => now(),
+            ]);
+            $this->regenerateLeavePdf($leave);
+
+            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
         }
 
         if ($role === 'hrd') {

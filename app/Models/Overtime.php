@@ -47,6 +47,12 @@ class Overtime extends Model
         'director_approved_by',
         'head_approved_at',
         'director_approved_at',
+
+        // MEDICAL SERVICE
+        'medical_service_status',
+        'medical_service_signature',
+        'medical_service_approved_by',
+        'medical_service_approved_at',
     ];
 
     /*
@@ -92,6 +98,11 @@ class Overtime extends Model
     public function hrdApprover()
     {
         return $this->belongsTo(User::class, 'hrd_approved_by');
+    }
+
+    public function medicalServiceApprover()
+    {
+        return $this->belongsTo(User::class, 'medical_service_approved_by');
     }
     
 }

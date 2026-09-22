@@ -17,9 +17,10 @@ class HRDPermissionController extends Controller
         // 1. Definisikan mapping status yang dicari berdasarkan role
         // Ini menggantikan banyak 'if'
         $statusMapping = [
-            'hrd'          => 'waiting_hrd',
-            'head_pegawai' => 'waiting_head',
-            'director'     => 'waiting_director',
+            'hrd'             => 'waiting_hrd',
+            'head_pegawai'    => 'waiting_head',
+            'director'        => 'waiting_director',
+            'medical_service' => 'waiting_medical_service',
         ];
 
         // 2. Ambil status yang sesuai, jika role tidak ada di mapping, gunakan array kosong
@@ -83,6 +84,20 @@ class HRDPermissionController extends Controller
             $this->regeneratePdf($permission);
 
             return back()->with('success', 'Disetujui Final oleh Direktur');
+        }
+
+        if ($role === 'medical_service') {
+
+            $permission->update([
+                'status' => 'waiting_hrd',
+                'medical_service_status' => 'approved',
+                'medical_service_signature' => $request->signature,
+                'medical_service_approved_by' => auth()->id(),
+                'medical_service_approved_at' => now(),
+            ]);
+            $this->regeneratePdf($permission);
+
+            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
         }
 
         if ($role === 'hrd') {

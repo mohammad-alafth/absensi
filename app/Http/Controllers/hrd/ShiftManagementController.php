@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\HRD;
 
@@ -94,11 +94,11 @@ class ShiftManagementController extends Controller
         ];
 
         // Ambil semua role dari database (tidak hanya work_type=shift)
-        $dbRoles = User::where('work_type', 'shift')
-    ->whereNotNull('role')
-    ->distinct()
-    ->pluck('role')
-    ->toArray();
+        $dbRoles = User::whereNotNull('role')
+            ->where('role', '!=', '')
+            ->distinct()
+            ->pluck('role')
+            ->toArray();
 
         $roles = array_values(array_unique(array_merge($shiftRoles, $dbRoles)));
 

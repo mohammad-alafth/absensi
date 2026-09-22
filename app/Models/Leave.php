@@ -69,6 +69,16 @@ class Leave extends Model
         'director_approved_by',
         'head_approved_at',
         'director_approved_at',
+
+        /*
+        |--------------------------------------------------------------------------
+        | MEDICAL SERVICE
+        |--------------------------------------------------------------------------
+        */
+        'medical_service_status',
+        'medical_service_signature',
+        'medical_service_approved_by',
+        'medical_service_approved_at',
     ];
 
     /*
@@ -113,5 +123,9 @@ class Leave extends Model
     public function headApprover()
     {
         return $this->belongsTo(User::class, 'head_approved_by');
+    }
+    public function medicalServiceApprover()
+    {
+        return $this->belongsTo(User::class, 'medical_service_approved_by');
     }
 }

@@ -31,6 +31,10 @@ class HRDOvertimeController extends Controller
             $overtimes = Overtime::where('status', 'waiting_director')->get();
         }
 
+        if ($role === 'medical_service') {
+            $overtimes = Overtime::where('status', 'waiting_medical_service')->get();
+        }
+
         return view('hrd.lembur.lembur', compact('overtimes'));
     }
 
@@ -70,6 +74,18 @@ class HRDOvertimeController extends Controller
         }
 
 
+
+        if ($role === 'medical_service') {
+            $overtime->update([
+                'status' => 'waiting_hrd',
+                'medical_service_status' => 'approved',
+                'medical_service_signature' => $request->signature,
+                'medical_service_approved_by' => auth()->id(),
+                'medical_service_approved_at' => now(),
+            ]);
+            $this->regeneratePdf($overtime);
+            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
+        }
 
         if ($role === 'hrd') {
             $overtime->update([

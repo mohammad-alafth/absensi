@@ -49,6 +49,13 @@ class HRDDashboardController extends Controller
             $overtimes->where('status', 'waiting_director');
         }
 
+        if ($role === 'medical_service') {
+
+            $leaves->where('status', 'waiting_medical_service');
+            $permissions->where('status', 'waiting_medical_service');
+            $overtimes->where('status', 'waiting_medical_service');
+        }
+
         /*
     |--------------------------------------------------------------------------
     | COUNTS

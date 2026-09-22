@@ -341,7 +341,7 @@ Route::middleware([
     Route::prefix('hrd')
         ->middleware([
             'auth',
-            'role:hrd,head_pegawai,director'
+            'role:hrd,head_pegawai,director,medical_service'
         ])
         ->name('hrd.')
         ->group(function () {
