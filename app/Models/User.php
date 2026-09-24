@@ -82,13 +82,13 @@ class User extends Authenticatable
             'director' => 'DIREKTUR',
             
             'sekretariat' => 'SEKRETARIAT',
-            
+
             // Divisi & stage approval (struktur baru)
             'medical_service' => 'MEDICAL SERVICE',
-            'ugd' => 'UGD',
-            'pj_ugd' => 'PENANGGUNG JAWAB UGD',
-            'ranap' => 'RAWAT INAP',
-            'pj_ranap' => 'PENANGGUNG JAWAB RAWAT INAP',
+            // 'ugd' => 'UGD',
+            // 'pj_ugd' => 'PENANGGUNG JAWAB UGD',
+            // 'ranap' => 'RAWAT INAP',
+            // 'pj_ranap' => 'PENANGGUNG JAWAB RAWAT INAP',
             'ok' => 'KAMAR OPERASI',
             'pj_ok' => 'PENANGGUNG JAWAB KAMAR OPERASI',
             'pj_pipp' => 'PENANGGUNG JAWAB PIPP',

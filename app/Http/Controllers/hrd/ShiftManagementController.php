@@ -85,8 +85,8 @@ class ShiftManagementController extends Controller
         $shiftRoles = [
             'nurse', 'pj_nurse',
             'nurse_ok', 'pj_nurse_ok',
-            'ugd', 'pj_ugd',
-            'ranap', 'pj_ranap',
+            // 'ugd', 'pj_ugd',
+            // 'ranap', 'pj_ranap',
             'ok', 'pj_ok',
             'ro', 'pj_ro',
             'rm', 'pj_rm',
