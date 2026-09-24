@@ -5,6 +5,7 @@ namespace App\Http\Controllers\HRD;
 use App\Http\Controllers\Controller;
 use App\Models\Leave;
 use App\Models\User;
+use App\Services\ApprovalFlowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,30 +13,28 @@ class HRDLeaveController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | LIST CUTI HRD
+    | LIST CUTI (PUSAT APPROVAL)
     |--------------------------------------------------------------------------
+    | Role approver menyesuaikan stage-nya sendiri:
+    | medical_service, kabag_umum, manager_umum,
+    | kabag_marketing, manager_finance, director
     */
     public function index()
     {
-        $role = auth()->user()->role;
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
 
-        if ($role === 'hrd') {
-            $leaves = Leave::where('status', 'waiting_hrd')->get();
+        if (!$stage) {
+            return back()->with('error', 'Role tidak memiliki akses ke halaman ini.');
         }
 
-        if ($role === 'head_pegawai') {
-            $leaves = Leave::where('status', 'waiting_head')->get();
-        }
+        $leaves = Leave::with('user')
+            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
+            ->latest()
+            ->get();
 
-        if ($role === 'director') {
-            $leaves = Leave::where('status', 'waiting_director')->get();
-        }
+        $stageLabel = ApprovalFlowService::labelForStage($stage);
 
-        if ($role === 'medical_service') {
-            $leaves = Leave::where('status', 'waiting_medical_service')->get();
-        }
-
-        return view('hrd.cuti.cuti', compact('leaves'));
+        return view('hrd.cuti.cuti', compact('leaves', 'stage', 'stageLabel'));
     }
 
     /*
@@ -45,57 +44,35 @@ class HRDLeaveController extends Controller
     */
     public function approve(Request $request, $id)
     {
-        $leave = Leave::findOrFail($id);
+        $request->validate([
+            'signature' => 'nullable|string'
+        ]);
 
-        $role = auth()->user()->role;
+        $leave = Leave::with('user')->findOrFail($id);
 
-        if ($role === 'head_pegawai') {
-            $leave->update([
-                'status' => 'waiting_director',
-                'head_status' => 'approved',
-                'head_signature' => $request->signature, // Menyimpan TTD Head
-                'head_approved_by' => auth()->id(),
-                'head_approved_at' => now(),
-            ]);
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
         }
 
-        if ($role === 'director') {
-            $leave->update([
-                'status' => 'approved',
-                'director_status' => 'approved',
-                'director_signature' => $request->signature, // Menyimpan TTD Direktur
-                'director_approved_by' => auth()->id(),
-                'director_approved_at' => now(),
-            ]);
-            $this->regenerateLeavePdf($leave);
-
-            return back()->with('success', 'Disetujui Final oleh Direktur');
+        if (!in_array($leave->status, ApprovalFlowService::statusesForStage($stage), true)) {
+            return back()->with('error', 'Pengajuan tidak berada pada tahap '
+                . ApprovalFlowService::labelForStage($stage) . '.');
         }
 
-        if ($role === 'medical_service') {
-            $leave->update([
-                'status' => 'waiting_hrd',
-                'medical_service_status' => 'approved',
-                'medical_service_signature' => $request->signature, // Menyimpan TTD Medical Service
-                'medical_service_approved_by' => auth()->id(),
-                'medical_service_approved_at' => now(),
-            ]);
-            $this->regenerateLeavePdf($leave);
+        // Rantai approval mengikuti grup role pengaju
+        $chain = ApprovalFlowService::chainFor($leave->user->role ?? null);
 
-            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
-        }
+        $leave->update(array_merge(
+            ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
+            ApprovalFlowService::stagePayload($stage, 'approved', $request->signature)
+        ));
 
-        if ($role === 'hrd') {
-            $leave->update([
-                'status' => 'approved',
-                'hrd_status' => 'approved',
-                'hrd_approved_by' => auth()->id(),
-                'hrd_approved_at' => now(),
-            ]);
-            $this->regenerateLeavePdf($leave);
-        }
+        $this->regenerateLeavePdf($leave);
 
-        return back()->with('success', 'Disetujui oleh HRD');
+        return back()->with('success', 'Cuti disetujui oleh '
+            . ApprovalFlowService::labelForStage($stage) . '.');
     }
 
     /*
@@ -110,31 +87,31 @@ class HRDLeaveController extends Controller
         ]);
 
         $leave = Leave::findOrFail($id);
-        if ($leave->hrd_status != 'pending') {
+
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');
+        }
+
+        if (!in_array($leave->status, ApprovalFlowService::statusesForStage($stage), true)) {
 
             return back()->with(
                 'error',
-                'Cuti sudah diproses HRD'
+                'Pengajuan sudah diproses atau bukan tahap Anda.'
             );
         }
 
-        $leave->update([
+        $leave->update(array_merge(
+            ['status' => 'rejected'],
+            ApprovalFlowService::stagePayload($stage, 'rejected', null, $request->note)
+        ));
 
-            'hrd_status' => 'rejected',
-
-            'hrd_note' => $request->note,
-
-            'hrd_approved_by' => auth()->id(),
-
-            'hrd_approved_at' => now(),
-
-            'status' => 'rejected'
-        ]);
         $this->regenerateLeavePdf($leave);
 
         return back()->with(
             'success',
-            'Cuti ditolak HRD'
+            'Cuti ditolak oleh ' . ApprovalFlowService::labelForStage($stage) . '.'
         );
     }
     private function regenerateLeavePdf($leave)

@@ -8,28 +8,20 @@ use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\ShiftChangeRequest;
 use App\Models\User;
+use App\Services\ApprovalFlowService;
 
 class PJDashboardController extends Controller
 {
+    /**
+     * Daftar role yang berada dalam tanggung jawab PJ.
+     *
+     * Mapping terpusat di ApprovalFlowService::divisionRoles() sehingga
+     * divisi baru (ugd, ranap, ok, pipp, rm, gizi, admission, accounting, it)
+     * dan alias role lama (nutrition, medical_record, kasir) otomatis ikut.
+     */
     public static function getDivisionRolesForUser($role)
     {
-        if ($role === 'pj_nurse') {
-            // Unit gizi (nutrition) dibawahkan PJ Perawat:
-            // pengajuan gizi disetujui pj_nurse dahulu, lalu diteruskan ke HRD.
-            return ['nurse', 'pj_nurse', 'nutrition'];
-        }
-        if ($role === 'pj_nurse_ok') {
-            return ['nurse_ok', 'pj_nurse_ok'];
-        }
-        if ($role === 'pj_admin') {
-            return ['admin', 'administrasi', 'pj_admin'];
-        }
-        if ($role === 'pj_marketing') {
-            return ['marketing', 'creator', 'konten_creator', 'pj_marketing'];
-        }
-
-        $baseRole = str_starts_with($role, 'pj_') ? str_replace('pj_', '', $role) : $role;
-        return array_unique([$baseRole, 'pj_' . $baseRole]);
+        return ApprovalFlowService::divisionRoles($role);
     }
 
     public function index()

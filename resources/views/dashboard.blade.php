@@ -511,7 +511,7 @@
 
                     @endif
 
-                    @if(in_array(auth()->user()->role, ['hrd', 'head_pegawai', 'director', 'medical_service']))
+                    @if(in_array(auth()->user()->role, ['medical_service', 'medical_service', 'kabag_umum', 'manager_umum', 'kabag_marketing', 'manager_finance', 'director']))
 
                     <a href="{{ route('hrd.dashboard') }}"
                         class="relative 
@@ -534,7 +534,7 @@
 
                     </a>
                     @endif
-                    @if(auth()->user()->role === 'hrd')
+                    @if(in_array(auth()->user()->role, ['hrd', 'director']))
                     <a href="{{ route('hrd.rekap') }}"
                         class="relative bg-gradient-to-r from-slate-500 via-blue-500 to-indigo-600
                         rounded-3xl min-h-[110px]
@@ -643,23 +643,23 @@
 
         
 
-    <script>
-        const isHoliday = @json($isHoliday);
+    // <script>
+    //     const isHoliday = @json($isHoliday);
 
-        if (isHoliday) {
-            window.addEventListener('load', function() {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Hari Libur Nasional',
-                    text: 'Hari ini adalah tanggal merah/hari libur. Anda tidak dapat melakukan absensi.',
-                    confirmButtonColor: '#1E40AF',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false
-                }).then(() => {
-                    // Opsional: Redirect ke halaman lain jika memaksa masuk dashboard
-                    // window.location.href = "/home"; 
-                });
-            });
-        }
-    </script>
+    //     if (isHoliday) {
+    //         window.addEventListener('load', function() {
+    //             Swal.fire({
+    //                 icon: 'info',
+    //                 title: 'Hari Libur Nasional',
+    //                 text: 'Hari ini adalah tanggal merah/hari libur. Anda tidak dapat melakukan absensi.',
+    //                 confirmButtonColor: '#1E40AF',
+    //                 allowOutsideClick: false,
+    //                 allowEscapeKey: false
+    //             }).then(() => {
+    //                 // Opsional: Redirect ke halaman lain jika memaksa masuk dashboard
+    //                 // window.location.href = "/home"; 
+    //             });
+    //         });
+    //     }
+    // </script>
 </x-app-layout>

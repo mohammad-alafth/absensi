@@ -333,7 +333,7 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('hrd')->middleware(['auth', 'verified'])->group(function () {
+    Route::prefix('hrd')->middleware(['auth', 'verified', 'role:hrd,director'])->group(function () {
         Route::get('/users/approval', [HRDUserController::class, 'index'])->name('hrd.users.approval');
         Route::post('/users/{id}/approve', [HRDUserController::class, 'approve'])->name('hrd.users.approve');
         Route::post('/users/{id}/reset-password', [HRDUserController::class, 'resetPassword'])->name('hrd.users.reset-password');
@@ -341,31 +341,20 @@ Route::middleware([
     Route::prefix('hrd')
         ->middleware([
             'auth',
-            'role:hrd,head_pegawai,director,medical_service'
+            'role:medical_service,medical_service,kabag_umum,manager_umum,kabag_marketing,manager_finance,director'
         ])
         ->name('hrd.')
         ->group(function () {
 
             /*
             |--------------------------------------------------------------------------
-            | DASHBOARD
+            | DASHBOARD APPROVAL
             |--------------------------------------------------------------------------
+            | Hanya role approver (stage approval) yang dapat membuka halaman ini.
+            | Setiap approver hanya melihat pengajuan pada tahapnya sendiri.
             */
-            Route::get('/export-excel', [HRDController::class, 'exportExcel'])->name('export.excel');
-
             Route::get('/dashboard', [HRDDashboardController::class, 'index'])
                 ->name('dashboard');
-
-            /*
-            |--------------------------------------------------------------------------
-            | REKAP 
-            |--------------------------------------------------------------------------
-            */
-
-            Route::get('/rekap', [
-                HRDController::class,
-                'index'
-            ])->name('rekap');
 
             /*
             |--------------------------------------------------------------------------
@@ -387,15 +376,12 @@ Route::middleware([
                 HRDLeaveController::class,
                 'reject'
             ])->name('cuti.reject');
-            Route::post('/update-leave-quota/{user}', [HRDController::class, 'updateLeaveQuota'])
-                ->name('update.leave.quota');
 
             /*
             |--------------------------------------------------------------------------
             | IZIN
             |--------------------------------------------------------------------------
             */
-            Route::get('/rekap', [HRDController::class, 'index'])->name('rekap');
             Route::get('/izin', [
                 HRDPermissionController::class,
                 'index'
@@ -432,6 +418,31 @@ Route::middleware([
                 'reject'
             ])->name('lembur.reject');
 
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | HRD ADMIN AREA (LAPORAN REKAP & ADMINISTRASI KEPEGAWAIAN)
+    |--------------------------------------------------------------------------
+    | Semua laporan rekap HRD hanya dapat diakses oleh HRD dan Direktur.
+    */
+    Route::prefix('hrd')
+        ->middleware([
+            'auth',
+            'role:hrd,director'
+        ])
+        ->name('hrd.')
+        ->group(function () {
+
+            /*
+            |--------------------------------------------------------------------------
+            | REKAP & LAPORAN
+            |--------------------------------------------------------------------------
+            */
+            Route::get('/rekap', [HRDController::class, 'index'])->name('rekap');
+            Route::get('/export-excel', [HRDController::class, 'exportExcel'])->name('export.excel');
+            Route::get('/tracking', [HRDController::class, 'tracking'])->name('tracking');
+
             Route::prefix('reports')->name('reports.')->group(function () {
                 Route::get('/attendance/daily', [HRDController::class, 'reportAttendanceDaily'])->name('attendance.daily');
                 Route::get('/absent/daily', [HRDController::class, 'reportAbsentDaily'])->name('absent.daily');
@@ -442,28 +453,39 @@ Route::middleware([
                 Route::get('/export', [HRDController::class, 'exportReport'])->name('export');
             });
 
-            Route::get('/tracking', [HRDController::class, 'tracking'])->name('tracking');
+            /*
+            |--------------------------------------------------------------------------
+            | ADMINISTRASI KEPEGAWAIAN
+            |--------------------------------------------------------------------------
+            */
+            Route::post('/update-leave-quota/{user}', [HRDController::class, 'updateLeaveQuota'])
+                ->name('update.leave.quota');
         });
 
-    Route::get(
-        '/hrd/calendar/export',
-        [HRDController::class, 'exportCalendar']
-    )->name('hrd.calendar.export');
+    Route::middleware(['auth', 'role:hrd,director'])->group(function () {
 
-    Route::get(
-        '/hrd/calendar/export-user/{user}',
-        [HRDController::class, 'exportCalendarUser']
-    )->name('hrd.calendar.export.user');
-    Route::get('/hrd/calendar/export-all', [HRDController::class, 'exportCalendarAll']);
-    /*
+        Route::get(
+            '/hrd/calendar/export',
+            [HRDController::class, 'exportCalendar']
+        )->name('hrd.calendar.export');
+
+        Route::get(
+            '/hrd/calendar/export-user/{user}',
+            [HRDController::class, 'exportCalendarUser']
+        )->name('hrd.calendar.export.user');
+
+        Route::get('/hrd/calendar/export-all', [HRDController::class, 'exportCalendarAll']);
+
+        /*
         |--------------------------------------------------------------------------
         | SHIFT
         |--------------------------------------------------------------------------
-    */
-    Route::get(
-        '/hrd/employee-shifts/{user}',
-        [HRDController::class, 'employeeShifts']
-    )->name('hrd.employee.shifts');
+        */
+        Route::get(
+            '/hrd/employee-shifts/{user}',
+            [HRDController::class, 'employeeShifts']
+        )->name('hrd.employee.shifts');
+    });
     Route::middleware(['auth'])->group(function () {
         // Rute Shift Umum (Bisa diakses user)
         Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
@@ -473,8 +495,8 @@ Route::middleware([
         Route::get('/shift/weekly-schedules',[ShiftController::class, 'weeklySchedules'])->name('shift.weekly-schedules');
         Route::get('/shifts/calendar-events', [ShiftController::class, 'calendarEvents'])->name('shift.calendar');
 
-        // Rute Shift Management (Khusus HRD)
-        Route::prefix('hrd')->name('hrd.')->group(function () {
+        // Rute Shift Management (Khusus HRD & Direktur)
+        Route::prefix('hrd')->name('hrd.')->middleware('role:hrd,director')->group(function () {
             Route::get('/shifts', [ShiftManagementController::class, 'index'])->name('shifts.index');
             // Ubah POST menjadi PUT agar sinkron dengan @method('PUT') di Blade
             Route::put('/shifts/update/{id}', [ShiftManagementController::class, 'update'])->name('shifts.update');
@@ -484,7 +506,7 @@ Route::middleware([
         Route::get(
             '/hrd/calendar-employee/{user}',
             [HrdController::class, 'calendarEmployee']
-        );
+        )->middleware('role:hrd,director');
     });
 });
 

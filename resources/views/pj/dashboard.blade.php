@@ -166,8 +166,16 @@
                                     <span class="bg-purple-50 text-purple-700 border border-purple-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting Direktur</span>
 
                                     @elseif($item->status == 'waiting_medical_service')
-                                    <span class="bg-cyan-50 text-cyan-700 border border-cyan-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Medical Service</span>
+                                    <span class="bg-cyan-50 text-cyan-700 border border-cyan-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting YANMED</span>
 
+                                    @elseif($item->status == 'waiting_kabag_umum')
+                                                                        <span class="bg-sky-50 text-sky-700 border border-sky-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting Kabag Umum</span>
+                                    @elseif($item->status == 'waiting_manager_umum')
+                                                                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting Manager Umum</span>
+                                    @elseif($item->status == 'waiting_kabag_marketing')
+                                                                        <span class="bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting Kabag Marketing</span>
+                                    @elseif($item->status == 'waiting_manager_finance')
+                                                                        <span class="bg-teal-50 text-teal-700 border border-teal-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Waiting Manager Finance</span>
                                     @elseif($item->status == 'approved')
                                     <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-xl text-[11px] font-bold">Approved</span>
 

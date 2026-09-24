@@ -69,11 +69,11 @@
                                 <td class="p-4 text-gray-600 italic">{{ $item->reason ?? $item->alasan ?? 'Tidak ada keterangan' }}</td>
 
                                 <td class="p-4">
-                                    @if($item->status == 'waiting_hrd')
-                                    {{-- Link ke route sesuai tipe laporan yang aktif --}}
+                                    @if(str_starts_with((string) $item->status, 'waiting_'))
+                                    {{-- Link ke halaman approval sesuai tipe laporan yang aktif --}}
                                     <a href="{{ route('hrd.' . ($reportType == 'leave' ? 'cuti' : ($reportType == 'permission' ? 'izin' : 'lembur')), ['id' => $item->id]) }}"
                                         class="inline-block bg-blue-600 text-white px-4 py-1.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm">
-                                        Proses HRD
+                                        Proses Approval
                                     </a>
                                     @else
                                     <span class="inline-block px-3 py-1 rounded-xl font-bold text-[10px] uppercase tracking-wide

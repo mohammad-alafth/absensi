@@ -50,7 +50,7 @@ class AttendanceController extends Controller
         | GRACE PERIOD
         |--------------------------------------------------------------------------
         */
-        $graceMinutes = $schedule['grace_minutes'] ?? 15;
+        $graceMinutes = $schedule['grace_minutes'] ?? 5;
         $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
 
         /*

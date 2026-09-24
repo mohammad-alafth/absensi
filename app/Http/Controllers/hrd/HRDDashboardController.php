@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\Overtime;
+use App\Services\ApprovalFlowService;
 
 class HRDDashboardController extends Controller
 {
@@ -24,36 +25,30 @@ class HRDDashboardController extends Controller
 
         /*
     |--------------------------------------------------------------------------
-    | FILTER BERDASARKAN ROLE
+    | FILTER BERDASARKAN STAGE APPROVER
     |--------------------------------------------------------------------------
+    | Setiap role approver hanya melihat pengajuan yang berada pada tahapnya:
+    | medical_service (+alias lama medical_service), kabag_umum, manager_umum,
+    | kabag_marketing, manager_finance, director.
+    | Status lama (mis. waiting_medical_service) ikut dicocokkan agar
+    | data lama tetap muncul di antrean.
     */
+        $stage = ApprovalFlowService::stageForApproverRole($role);
+        $stageLabel = $stage ? ApprovalFlowService::labelForStage($stage) : null;
 
-        if ($role === 'hrd') {
+        if ($stage) {
 
-            $leaves->where('status', 'waiting_hrd');
-            $permissions->where('status', 'waiting_hrd');
-            $overtimes->where('status', 'waiting_hrd');
-        }
+            $targetStatuses = ApprovalFlowService::statusesForStage($stage);
 
-        if ($role === 'head_pegawai') {
+            $leaves->whereIn('status', $targetStatuses);
+            $permissions->whereIn('status', $targetStatuses);
+            $overtimes->whereIn('status', $targetStatuses);
+        } else {
 
-            $leaves->where('status', 'waiting_head');
-            $permissions->where('status', 'waiting_head');
-            $overtimes->where('status', 'waiting_head');
-        }
-
-        if ($role === 'director') {
-
-            $leaves->where('status', 'waiting_director');
-            $permissions->where('status', 'waiting_director');
-            $overtimes->where('status', 'waiting_director');
-        }
-
-        if ($role === 'medical_service') {
-
-            $leaves->where('status', 'waiting_medical_service');
-            $permissions->where('status', 'waiting_medical_service');
-            $overtimes->where('status', 'waiting_medical_service');
+            // Role tanpa tahap approval (mis. HRD): tidak ada data pengajuan
+            $leaves->whereRaw('1 = 0');
+            $permissions->whereRaw('1 = 0');
+            $overtimes->whereRaw('1 = 0');
         }
 
         /*
@@ -95,7 +90,9 @@ class HRDDashboardController extends Controller
             'pendingLeave',
             'pendingPermission',
             'pendingOvertime',
-            'recentSubmissions'
+            'recentSubmissions',
+            'stage',
+            'stageLabel'
         ));
     }
 }

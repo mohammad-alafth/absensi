@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HRD;
 
 use App\Http\Controllers\Controller;
 use App\Models\Overtime;
+use App\Services\ApprovalFlowService;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Storage;
@@ -17,25 +18,22 @@ class HRDOvertimeController extends Controller
     */
     public function index()
     {
-        $role = auth()->user()->role;
+        // Stage approver ditentukan terpusat di ApprovalFlowService.
+        // Mencakup status baru + status lama agar data lama tetap muncul.
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
 
-        if ($role === 'hrd') {
-            $overtimes = Overtime::where('status', 'waiting_hrd')->get();
+        if (!$stage) {
+            return back()->with('error', 'Role tidak memiliki akses ke halaman ini.');
         }
 
-        if ($role === 'head_pegawai') {
-            $overtimes = Overtime::where('status', 'waiting_head')->get();
-        }
+        $overtimes = Overtime::with('user')
+            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
+            ->latest()
+            ->get();
 
-        if ($role === 'director') {
-            $overtimes = Overtime::where('status', 'waiting_director')->get();
-        }
+        $stageLabel = ApprovalFlowService::labelForStage($stage);
 
-        if ($role === 'medical_service') {
-            $overtimes = Overtime::where('status', 'waiting_medical_service')->get();
-        }
-
-        return view('hrd.lembur.lembur', compact('overtimes'));
+        return view('hrd.lembur.lembur', compact('overtimes', 'stage', 'stageLabel'));
     }
 
     /*
@@ -45,58 +43,33 @@ class HRDOvertimeController extends Controller
     */
     public function approve(Request $request, $id)
     {
-        $request->validate(['signature' => 'required']);
-        $overtime = Overtime::findOrFail($id);
-        $role = auth()->user()->role;
+        $request->validate(['signature' => 'nullable|string']);
 
-        if ($role === 'head_pegawai') {
-            $overtime->update([
-                'status' => 'waiting_director',
-                'head_status' => 'approved',
-                'head_signature' => $request->signature,
-                'head_approved_by' => auth()->id(),
-                'head_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($overtime);
-            return back()->with('success', 'Disetujui Head, diteruskan ke Direktur');
+        $overtime = Overtime::with('user')->findOrFail($id);
+
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
         }
 
-        if ($role === 'director') {
-            $overtime->update([
-                'status' => 'approved',
-                'director_status' => 'approved',
-                'director_signature' => $request->signature,
-                'director_approved_by' => auth()->id(),
-                'director_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($overtime);
-            return back()->with('success', 'Disetujui sesuai alur');
+        if (!in_array($overtime->status, ApprovalFlowService::statusesForStage($stage), true)) {
+            return back()->with('error', 'Pengajuan tidak berada pada tahap '
+                . ApprovalFlowService::labelForStage($stage) . '.');
         }
 
+        // Rantai approval mengikuti grup role pengaju
+        $chain = ApprovalFlowService::chainFor($overtime->user->role ?? null);
 
+        $overtime->update(array_merge(
+            ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
+            ApprovalFlowService::stagePayload($stage, 'approved', $request->signature)
+        ));
 
-        if ($role === 'medical_service') {
-            $overtime->update([
-                'status' => 'waiting_hrd',
-                'medical_service_status' => 'approved',
-                'medical_service_signature' => $request->signature,
-                'medical_service_approved_by' => auth()->id(),
-                'medical_service_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($overtime);
-            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
-        }
+        $this->regeneratePdf($overtime);
 
-        if ($role === 'hrd') {
-            $overtime->update([
-                'status' => 'approved',
-                'hrd_status' => 'approved',
-            ]);
-
-            $this->regeneratePdf($overtime);
-        }
-
-        return back()->with('success', 'Disetujui oleh HRD');
+        return back()->with('success', 'Lembur disetujui oleh '
+            . ApprovalFlowService::labelForStage($stage) . '.');
     }
 
     private function regeneratePdf($overtime)
@@ -140,24 +113,26 @@ class HRDOvertimeController extends Controller
 
         $overtime = Overtime::findOrFail($id);
 
-        $overtime->update([
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
 
-            'status' => 'rejected',
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');
+        }
 
-            'hrd_status' => 'rejected',
+        if (!in_array($overtime->status, ApprovalFlowService::statusesForStage($stage), true)) {
+            return back()->with('error', 'Pengajuan sudah diproses atau bukan tahap Anda.');
+        }
 
-            'hrd_note' => $request->note,
-
-            'hrd_approved_by' => auth()->id(),
-
-            'hrd_approved_at' => now(),
-        ]);
+        $overtime->update(array_merge(
+            ['status' => 'rejected'],
+            ApprovalFlowService::stagePayload($stage, 'rejected', null, $request->note)
+        ));
 
         $this->regeneratePdf($overtime);
 
         return back()->with(
             'success',
-            'Lembur ditolak HRD'
+            'Lembur ditolak oleh ' . ApprovalFlowService::labelForStage($stage) . '.'
         );
     }
 }

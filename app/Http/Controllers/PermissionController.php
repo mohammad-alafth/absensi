@@ -131,7 +131,8 @@ class PermissionController extends Controller
             'pj_status' => $pjStatus,
             // 'employee_signature' => $request->employee_signature,
             'hrd_status' => $hrdStatus,
-        ]);
+            // $flow membawa seluruh kolom status stage approval
+        ] + $flow);
 
         /*
         |--------------------------------------------------------------------------

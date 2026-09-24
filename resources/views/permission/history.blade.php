@@ -75,7 +75,15 @@
                                 @elseif($item->status == 'waiting_director')
                                 <span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Direktur</span>
                                 @elseif($item->status == 'waiting_medical_service')
-                                <span class="bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">PJS Medis</span>
+                                <span class="bg-cyan-100 text-cyan-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting YANMED</span>
+                                @elseif($item->status == 'waiting_kabag_umum')
+                                                                <span class="bg-sky-100 text-sky-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting Kabag Umum</span>
+                                @elseif($item->status == 'waiting_manager_umum')
+                                                                <span class="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting Manager Umum</span>
+                                @elseif($item->status == 'waiting_kabag_marketing')
+                                                                <span class="bg-fuchsia-100 text-fuchsia-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting Kabag Marketing</span>
+                                @elseif($item->status == 'waiting_manager_finance')
+                                                                <span class="bg-teal-100 text-teal-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Waiting Manager Finance</span>
                                 @elseif($item->status == 'approved')
                                 <span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap">Approved</span>
                                 @elseif($item->status == 'rejected')

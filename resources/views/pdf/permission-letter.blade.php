@@ -132,6 +132,36 @@
             </td>
             @endif
 
+            @php
+            // Surat izin grup YANMED membutuhkan TTD YANMED (penunjang medis).
+            $needsYanmed = in_array(
+                'medical_service',
+                \App\Services\ApprovalFlowService::chainFor($permission->user->role ?? null),
+                true
+            ) || $permission->yanmed_approved_by || $permission->medical_service_approved_by;
+
+            if ($needsYanmed) {
+            $ys = $permission->yanmed_status;
+            $ms = $permission->medical_service_status;
+            $yanmedStatus = ($ys && $ys !== 'pending')
+            ? $ys
+            : (($ms && $ms !== 'pending') ? $ms : ($ys ?: 'pending'));
+            $yanmedSig = $permission->yanmed_signature ?: $permission->medical_service_signature;
+            $yanmedApprover = $permission->yanmedApprover ?: $permission->medicalServiceApprover;
+            }
+            @endphp
+
+            @if($needsYanmed)
+            <td class="signature-box">
+                YANMED<br><br>
+                <div style="font-size: 8pt; font-style: italic;">[{{ strtoupper($yanmedStatus) }}]</div>
+                @if($yanmedSig)
+                <img src="{{ (strpos($yanmedSig, 'data:image') === 0) ? $yanmedSig : public_path('storage/'.$yanmedSig) }}" class="signature">
+                @else <br><br><br> @endif
+                <div style="text-decoration: underline;">{{ $yanmedApprover->name ?? '-' }}</div>
+            </td>
+            @endif
+
             @if($permission->head_approved_by)
             <td class="signature-box">
                 Kepala Bagian<br><br>

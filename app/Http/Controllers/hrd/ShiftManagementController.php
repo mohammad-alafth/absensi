@@ -85,12 +85,22 @@ class ShiftManagementController extends Controller
         $shiftRoles = [
             'nurse', 'pj_nurse',
             'nurse_ok', 'pj_nurse_ok',
+            'ugd', 'pj_ugd',
+            'ranap', 'pj_ranap',
+            'ok', 'pj_ok',
             'ro', 'pj_ro',
-            'security', 'pj_security',
+            'rm', 'pj_rm',
+            'gizi', 'pj_gizi',
+            'pipp', 'pj_pipp',
             'pharmacist', 'pj_pharmacist',
+            'security', 'pj_security',
+            'cs', 'pj_cs',
+            'it', 'pj_it',
+            'ipsrs', 'pj_ipsrs',
+            'admission', 'pj_admission',
+            'accounting', 'pj_accounting',
             'finance', 'pj_finance',
             'administrasi', 'pj_administrasi',
-            'cs', 'pj_cs',
         ];
 
         // Ambil semua role dari database (tidak hanya work_type=shift)

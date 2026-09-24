@@ -165,7 +165,10 @@ class LeaveController extends Controller
             'pj_status' => $pjStatus,
 
             'hrd_status' => $hrdStatus,
-        ]);
+            // $flow membawa seluruh kolom status stage (medical_service,
+            // kabag_umum, manager_umum, kabag_marketing, manager_finance,
+            // director) sehingga semua tahap terinisialisasi 'pending'.
+        ] + $flow);
         /*
     |--------------------------------------------------------------------------
     | GENERATE PDF

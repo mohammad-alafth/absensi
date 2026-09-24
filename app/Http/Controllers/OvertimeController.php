@@ -78,10 +78,8 @@ class OvertimeController extends Controller
             'total_hours' => $hoursDecimal, // Menyimpan nilai jam dalam bentuk pecahan desimal murni
             'employee_signature' => $request->employee_signature,
             'reason' => $request->reason,
-            'status' => $flow['status'],
-            'pj_status' => $flow['pj_status'],
-            'hrd_status' => $flow['hrd_status'],
-        ]);
+            // $flow membawa status global + seluruh kolom status stage approval
+        ] + $flow);
 
         /*
         |--------------------------------------------------------------------------

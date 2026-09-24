@@ -70,7 +70,7 @@ class ScheduleService
                 'start_time' => '08:00:00',
                 'end_time'   => '17:00:00',
 
-                'grace_minutes' => 15,
+                'grace_minutes' => 5,
                 'is_overnight' => false,
 
                 'shift_start' => $shiftStart,
@@ -230,7 +230,7 @@ class ScheduleService
                 'start_time' => '08:00:00',
                 'end_time'   => $endTime,
 
-                'grace_minutes' => 15,
+                'grace_minutes' => 5,
                 'is_overnight' => false,
 
                 'shift_start' => $shiftStart,

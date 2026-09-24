@@ -37,15 +37,13 @@ class PJLeaveController extends Controller
             return back()->with('error', 'Cuti sudah diproses PJ');
         }
 
-        $flow = ApprovalFlowService::handle($leave->user->role);
-
         $leave->update([
             'pj_status' => 'approved',
             'pj_signature' => $request->signature,
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
-            'status' => 'waiting_hrd',
-            'hrd_status' => $flow['hrd_status'],
+            // Tahap PJ selesai -> masuk stage approver pertama sesuai grup role
+            'status' => ApprovalFlowService::statusAfterPj($leave->user->role),
         ]);
 
         $this->regenerateLeavePdf($leave);

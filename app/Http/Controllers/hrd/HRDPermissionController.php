@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HRD;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use App\Services\ApprovalFlowService;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Storage;
@@ -12,31 +13,22 @@ class HRDPermissionController extends Controller
 {
     public function index()
     {
-        $role = auth()->user()->role;
+        // Stage approver ditentukan terpusat di ApprovalFlowService.
+        // Mencakup status baru + status lama agar data lama tetap muncul.
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
 
-        // 1. Definisikan mapping status yang dicari berdasarkan role
-        // Ini menggantikan banyak 'if'
-        $statusMapping = [
-            'hrd'             => 'waiting_hrd',
-            'head_pegawai'    => 'waiting_head',
-            'director'        => 'waiting_director',
-            'medical_service' => 'waiting_medical_service',
-        ];
-
-        // 2. Ambil status yang sesuai, jika role tidak ada di mapping, gunakan array kosong
-        $targetStatus = $statusMapping[$role] ?? null;
-
-        if (!$targetStatus) {
+        if (!$stage) {
             return back()->with('error', 'Role tidak memiliki akses ke halaman ini.');
         }
 
-        // 3. Query dinamis
         $permissions = Permission::with('user')
-            ->where('status', $targetStatus)
+            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
             ->latest()
             ->get();
 
-        return view('hrd.permission.izin', compact('permissions'));
+        $stageLabel = ApprovalFlowService::labelForStage($stage);
+
+        return view('hrd.permission.izin', compact('permissions', 'stage', 'stageLabel'));
     }
 
 
@@ -48,74 +40,38 @@ class HRDPermissionController extends Controller
     public function approve(Request $request, $id)
     {
         $request->validate([
-            'signature' => 'required'
+            'signature' => 'nullable|string'
         ]);
 
-        $permission = Permission::findOrFail($id);
-        $role = auth()->user()->role;
+        $permission = Permission::with('user')->findOrFail($id);
+
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
+        }
+
+        if (!in_array($permission->status, ApprovalFlowService::statusesForStage($stage), true)) {
+            return back()->with('error', 'Pengajuan tidak berada pada tahap '
+                . ApprovalFlowService::labelForStage($stage) . '.');
+        }
 
         /*
     |--------------------------------------------------------------------------
-    | FLOW BERJENJANG
+    | FLOW BERJENJANG (rantai mengikuti grup role pengaju)
     |--------------------------------------------------------------------------
     */
+        $chain = ApprovalFlowService::chainFor($permission->user->role ?? null);
 
-        if ($role === 'head_pegawai') {
+        $permission->update(array_merge(
+            ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
+            ApprovalFlowService::stagePayload($stage, 'approved', $request->signature)
+        ));
 
-            $permission->update([
-                'status' => 'waiting_director',
-                'head_status' => 'approved',
-                'head_signature' => $request->signature,
-                'head_approved_by' => auth()->id(),
-                'head_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($permission);
-            return back()->with('success', 'Diteruskan ke Direktur');
-        }
+        $this->regeneratePdf($permission);
 
-        if ($role === 'director') {
-            $permission->update([
-                'status' => 'approved',
-                'director_status' => 'approved',
-                'director_signature' => $request->signature,
-                'director_approved_by' => auth()->id(),
-                'director_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($permission);
-
-            return back()->with('success', 'Disetujui Final oleh Direktur');
-        }
-
-        if ($role === 'medical_service') {
-
-            $permission->update([
-                'status' => 'waiting_hrd',
-                'medical_service_status' => 'approved',
-                'medical_service_signature' => $request->signature,
-                'medical_service_approved_by' => auth()->id(),
-                'medical_service_approved_at' => now(),
-            ]);
-            $this->regeneratePdf($permission);
-
-            return back()->with('success', 'Disetujui Medical Service, diteruskan ke HRD');
-        }
-
-        if ($role === 'hrd') {
-
-            $permission->update([
-                'status' => 'approved',
-                'hrd_status' => 'approved',
-                'hrd_signature' => $request->signature,
-                'hrd_approved_by' => auth()->id(),
-                'hrd_approved_at' => now(),
-            ]);
-
-            $this->regeneratePdf($permission);
-
-            return back()->with('success', 'Final Approved oleh HRD');
-        }
-
-        return back()->with('error', 'Unauthorized');
+        return back()->with('success', 'Izin disetujui oleh '
+            . ApprovalFlowService::labelForStage($stage) . '.');
     }
 
 
@@ -132,24 +88,26 @@ class HRDPermissionController extends Controller
 
         $permission = Permission::findOrFail($id);
 
-        $permission->update([
+        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
 
-            'status' => 'rejected',
+        if (!$stage) {
+            return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');
+        }
 
-            'hrd_status' => 'rejected',
+        if (!in_array($permission->status, ApprovalFlowService::statusesForStage($stage), true)) {
+            return back()->with('error', 'Pengajuan sudah diproses atau bukan tahap Anda.');
+        }
 
-            'hrd_note' => $request->note,
-
-            'hrd_approved_by' => auth()->id(),
-
-            'hrd_approved_at' => now(),
-        ]);
+        $permission->update(array_merge(
+            ['status' => 'rejected'],
+            ApprovalFlowService::stagePayload($stage, 'rejected', null, $request->note)
+        ));
 
         $this->regeneratePdf($permission);
 
         return back()->with(
             'success',
-            'Izin ditolak HRD'
+            'Izin ditolak oleh ' . ApprovalFlowService::labelForStage($stage) . '.'
         );
     }
 

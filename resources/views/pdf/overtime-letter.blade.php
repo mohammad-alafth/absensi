@@ -380,8 +380,25 @@
                         <tr>
                             <td>
                                 @php
-                                // Menentukan siapa yang tampil berdasarkan hirarki approval
-                                if ($overtime->director_approved_by) {
+                                // Surat grup YANMED: approver final adalah YANMED
+                                // (fallback kolom lama medical_service_* untuk data lama).
+                                $needsYanmed = in_array(
+                                    'medical_service',
+                                    \App\Services\ApprovalFlowService::chainFor($overtime->user->role ?? null),
+                                    true
+                                );
+
+                                if ($needsYanmed) {
+                                $jabatan = 'YANMED (Penunjang Medis)';
+                                $ys = $overtime->yanmed_status;
+                                $ms = $overtime->medical_service_status;
+                                $status = ($ys && $ys !== 'pending')
+                                ? $ys
+                                : (($ms && $ms !== 'pending') ? $ms : ($ys ?: 'pending'));
+                                $sig = $overtime->yanmed_signature ?: $overtime->medical_service_signature;
+                                $approver = $overtime->yanmedApprover ?: $overtime->medicalServiceApprover;
+                                $nama = $approver->name ?? '-';
+                                } elseif ($overtime->director_approved_by) {
                                 $jabatan = 'Direktur';
                                 $nama = $overtime->directorApprover->name ?? '-';
                                 $sig = $overtime->director_signature;
@@ -410,6 +427,19 @@
 
                                 <div class="name-output">{{ $nama }}</div>
                                 <div style="font-size: 8pt; color:#444;">{{ $jabatan }}</div>
+
+                                {{-- Kompatibilitas data lama: surat YANMED era lama juga ditandatangani HRD --}}
+                                @if($needsYanmed && $overtime->hrd_approved_by)
+                                <div style="font-size: 9pt; margin-top: 4px;">HRD</div>
+                                <div class="status-badge">[{{ strtoupper($overtime->hrd_status ?? 'APPROVED') }}]</div>
+                                <div class="sig-space-wrapper">
+                                    @if($overtime->hrd_signature)
+                                    <img src="{{ (strpos($overtime->hrd_signature, 'data:image') === 0) ? $overtime->hrd_signature : public_path('storage/'.$overtime->hrd_signature) }}" class="sig-image">
+                                    @endif
+                                </div>
+                                <div class="name-output">{{ $overtime->hrdApprover->name ?? '-' }}</div>
+                                <div style="font-size: 8pt; color:#444;">HRD</div>
+                                @endif
                             </td>
                         </tr>
                     </table>

@@ -36,7 +36,7 @@ class ScheduleService
                 'start_time' => '08:00:00',
                 'end_time'   => '17:00:00',
 
-                'grace_minutes' => 15,
+                'grace_minutes' => 5,
                 'is_overnight' => false,
 
                 'shift_start' => $shiftStart,
@@ -89,7 +89,7 @@ class ScheduleService
                         'shift_name' => optional($yesterdayShift->shift)->name ?? 'Shift',
                         'start_time' => $yesterdayShift->start_time,
                         'end_time'   => $yesterdayShift->end_time,
-                        'grace_minutes' => 15,
+                        'grace_minutes' => 5,
                         'is_overnight' => true,
                         'shift_start' => $shiftStart,
                         'shift_end'   => $shiftEnd,
@@ -140,7 +140,7 @@ class ScheduleService
                 'start_time' => $employeeShift->start_time,
                 'end_time'   => $employeeShift->end_time,
 
-                'grace_minutes' => 15,
+                'grace_minutes' => 5,
                 'is_overnight' => $employeeShift->is_overnight,
 
                 'shift_start' => $shiftStart,
@@ -176,7 +176,7 @@ class ScheduleService
                 'start_time' => '08:00:00',
                 'end_time'   => '16:00:00',
 
-                'grace_minutes' => 15,
+                'grace_minutes' => 5,
                 'is_overnight' => false,
 
                 'shift_start' => $shiftStart,

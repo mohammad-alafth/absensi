@@ -51,11 +51,42 @@ class Permission extends Model
         'head_approved_at',
         'director_approved_at',
 
-        // MEDICAL SERVICE
+        // APPROVAL STAGE (konvensi: nama stage == prefix kolom)
+        'yanmed_status',
+        'yanmed_signature',
+        'yanmed_note',
+        'yanmed_approved_by',
+        'yanmed_approved_at',
+
         'medical_service_status',
         'medical_service_signature',
+        'medical_service_note',
         'medical_service_approved_by',
         'medical_service_approved_at',
+
+        'kabag_umum_status',
+        'kabag_umum_signature',
+        'kabag_umum_note',
+        'kabag_umum_approved_by',
+        'kabag_umum_approved_at',
+
+        'manager_umum_status',
+        'manager_umum_signature',
+        'manager_umum_note',
+        'manager_umum_approved_by',
+        'manager_umum_approved_at',
+
+        'kabag_marketing_status',
+        'kabag_marketing_signature',
+        'kabag_marketing_note',
+        'kabag_marketing_approved_by',
+        'kabag_marketing_approved_at',
+
+        'manager_finance_status',
+        'manager_finance_signature',
+        'manager_finance_note',
+        'manager_finance_approved_by',
+        'manager_finance_approved_at',
     ];
 
     public function user()
@@ -87,5 +118,30 @@ class Permission extends Model
     public function medicalServiceApprover()
     {
         return $this->belongsTo(User::class, 'medical_service_approved_by');
+    }
+
+    public function yanmedApprover()
+    {
+        return $this->belongsTo(User::class, 'yanmed_approved_by');
+    }
+
+    public function kabagUmumApprover()
+    {
+        return $this->belongsTo(User::class, 'kabag_umum_approved_by');
+    }
+
+    public function managerUmumApprover()
+    {
+        return $this->belongsTo(User::class, 'manager_umum_approved_by');
+    }
+
+    public function kabagMarketingApprover()
+    {
+        return $this->belongsTo(User::class, 'kabag_marketing_approved_by');
+    }
+
+    public function managerFinanceApprover()
+    {
+        return $this->belongsTo(User::class, 'manager_finance_approved_by');
     }
 }

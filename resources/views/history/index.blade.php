@@ -79,7 +79,15 @@
                                         @elseif($leave->status == 'waiting_director')
                                         <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">PJS Direktur</span>
                                         @elseif($leave->status == 'waiting_medical_service')
-                                        <span class="bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">PJS Medis</span>
+                                        <span class="bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Waiting YANMED</span>
+                                        @elseif($leave->status == 'waiting_kabag_umum')
+                                        <span class="bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Waiting Kabag Umum</span>
+                                        @elseif($leave->status == 'waiting_manager_umum')
+                                        <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Waiting Manager Umum</span>
+                                        @elseif($leave->status == 'waiting_kabag_marketing')
+                                        <span class="bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Waiting Kabag Marketing</span>
+                                        @elseif($leave->status == 'waiting_manager_finance')
+                                        <span class="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Waiting Manager Finance</span>
                                         @else
                                         <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase whitespace-nowrap">Pending</span>
                                         @endif
