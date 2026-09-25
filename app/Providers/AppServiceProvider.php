@@ -21,7 +21,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         View::composer('dashboard', function ($view) {
-            $view->with('pendingUsers', User::where('is_approved', false)->get());
+            // Hanya kolom yang dipakai view (badge jumlah akun menunggu approval).
+            $view->with('pendingUsers', User::where('is_approved', false)->select('id', 'name')->get());
         });
     }
 }

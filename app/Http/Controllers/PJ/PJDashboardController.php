@@ -48,7 +48,8 @@ class PJDashboardController extends Controller
 
         $recentSubmissions = collect();
 
-        $leaves = Leave::with('user')->whereIn('user_id', $userIds)->latest()->take(5)->get();
+        // Hanya kolom yang dipakai view (nama user) agar tidak menarik data berat.
+        $leaves = Leave::with('user:id,name')->whereIn('user_id', $userIds)->latest()->take(5)->get();
         foreach ($leaves as $l) {
             $recentSubmissions->push((object)[
                 'user' => $l->user ?? (object)['name' => 'N/A'],

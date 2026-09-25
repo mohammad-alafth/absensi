@@ -1076,7 +1076,12 @@ class HRDController extends Controller
     public function reportAttendanceDaily(Request $request)
     {
         $date = $request->date ?? Carbon::today()->format('Y-m-d');
-        $data = Attendance::whereDate('tanggal', $date)->with('user')->get();
+        // `where` (bukan `whereDate`) agar index (tanggal, status) terpakai,
+        // dan hanya kolom yang ditampilkan template yang diambil.
+        $data = Attendance::where('tanggal', $date)
+            ->select('id', 'user_id', 'tanggal', 'jam_masuk', 'jam_keluar', 'status', 'late_minutes', 'overtime_minutes')
+            ->with('user:id,name')
+            ->get();
 
         // Simpan filter untuk digunakan di tombol export
         return view('hrd.reports.template', [
@@ -1094,33 +1099,59 @@ class HRDController extends Controller
         $start = Carbon::parse($startDate)->startOfDay();
         $end   = Carbon::parse($endDate)->endOfDay();
 
-        $employees = User::whereNotIn('role', ['admin'])->get();
+        // Hanya kolom yang diperlukan + tanpa kolom signature (base64) agar hemat memori.
+        $employees = User::whereNotIn('role', ['admin'])
+            ->select('id', 'name', 'work_type')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | AMBIL DATA PERIODE SEKALI SAJA (mengganti query per pegawai / N+1)
+        |--------------------------------------------------------------------------
+        | Hasil akhir identik dengan sebelumnya, hanya jumlah query berkurang
+        | dari 3-4 query x jumlah pegawai menjadi 4 query total.
+        */
+        $attendanceByUser = Attendance::whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->select('user_id', 'tanggal')
+            ->get()
+            ->groupBy('user_id');
+
+        $permissionByUser = Permission::where('status', 'approved')
+            ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->select('user_id', 'tanggal')
+            ->get()
+            ->groupBy('user_id');
+
+        $leaveByUser = Leave::where('status', 'approved')
+            ->where(function ($q) use ($start, $end) {
+                $q->where('start_date', '<=', $end->format('Y-m-d'))
+                    ->where('end_date', '>=', $start->format('Y-m-d'));
+            })
+            ->select('user_id', 'start_date', 'end_date')
+            ->get()
+            ->groupBy('user_id');
+
+        $shiftByUser = EmployeeShift::whereBetween('shift_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->select('user_id', 'shift_date')
+            ->get()
+            ->groupBy('user_id');
+
         $data = collect();
 
         foreach ($employees as $employee) {
-            $attendanceDates = Attendance::where('user_id', $employee->id)
-                ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            $attendanceDates = ($attendanceByUser[$employee->id] ?? collect())
                 ->pluck('tanggal')
                 ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
                 ->unique();
 
-            $permissionDates = Permission::where('user_id', $employee->id)
-                ->where('status', 'approved')
-                ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            $permissionDates = ($permissionByUser[$employee->id] ?? collect())
                 ->pluck('tanggal')
                 ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
                 ->unique();
 
             $leaveDates = collect();
-            $leaves = Leave::where('user_id', $employee->id)
-                ->where('status', 'approved')
-                ->where(function ($q) use ($start, $end) {
-                    $q->where('start_date', '<=', $end->format('Y-m-d'))
-                        ->where('end_date', '>=', $start->format('Y-m-d'));
-                })
-                ->get();
 
-            foreach ($leaves as $leave) {
+            foreach (($leaveByUser[$employee->id] ?? collect()) as $leave) {
                 $lStart = Carbon::parse($leave->start_date);
                 $lEnd   = Carbon::parse($leave->end_date);
                 while ($lStart->lte($lEnd)) {
@@ -1135,8 +1166,7 @@ class HRDController extends Controller
             $absentCount = 0;
 
             if ($employee->work_type === 'shift') {
-                $shiftDates = EmployeeShift::where('user_id', $employee->id)
-                    ->whereBetween('shift_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                $shiftDates = ($shiftByUser[$employee->id] ?? collect())
                     ->pluck('shift_date')
                     ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
                     ->unique();
@@ -1203,12 +1233,14 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
         $data = Leave::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->where('start_date', '<=', $endDate)
                   ->where('end_date', '>=', $startDate);
             })
-            ->with('user')
+            ->select('id', 'user_id', 'start_date', 'end_date', 'leave_type', 'reason', 'status', 'created_at')
+            ->with('user:id,name')
             ->latest()
             ->get();
 
@@ -1228,9 +1260,11 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
         $data = Permission::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
             ->whereBetween('tanggal', [$startDate, $endDate])
-            ->with('user')
+            ->select('id', 'user_id', 'tanggal', 'tanggal_selesai', 'jenis', 'jam_mulai', 'jam_selesai', 'alasan', 'status', 'created_at')
+            ->with('user:id,name')
             ->latest()
             ->get();
 
@@ -1250,9 +1284,11 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
         $data = Overtime::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
             ->whereBetween('overtime_date', [$startDate, $endDate])
-            ->with('user')
+            ->select('id', 'user_id', 'overtime_date', 'start_time', 'end_time', 'total_hours', 'day_type', 'reason', 'status', 'created_at')
+            ->with('user:id,name')
             ->latest()
             ->get();
 
@@ -1269,9 +1305,31 @@ class HRDController extends Controller
 
     public function tracking()
     {
-        $leaves = \App\Models\Leave::with('user')->latest()->get();
-        $permissions = \App\Models\Permission::with('user')->latest()->get();
-        $overtimes = \App\Models\Overtime::with('user')->latest()->get();
+        /*
+        |--------------------------------------------------------------------------
+        | DIBATASI + KOLOM SE PERLUNYA
+        |--------------------------------------------------------------------------
+        | Sebelumnya memuat SELURUH baris 3 tabel beserta kolom signature (base64)
+        | dan data user lengkap sehingga memori server melonjak.
+        | Halaman ini tetap menampilkan data terbaru lebih dulu.
+        */
+        $leaves = \App\Models\Leave::select('id', 'user_id', 'start_date', 'end_date', 'leave_type', 'reason', 'status', 'created_at')
+            ->with('user:id,name')
+            ->latest()
+            ->limit(200)
+            ->get();
+
+        $permissions = \App\Models\Permission::select('id', 'user_id', 'tanggal', 'tanggal_selesai', 'jenis', 'alasan', 'status', 'created_at')
+            ->with('user:id,name')
+            ->latest()
+            ->limit(200)
+            ->get();
+
+        $overtimes = \App\Models\Overtime::select('id', 'user_id', 'overtime_date', 'total_hours', 'reason', 'status', 'created_at')
+            ->with('user:id,name')
+            ->latest()
+            ->limit(200)
+            ->get();
 
         return view('hrd.tracking', compact('leaves', 'permissions', 'overtimes'));
     }
@@ -1283,17 +1341,32 @@ class HRDController extends Controller
         $year = Carbon::parse($month)->year;
         $monthNumber = Carbon::parse($month)->month;
 
+        $periodStart = Carbon::parse($month)->startOfMonth()->format('Y-m-d');
+        $periodEnd   = Carbon::parse($month)->endOfMonth()->format('Y-m-d');
+
+        /*
+        |--------------------------------------------------------------------------
+        | ABSENSI PERIODE INI DIAMBIL SEKALI SAJA
+        |--------------------------------------------------------------------------
+        | Sebelumnya: 1 query Attendance per baris shift (N+1). Sekarang 1 query.
+        | Hasil tampilan tetap sama karena tanggal absensi dipetakan per hari.
+        */
+        $attendanceByDate = Attendance::where('user_id', $user->id)
+            ->whereBetween('tanggal', [$periodStart, $periodEnd])
+            ->select('user_id', 'tanggal', 'jam_masuk', 'jam_keluar')
+            ->get()
+            ->keyBy(fn($row) => Carbon::parse($row->tanggal)->format('Y-m-d'));
+
         $shifts = EmployeeShift::with('shift')
             ->where('user_id', $user->id)
-            ->whereMonth('shift_date', $monthNumber)
-            ->whereYear('shift_date', $year)
+            ->whereBetween('shift_date', [$periodStart, $periodEnd])
             ->orderBy('shift_date')
             ->get()
-            ->map(function ($item) use ($user) {
+            ->map(function ($item) use ($user, $attendanceByDate) {
 
-                $attendance = Attendance::where('user_id', $item->user_id)
-                    ->whereDate('tanggal', $item->shift_date)
-                    ->first();
+                $attendance = $attendanceByDate[
+                    Carbon::parse($item->shift_date)->format('Y-m-d')
+                ] ?? null;
 
                 return [
                     'shift_date' => Carbon::parse($item->shift_date)->format('d-m-Y'),
@@ -1328,9 +1401,8 @@ class HRDController extends Controller
 
             if ($schedule) {
 
-                $attendance = Attendance::where('user_id', $user->id)
-                    ->whereDate('tanggal', $today)
-                    ->first();
+                // Memakai map absensi periode di atas (tanpa query tambahan).
+                $attendance = $attendanceByDate[$today] ?? null;
 
                 $shifts->push([
                     'shift_date' => Carbon::now()->format('d-m-Y'),

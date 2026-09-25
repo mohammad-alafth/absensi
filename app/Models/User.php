@@ -83,6 +83,7 @@ class User extends Authenticatable
             
             'sekretariat' => 'SEKRETARIAT',
             'supervisor' => 'SUPERVISOR',
+            'spv' => 'SUPERVISOR',
 
             // Divisi & stage approval (struktur baru)
             'medical_service' => 'MEDICAL SERVICE',

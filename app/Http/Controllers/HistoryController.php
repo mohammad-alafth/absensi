@@ -43,51 +43,31 @@ class HistoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | LEAVES
+        | LEAVES / PERMISSIONS / OVERTIMES PER TAHUN
+        |--------------------------------------------------------------------------
+        | Hanya 3 query total (sebelumnya 3 query x jumlah tahun karena
+        | whereYear + selectRaw YEAR() yang tidak memakai index).
+        | Struktur hasil tetap sama: $data[$tahun] berisi data terbaru dulu.
         |--------------------------------------------------------------------------
         */
 
-        $leaves = [];
+        $leaves = Leave::where('user_id', $userId)
+            ->latest()
+            ->get()
+            ->groupBy(fn($item) => (int) Carbon::parse($item->start_date)->year)
+            ->all();
 
-        foreach ($years as $year) {
+        $permissions = Permission::where('user_id', $userId)
+            ->latest()
+            ->get()
+            ->groupBy(fn($item) => (int) Carbon::parse($item->tanggal)->year)
+            ->all();
 
-            $leaves[$year] = Leave::where('user_id', $userId)
-                ->whereYear('start_date', $year)
-                ->latest()
-                ->get();
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PERMISSIONS
-        |--------------------------------------------------------------------------
-        */
-
-        $permissions = [];
-
-        foreach ($years as $year) {
-
-            $permissions[$year] = Permission::where('user_id', $userId)
-                ->whereYear('tanggal', $year)
-                ->latest()
-                ->get();
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | OVERTIMES
-        |--------------------------------------------------------------------------
-        */
-
-        $overtimes = [];
-
-        foreach ($years as $year) {
-
-            $overtimes[$year] = Overtime::where('user_id', $userId)
-                ->whereYear('overtime_date', $year)
-                ->latest()
-                ->get();
-        }
+        $overtimes = Overtime::where('user_id', $userId)
+            ->latest()
+            ->get()
+            ->groupBy(fn($item) => (int) Carbon::parse($item->overtime_date)->year)
+            ->all();
 
         /*
         |--------------------------------------------------------------------------

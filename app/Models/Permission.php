@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\CompressesSignatureAttributes;
 
 class Permission extends Model
 {
+    use CompressesSignatureAttributes;
+
     protected $fillable = [
 
         'user_id',

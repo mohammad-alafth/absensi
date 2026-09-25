@@ -65,17 +65,17 @@ class HRDDashboardController extends Controller
     | RECENT (ROLE FILTERED)
     |--------------------------------------------------------------------------
     */
-        $leaves = $leaves->with('user')->latest()->take(5)->get()->map(function ($item) {
+        $leaves = $leaves->with('user:id,name')->latest()->take(5)->get()->map(function ($item) {
             $item->type = 'Cuti';
             return $item;
         });
 
-        $permissions = $permissions->with('user')->latest()->take(5)->get()->map(function ($item) {
+        $permissions = $permissions->with('user:id,name')->latest()->take(5)->get()->map(function ($item) {
             $item->type = 'Izin';
             return $item;
         });
 
-        $overtimes = $overtimes->with('user')->latest()->take(5)->get()->map(function ($item) {
+        $overtimes = $overtimes->with('user:id,name')->latest()->take(5)->get()->map(function ($item) {
             $item->type = 'Lembur';
             return $item;
         });

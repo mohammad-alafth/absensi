@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use App\Models\Concerns\CompressesSignatureAttributes;
 
 class Leave extends Model
 {
+    use CompressesSignatureAttributes;
+
     protected $table = 'leaves';
 
     protected $fillable = [

@@ -62,7 +62,7 @@ class AttendanceController extends Controller
         |--------------------------------------------------------------------------
         */
         $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', $shiftDate)
+            ->where('tanggal', $shiftDate)
             ->orderByDesc('jam_masuk')
             ->first();
 

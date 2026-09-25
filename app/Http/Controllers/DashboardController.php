@@ -9,6 +9,8 @@ use App\Models\Overtime;
 use App\Models\EmployeeShift;
 use Carbon\Carbon;
 use App\Services\ScheduleService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class DashboardController extends Controller
 {
@@ -34,8 +36,9 @@ class DashboardController extends Controller
             ? $scheduleData['shift_date']
             : today()->format('Y-m-d');
 
+        // `where` (bukan `whereDate`) agar index (user_id, tanggal) terpakai.
         $todayAttendance = Attendance::where('user_id', $user->id)
-            ->whereDate('tanggal', $attendanceDate)
+            ->where('tanggal', $attendanceDate)
             ->first();
 
         /*
@@ -144,18 +147,50 @@ class DashboardController extends Controller
         // 1. Cek Akhir Pekan (Sabtu & Minggu)
         if ($date->isWeekend()) return true;
 
-        // 2. Cek Tanggal Merah via API (https://api-harilibur.id)
-        try {
-            $url = "https://api-harilibur.id/api?tanggal=" . $date->format('Y-m-d');
-            $response = @file_get_contents($url);
-            $data = json_decode($response, true);
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Cek Tanggal Merah via API (https://api-harilibur.id)
+        |--------------------------------------------------------------------------
+        | Hasil disimpan di cache agar dashboard tidak memanggil API eksternal
+        | pada setiap request (sumber lag ketika banyak user membuka dashboard).
+        | Nilai & arti kembalian tetap sama seperti sebelumnya:
+        |   - ada data libur  -> true
+        |   - api error/kosong -> false
+        | Saat API gagal, cache ditahan hanya 5 menit agar bisa dicoba lagi,
+        | dan kegagalan cache (mis. Redis mati) tidak membuat dashboard error.
+        */
+        $cacheKey = 'hari_libur:' . $date->format('Y-m-d');
 
-            // Jika API mengembalikan data libur
-            if (!empty($data)) return true;
-        } catch (\Exception $e) {
-            return false;
+        try {
+            if (Cache::has($cacheKey)) {
+                return (bool) Cache::get($cacheKey);
+            }
+        } catch (\Throwable $e) {
+            // cache tidak tersedia -> lanjut memanggil API seperti biasa
         }
 
-        return false;
+        $isHoliday = false;
+        $fromApi   = false;
+
+        try {
+            $response = Http::timeout(3)
+                ->get('https://api-harilibur.id/api', ['tanggal' => $date->format('Y-m-d')]);
+
+            if ($response->successful()) {
+                $isHoliday = !empty($response->json());
+                $fromApi   = true;
+            }
+        } catch (\Throwable $e) {
+            $isHoliday = false;
+            $fromApi   = false;
+        }
+
+        try {
+            Cache::put($cacheKey, $isHoliday, $fromApi ? now()->addHours(12) : now()->addMinutes(5));
+        } catch (\Throwable $e) {
+            // abaikan kegagalan cache
+        }
+
+        return $isHoliday;
     }
 }
