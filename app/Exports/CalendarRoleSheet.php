@@ -14,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\Overtime;
+use App\Support\PermissionRange;
 
 class CalendarRoleSheet implements WithTitle, WithEvents
 {
@@ -160,10 +161,14 @@ class CalendarRoleSheet implements WithTitle, WithEvents
                             ->whereDate('end_date', '>=', $date->format('Y-m-d'))
                             ->exists();
 
-                        $permission = Permission::where('user_id', $user->id)
-                            ->whereDate('tanggal', $date->format('Y-m-d'))
-                            ->where('status', 'approved')
-                            ->exists();
+                        // Izin multi-hari (tanggal .. tanggal_selesai) menutup
+                        // seluruh tanggal dalam rentang, bukan hanya hari pertama.
+                        $permission = PermissionRange::applyOverlapsPeriod(
+                            Permission::where('user_id', $user->id)
+                                ->where('status', 'approved'),
+                            $date->format('Y-m-d'),
+                            $date->format('Y-m-d')
+                        )->exists();
                         $overtime = Overtime::where('user_id', $user->id)
                             ->whereDate('overtime_date', $date->format('Y-m-d'))
                             ->where('status', 'approved')

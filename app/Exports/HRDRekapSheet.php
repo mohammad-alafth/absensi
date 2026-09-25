@@ -8,6 +8,7 @@ use App\Models\EmployeeShift;
 use App\Models\Leave;
 use App\Models\Overtime;
 use App\Models\Permission;
+use App\Support\PermissionRange;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -314,14 +315,19 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             | TANGGAL IZIN (izin approved dalam rentang periode)
             |----------------------------------------------------------------------
             */
-            $izinList = Permission::where('user_id', $employee->id)
-                ->where('status', 'approved')
-                ->whereBetween('tanggal', [$startDate, $endDate])
+            // Izin multi-hari diambil lewat rentang (tanggal .. tanggal_selesai),
+            // lalu tiap hari dalam rentang ditulis sebagai tanggal izin.
+            $izinList = PermissionRange::applyOverlapsPeriod(
+                Permission::where('user_id', $employee->id)
+                    ->where('status', 'approved'),
+                $startDate,
+                $endDate
+            )
                 ->orderBy('tanggal')
                 ->get();
 
-            $izinDates = $izinList
-                ->map(fn($p) => Carbon::parse($p->tanggal)->format('d/m'))
+            $izinDates = PermissionRange::datesWithin($izinList, $startDate, $endDate)
+                ->map(fn($date) => Carbon::parse($date)->format('d/m'))
                 ->sort()
                 ->unique()
                 ->values()

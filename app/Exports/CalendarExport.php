@@ -12,6 +12,8 @@ use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use App\Models\User;
+use App\Models\Permission;
+use App\Support\PermissionRange;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -233,13 +235,16 @@ class CalendarExport implements FromCollection, WithHeadings, WithMapping, WithE
             ->whereDate('end_date', '>=', $row->shift_date)
             ->exists();
 
-        $permission = \App\Models\Permission::where(
-            'user_id',
-            $row->user_id
-        )
-            ->whereDate('tanggal', $row->shift_date)
-            ->where('status', 'approved')
-            ->exists();
+        // Izin multi-hari (tanggal .. tanggal_selesai) menutup seluruh tanggal
+        // dalam rentang, bukan hanya hari pertama.
+        $permission = PermissionRange::applyOverlapsPeriod(
+            Permission::where(
+                'user_id',
+                $row->user_id
+            )->where('status', 'approved'),
+            $row->shift_date,
+            $row->shift_date
+        )->exists();
 
         $overtime = \App\Models\Overtime::where(
             'user_id',

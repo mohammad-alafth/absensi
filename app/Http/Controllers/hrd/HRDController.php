@@ -30,6 +30,7 @@ use App\Exports\CalendarExport;
 use App\Exports\CalendarUserExport;
 use App\Services\ScheduleService;
 use App\Exports\CalendarMultiExport;
+use App\Support\PermissionRange;
 
 
 class HRDController extends Controller
@@ -143,15 +144,17 @@ class HRDController extends Controller
             ->get()
             ->groupBy('user_id');
 
-        $permissionGroups = Permission::select(
-            'user_id',
-            'tanggal'
+        // Izin multi-hari menempati `tanggal` s/d `tanggal_selesai`, jadi
+        // seluruh tanggal dalam rentang ikut dihitung (bukan hanya hari pertama).
+        $permissionGroups = PermissionRange::applyOverlapsPeriod(
+            Permission::select(
+                'user_id',
+                'tanggal',
+                'tanggal_selesai'
+            )->where('status', 'approved'),
+            $startDate,
+            $endDate
         )
-            ->where('status', 'approved')
-            ->whereBetween('tanggal', [
-                $startDate,
-                $endDate
-            ])
             ->get()
             ->groupBy('user_id');
 
@@ -251,10 +254,11 @@ class HRDController extends Controller
                 | TANGGAL IZIN APPROVED
                 |--------------------------------------------------------------------------
                 */
-            $permissionDates = $userPermissions
-                ->pluck('tanggal')
-                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
-                ->unique();
+            $permissionDates = PermissionRange::datesWithin(
+                $userPermissions,
+                $startDate,
+                $endDate
+            );
 
             /*
                 |--------------------------------------------------------------------------
@@ -1116,9 +1120,14 @@ class HRDController extends Controller
             ->get()
             ->groupBy('user_id');
 
-        $permissionByUser = Permission::where('status', 'approved')
-            ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
-            ->select('user_id', 'tanggal')
+        // Rentang izin (tanggal .. tanggal_selesai) harus dibaca lengkap,
+        // bukan hanya hari pertama, agar hari ke-2 dst tidak dihitung alpha.
+        $permissionByUser = PermissionRange::applyOverlapsPeriod(
+            Permission::where('status', 'approved'),
+            $start,
+            $end
+        )
+            ->select('user_id', 'tanggal', 'tanggal_selesai')
             ->get()
             ->groupBy('user_id');
 
@@ -1144,10 +1153,11 @@ class HRDController extends Controller
                 ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
                 ->unique();
 
-            $permissionDates = ($permissionByUser[$employee->id] ?? collect())
-                ->pluck('tanggal')
-                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
-                ->unique();
+            $permissionDates = PermissionRange::datesWithin(
+                $permissionByUser[$employee->id] ?? collect(),
+                $start,
+                $end
+            );
 
             $leaveDates = collect();
 
@@ -1452,12 +1462,16 @@ class HRDController extends Controller
     | TANGGAL IZIN
     |--------------------------------------------------------------------------
     */
-        $permissionDates = Permission::where('user_id', $employee->id)
-            ->where('status', 'approved')
-            ->whereBetween('tanggal', [$startDate, $endDate])
-            ->pluck('tanggal')
-            ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
-            ->unique();
+        $permissionDates = PermissionRange::datesWithin(
+            PermissionRange::applyOverlapsPeriod(
+                Permission::where('user_id', $employee->id)
+                    ->where('status', 'approved'),
+                $startDate,
+                $endDate
+            )->get(['tanggal', 'tanggal_selesai']),
+            $startDate,
+            $endDate
+        );
 
         /*
     |--------------------------------------------------------------------------

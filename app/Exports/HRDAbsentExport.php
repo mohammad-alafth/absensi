@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\EmployeeShift;
+use App\Support\PermissionRange;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -121,12 +122,20 @@ class HRDAbsentExport implements FromCollection, WithEvents, WithHeadings, WithC
             ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
             ->unique();
 
-        $permissionDates = Permission::where('user_id', $employee->id)
-            ->where('status', 'approved')
-            ->whereBetween('tanggal', [$start->format('Y-m-d'), $end->format('Y-m-d')])
-            ->pluck('tanggal')
-            ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
-            ->unique();
+        // Rentang izin (tanggal .. tanggal_selesai) diekspansi per tanggal,
+        // supaya hari ke-2 dst tidak tercatat sebagai hari tidak hadir.
+        $permissionRows = PermissionRange::applyOverlapsPeriod(
+            Permission::where('user_id', $employee->id)
+                ->where('status', 'approved'),
+            $start->format('Y-m-d'),
+            $end->format('Y-m-d')
+        )->get(['tanggal', 'tanggal_selesai']);
+
+        $permissionDates = PermissionRange::datesWithin(
+            $permissionRows,
+            $start->format('Y-m-d'),
+            $end->format('Y-m-d')
+        );
 
         $leaveDates = collect();
         $leaves = Leave::where('user_id', $employee->id)

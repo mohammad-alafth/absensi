@@ -8,6 +8,7 @@ use App\Models\Leave;
 use App\Models\Permission;
 use App\Models\Overtime;
 use App\Models\EmployeeShift;
+use App\Support\PermissionRange;
 use Carbon\Carbon;
 
 class HistoryController extends Controller
@@ -173,11 +174,20 @@ class HistoryController extends Controller
             ->where('end_date', '>=', $dateStart)
             ->get();
 
-        $approvedPermissions = Permission::where('user_id', $user->id)
-            ->where('status', 'approved')
-            ->whereBetween('tanggal', [$dateStart, $dateEnd])
-            ->get()
-            ->keyBy('tanggal');
+        // Izin multi-hari menempati `tanggal` s/d `tanggal_selesai`:
+        // seluruh tanggal dalam rentang dipetakan, bukan hanya hari pertama.
+        $approvedPermissions = PermissionRange::applyOverlapsPeriod(
+            Permission::where('user_id', $user->id)
+                ->where('status', 'approved'),
+            $dateStart,
+            $dateEnd
+        )->get();
+
+        $permissionByDate = PermissionRange::mapByDate(
+            $approvedPermissions,
+            $dateStart,
+            $dateEnd
+        );
 
         // Jenis izin yang dianggap "sehari penuh tidak masuk"
         $fullDayPermitTypes = [
@@ -212,7 +222,7 @@ class HistoryController extends Controller
 
             $attendance = $attendanceList->get($dateStr);
             $shiftRow   = $employeeShifts->get($dateStr);
-            $permit     = $approvedPermissions->get($dateStr);
+            $permit     = $permissionByDate[$dateStr] ?? null;
 
             // Cuti disetujui yang menutup tanggal ini
             $leaveCover = null;
