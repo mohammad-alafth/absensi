@@ -10,7 +10,7 @@ namespace App\Services;
  *   CASEMIX   : casemix (+pj_casemix) + hrd                 -> PJ -> Direktur (final)
  *   ADMISSION : admission (+pj_admission)                   -> PJ -> Kabag Marketing -> Manager Umum
  *   FINANCE   : accounting, finance (+pj_*)                 -> PJ -> Manager Finance (final)
- *   DIREKTUR  : direktur, manajer, kabag, dll              -> Direktur (final, tanpa PJ)
+ *   DIREKTUR  : direktur, manajer, kabag, sekre, supervisor -> Direktur (final, tanpa PJ)
  *
  * Konvensi: nama STAGE == nama ROLE approver == prefix kolom database.
  * (stage "kabag_umum" -> role "kabag_umum" -> kolom kabag_umum_status,
@@ -89,10 +89,10 @@ class ApprovalFlowService
     */
     public const ROLE_GROUPS = [
         // ---- YANMED (penunjang medis) ----
-        'ugd' => 'medical_service',
-        'pj_ugd' => 'medical_service',
-        'ranap' => 'medical_service',
-        'pj_ranap' => 'medical_service',
+        // 'ugd' => 'medical_service',
+        // 'pj_ugd' => 'medical_service',
+        // 'ranap' => 'medical_service',
+        // 'pj_ranap' => 'medical_service',
         'ok' => 'medical_service',
         'pj_ok' => 'medical_service',
         'pipp' => 'medical_service',
@@ -151,6 +151,8 @@ class ApprovalFlowService
         'head_pegawai' => 'direktur',
         'sekre' => 'direktur',
         'sekretariat' => 'direktur',
+        // Supervisor juga pengaju langsung: approval hanya ke Direktur (tanpa PJ).
+        'supervisor' => 'direktur',
         'director' => 'direktur',
         'medical_service' => 'direktur',
         'medical_service' => 'direktur',
@@ -176,6 +178,7 @@ class ApprovalFlowService
         'head_pegawai',
         'sekre',
         'sekretariat',
+        'supervisor',
         'medical_service',
         'medical_service',
         'kabag_umum',
@@ -319,7 +322,9 @@ class ApprovalFlowService
     public static function columnPrefixesForStage(string $stage): array
     {
         if ($stage === 'medical_service') {
-            return ['medical_service', 'medical_service'];
+            // Kolom baru yanmed_* + kolom kompatibilitas lama medical_service_*
+            // agar data & PDF lama tetap konsisten.
+            return ['yanmed', 'medical_service'];
         }
 
         return [$stage];
