@@ -378,91 +378,33 @@
         Pekanbaru, <span class="dots-line" style="width: 130px;">{{ \Carbon\Carbon::parse($leave->created_at)->translatedFormat('d F Y') }}</span>
     </div>
 
+    @php
+    // Blok tanda tangan approver mengikuti rantai approval pengaju:
+    // Atasan (PJ) -> Kabag -> Manajemen. Kabag dan Manajemen masing-masing
+    // punya kolom sendiri agar kedua tanda tangan terlihat jelas (split 2).
+    $signatureBlocks = \App\Support\PdfSignatureBlocks::for($leave);
+    $signatureWidth = \App\Support\PdfSignatureBlocks::columnWidth($signatureBlocks);
+    @endphp
+
     <table class="signature-table">
         <tr>
-            <td>
-                <div>Menyetujui,</div>
-                <div>Atasan Langsung</div>
+            @foreach($signatureBlocks as $block)
+            <td style="width: {{ $signatureWidth }}%;">
+                <div>{{ $block['heading'] }}</div>
+                <div>{{ $block['label'] }}</div>
                 <div class="status-text">
-                    @if($leave->pj_status) ({{ strtoupper($leave->pj_status) }}) @endif
+                    @if($block['status_text']) ({{ $block['status_text'] }}) @endif
                 </div>
                 <div class="signature-space">
-                    @if($leave->pj_signature)
-                    <img src="{{ $leave->pj_signature }}" class="signature-img">
+                    @if($block['image'])
+                    <img src="{{ $block['image'] }}" class="signature-img">
                     @endif
                 </div>
-                <div class="name-line">{{ $leave->pjApprover->name ?? '........................' }}</div>
+                <div class="name-line">{{ $block['name'] }}</div>
             </td>
+            @endforeach
 
-            <td>
-                @php
-                // Surat untuk grup YANMED ditandatangani YANMED (penunjang medis)
-                // sebagai approver final. Fallback ke kolom lama medical_service_*
-                // untuk data yang disetujui sebelum migrasi stage.
-                $needsYanmed = in_array(
-                    'medical_service',
-                    \App\Services\ApprovalFlowService::chainFor($leave->user->role ?? null),
-                    true
-                );
-
-                if ($needsYanmed) {
-                $heading = 'Menyetujui,';
-                $jabatan = 'YANMED (Penunjang Medis)';
-                $ys = $leave->yanmed_status;
-                $ms = $leave->medical_service_status;
-                $status = ($ys && $ys !== 'pending')
-                ? $ys
-                : (($ms && $ms !== 'pending') ? $ms : ($ys ?: 'pending'));
-                $sig = $leave->yanmed_signature ?: $leave->medical_service_signature;
-                $approver = $leave->yanmedApprover ?: $leave->medicalServiceApprover;
-                $nama = $approver->name ?? '........................';
-                } elseif ($leave->director_approved_by) {
-                $heading = 'Mengetahui,';
-                $jabatan = 'Direktur';
-                $status = $leave->director_status;
-                $sig = $leave->director_signature;
-                $nama = $leave->directorApprover->name ?? '........................';
-                } elseif ($leave->head_approved_by) {
-                $heading = 'Mengetahui,';
-                $jabatan = 'Kepala Unit';
-                $status = $leave->head_status;
-                $sig = $leave->head_signature;
-                $nama = $leave->headApprover->name ?? '........................';
-                } else {
-                $heading = 'Mengetahui,';
-                $jabatan = 'HRD';
-                $status = $leave->hrd_status;
-                $sig = $leave->hrd_signature;
-                $nama = $leave->hrdApprover->name ?? '........................';
-                }
-                @endphp
-
-                <div>{{ $heading }}</div>
-                <div>{{ $jabatan }}</div>
-                <div class="status-text">
-                    @if($status) ({{ strtoupper($status) }}) @endif
-                </div>
-                <div class="signature-space">
-                    @if($sig)
-                    <img src="{{ (strpos($sig, 'data:image') === 0) ? $sig : public_path('storage/'.$sig) }}" class="signature-img">
-                    @endif
-                </div>
-                <div class="name-line">{{ $nama }}</div>
-
-                {{-- Kompatibilitas data lama: surat YANMED era lama juga ditandatangani HRD --}}
-                @if($needsYanmed && $leave->hrd_approved_by)
-                <div style="margin-top: 4px;">HRD</div>
-                <div class="status-text">({{ strtoupper($leave->hrd_status ?? 'APPROVED') }})</div>
-                <div class="signature-space">
-                    @if($leave->hrd_signature)
-                    <img src="{{ (strpos($leave->hrd_signature, 'data:image') === 0) ? $leave->hrd_signature : public_path('storage/'.$leave->hrd_signature) }}" class="signature-img">
-                    @endif
-                </div>
-                <div class="name-line">{{ $leave->hrdApprover->name ?? '........................' }}</div>
-                @endif
-            </td>
-
-            <td>
+            <td style="width: {{ $signatureWidth }}%;">
                 <div>Hormat Saya,</div>
                 <div>Pemohon</div>
                 <div class="status-text">&nbsp;</div>

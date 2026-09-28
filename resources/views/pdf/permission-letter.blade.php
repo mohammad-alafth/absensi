@@ -119,81 +119,35 @@
     </div>
     @endif
 
+    @php
+    // Blok tanda tangan approver dihitung dari rantai approval pengaju:
+    // Atasan (PJ) -> Kabag -> Manajemen. Kabag dan Manajemen masing-masing
+    // mendapat satu kolom sendiri supaya kedua tanda tangan terlihat jelas.
+    $signatureBlocks = \App\Support\PdfSignatureBlocks::for($permission);
+    $signatureWidth = \App\Support\PdfSignatureBlocks::columnWidth($signatureBlocks, 0);
+    @endphp
+
     <table class="signature-table">
         <tr>
-            @if($permission->pj_signature || $permission->pj_approved_by)
-            <td class="signature-box">
-                PJ<br><br>
-                <div style="font-size: 8pt; font-style: italic;">[{{ $permission->pj_status }}]</div>
-                @if($permission->pj_signature)
-                <img src="{{ $permission->pj_signature }}" class="signature">
+            @forelse($signatureBlocks as $block)
+            <td class="signature-box" style="width: {{ $signatureWidth }}%;">
+                {{ $block['heading'] }}<br>
+                {{ $block['label'] }}<br><br>
+                <div style="font-size: 8pt; font-style: italic;">[{{ $block['status_text'] ?? 'PENDING' }}]</div>
+                @if($block['image'])
+                <img src="{{ $block['image'] }}" class="signature">
                 @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $permission->pjApprover->name ?? '-' }}</div>
+                <div style="text-decoration: underline;">{{ $block['name'] }}</div>
             </td>
-            @endif
-
-            @php
-            // Surat izin grup YANMED membutuhkan TTD YANMED (penunjang medis).
-            $needsYanmed = in_array(
-                'medical_service',
-                \App\Services\ApprovalFlowService::chainFor($permission->user->role ?? null),
-                true
-            ) || $permission->yanmed_approved_by || $permission->medical_service_approved_by;
-
-            if ($needsYanmed) {
-            $ys = $permission->yanmed_status;
-            $ms = $permission->medical_service_status;
-            $yanmedStatus = ($ys && $ys !== 'pending')
-            ? $ys
-            : (($ms && $ms !== 'pending') ? $ms : ($ys ?: 'pending'));
-            $yanmedSig = $permission->yanmed_signature ?: $permission->medical_service_signature;
-            $yanmedApprover = $permission->yanmedApprover ?: $permission->medicalServiceApprover;
-            }
-            @endphp
-
-            @if($needsYanmed)
+            @empty
             <td class="signature-box">
-                YANMED<br><br>
-                <div style="font-size: 8pt; font-style: italic;">[{{ strtoupper($yanmedStatus) }}]</div>
-                @if($yanmedSig)
-                <img src="{{ (strpos($yanmedSig, 'data:image') === 0) ? $yanmedSig : public_path('storage/'.$yanmedSig) }}" class="signature">
-                @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $yanmedApprover->name ?? '-' }}</div>
+                Menyetujui,<br>
+                Manajemen<br><br>
+                <div style="font-size: 8pt; font-style: italic;">[PENDING]</div>
+                <br><br><br>
+                <div style="text-decoration: underline;">-</div>
             </td>
-            @endif
-
-            @if($permission->head_approved_by)
-            <td class="signature-box">
-                Kepala Bagian<br><br>
-                <div style="font-size: 8pt; font-style: italic;">[Approved]</div>
-                @if($permission->head_signature)
-                <img src="{{ $permission->head_signature }}" class="signature">
-                @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $permission->headApprover->name ?? '...' }}</div>
-            </td>
-            @endif
-
-            @if($permission->director_approved_by)
-            <td class="signature-box">
-                Direktur<br><br>
-                <div style="font-size: 8pt; font-style: italic;">[{{ $permission->director_status ?? 'Approved' }}]</div>
-                @if($permission->director_signature)
-                <img src="{{ $permission->director_signature }}" class="signature">
-                @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $permission->directorApprover->name ?? '...' }}</div>
-            </td>
-            @endif
-
-            @if($permission->hrd_approved_by)
-            <td class="signature-box">
-                HRD<br><br>
-                <div style="font-size: 8pt; font-style: italic;">[{{ $permission->hrd_status }}]</div>
-                @if($permission->hrd_signature)
-                <img src="{{ $permission->hrd_signature }}" class="signature">
-                @else <br><br><br> @endif
-                <div style="text-decoration: underline;">{{ $permission->hrdApprover->name ?? '-' }}</div>
-            </td>
-            @endif
+            @endforelse
         </tr>
     </table>
 </body>

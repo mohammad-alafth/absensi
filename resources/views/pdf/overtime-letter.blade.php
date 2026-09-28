@@ -40,30 +40,6 @@
             padding: 4px;
         }
 
-        .logo-area {
-            width: 30%;
-        }
-
-        .logo-text {
-            font-size: 16pt;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-
-        .logo-subtext {
-            font-size: 8pt;
-            font-style: italic;
-            color: #333;
-        }
-
-        .title-area {
-            width: 70%;
-            text-align: right;
-            font-size: 15pt;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-        }
-
         /* Form Atas (Meta Data Lembur) */
         .meta-table {
             width: 100%;
@@ -196,14 +172,6 @@
             font-weight: bold;
             text-decoration: underline;
             font-size: 10.5pt;
-        }
-
-        .footer-name-row {
-            border-top: 1px solid #000 !important;
-            background-color: #f9f9f9;
-            font-size: 10pt;
-            padding: 4px 8px !important;
-            text-align: left !important;
         }
     </style>
 </head>
@@ -339,110 +307,79 @@
             </tbody>
         </table>
 
-        <table class="signature-section-table">
-            <tr>
-                <td>
-                    <table class="inner-sig-table">
-                        <tr>
-                            <th colspan="2">Diajukan Oleh :</th>
-                        </tr>
-                        <tr>
-                            <td style="width: 50%; border-right: 1px solid #eee;">
-                                <div style="font-size: 9pt;">Karyawan</div>
-                                <div class="sig-space-wrapper">
-                                    @if($overtime->employee_signature)
-                                    <img src="{{ $overtime->employee_signature }}" class="sig-image">
-                                    @endif
-                                </div>
-                                <div class="name-output">{{ $overtime->user->name ?? '-' }}</div>
-                                <div style="font-size: 8pt; color:#444;">NIK: {{ $overtime->user->nik ?? '-' }}</div>
-                            </td>
-                            <td style="width: 50%;">
-                                <div style="font-size: 9pt;">Atasan / PJ</div>
-                                <div class="status-badge">[{{ strtoupper($overtime->pj_status ?? 'PENDING') }}]</div>
-                                <div class="sig-space-wrapper">
-                                    @if($overtime->pj_signature)
-                                    <img src="{{ $overtime->pj_signature }}" class="sig-image">
-                                    @endif
-                                </div>
-                                <div class="name-output">{{ $overtime->pjApprover->name ?? '-' }}</div>
-                                <div style="font-size: 8pt; color:#444;">Atasan Langsung</div>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
+    @php
+    // Blok tanda tangan approver mengikuti rantai approval pengaju:
+    // Kabag dan Manajemen tampil berdampingan (dua blok terpisah) pada kolom
+    // "Disetujui Oleh". Blok PJ tetap berada pada kolom "Diajukan Oleh".
+    $signatureBlocks = \App\Support\PdfSignatureBlocks::for($overtime);
+    $approvalBlocks = array_values(array_filter(
+        $signatureBlocks,
+        static fn ($block) => $block['key'] !== 'pj'
+    ));
+    $approvalWidth = \App\Support\PdfSignatureBlocks::columnWidth($approvalBlocks, 0);
+    @endphp
 
-                <td>
-                    <table class="inner-sig-table">
-                        <tr>
-                            <th>Disetujui Oleh :</th>
-                        </tr>
-                        <tr>
-                            <td>
-                                @php
-                                // Surat grup YANMED: approver final adalah YANMED
-                                // (fallback kolom lama medical_service_* untuk data lama).
-                                $needsYanmed = in_array(
-                                    'medical_service',
-                                    \App\Services\ApprovalFlowService::chainFor($overtime->user->role ?? null),
-                                    true
-                                );
-
-                                if ($needsYanmed) {
-                                $jabatan = 'YANMED (Penunjang Medis)';
-                                $ys = $overtime->yanmed_status;
-                                $ms = $overtime->medical_service_status;
-                                $status = ($ys && $ys !== 'pending')
-                                ? $ys
-                                : (($ms && $ms !== 'pending') ? $ms : ($ys ?: 'pending'));
-                                $sig = $overtime->yanmed_signature ?: $overtime->medical_service_signature;
-                                $approver = $overtime->yanmedApprover ?: $overtime->medicalServiceApprover;
-                                $nama = $approver->name ?? '-';
-                                } elseif ($overtime->director_approved_by) {
-                                $jabatan = 'Direktur';
-                                $nama = $overtime->directorApprover->name ?? '-';
-                                $sig = $overtime->director_signature;
-                                $status = $overtime->director_status;
-                                } elseif ($overtime->head_approved_by) {
-                                $jabatan = 'Kepala Unit / Head';
-                                $nama = $overtime->headApprover->name ?? '-';
-                                $sig = $overtime->head_signature;
-                                $status = $overtime->head_status;
-                                } else {
-                                $jabatan = 'Manajemen / HRD';
-                                $nama = $overtime->hrdApprover->name ?? '-';
-                                $sig = $overtime->hrd_signature;
-                                $status = $overtime->hrd_status;
-                                }
-                                @endphp
-
-                                <div style="font-size: 9pt;">{{ $jabatan }}</div>
-                                <div class="status-badge">[{{ strtoupper($status ?? 'PENDING') }}]</div>
-
-                                <div class="sig-space-wrapper">
-                                    @if($sig)
-                                    <img src="{{ (strpos($sig, 'data:image') === 0) ? $sig : public_path('storage/'.$sig) }}" class="sig-image">
-                                    @endif
-                                </div>
-
-                                <div class="name-output">{{ $nama }}</div>
-                                <div style="font-size: 8pt; color:#444;">{{ $jabatan }}</div>
-
-                                {{-- Kompatibilitas data lama: surat YANMED era lama juga ditandatangani HRD --}}
-                                @if($needsYanmed && $overtime->hrd_approved_by)
-                                <div style="font-size: 9pt; margin-top: 4px;">HRD</div>
-                                <div class="status-badge">[{{ strtoupper($overtime->hrd_status ?? 'APPROVED') }}]</div>
-                                <div class="sig-space-wrapper">
-                                    @if($overtime->hrd_signature)
-                                    <img src="{{ (strpos($overtime->hrd_signature, 'data:image') === 0) ? $overtime->hrd_signature : public_path('storage/'.$overtime->hrd_signature) }}" class="sig-image">
-                                    @endif
-                                </div>
-                                <div class="name-output">{{ $overtime->hrdApprover->name ?? '-' }}</div>
-                                <div style="font-size: 8pt; color:#444;">HRD</div>
+    <table class="signature-section-table">
+        <tr>
+            <td>
+                <table class="inner-sig-table">
+                    <tr>
+                        <th colspan="2">Diajukan Oleh :</th>
+                    </tr>
+                    <tr>
+                        <td style="width: 50%; border-right: 1px solid #eee;">
+                            <div style="font-size: 9pt;">Karyawan</div>
+                            <div class="sig-space-wrapper">
+                                @if($overtime->employee_signature)
+                                <img src="{{ $overtime->employee_signature }}" class="sig-image">
                                 @endif
-                            </td>
-                        </tr>
-                    </table>
+                            </div>
+                            <div class="name-output">{{ $overtime->user->name ?? '-' }}</div>
+                            <div style="font-size: 8pt; color:#444;">NIK: {{ $overtime->user->nik ?? '-' }}</div>
+                        </td>
+                        <td style="width: 50%;">
+                            <div style="font-size: 9pt;">Atasan / PJ</div>
+                            <div class="status-badge">[{{ strtoupper($overtime->pj_status ?? 'PENDING') }}]</div>
+                            <div class="sig-space-wrapper">
+                                @if($overtime->pj_signature)
+                                <img src="{{ $overtime->pj_signature }}" class="sig-image">
+                                @endif
+                            </div>
+                            <div class="name-output">{{ $overtime->pjApprover->name ?? '-' }}</div>
+                            <div style="font-size: 8pt; color:#444;">Atasan Langsung</div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+
+            <td>
+                <table class="inner-sig-table">
+                    <tr>
+                        <th colspan="{{ max(count($approvalBlocks), 1) }}">Disetujui Oleh :</th>
+                    </tr>
+                    <tr>
+                        @forelse($approvalBlocks as $block)
+                        <td style="width: {{ $approvalWidth }}%;">
+                            <div style="font-size: 9pt;">{{ $block['label'] }}</div>
+                            <div class="status-badge">[{{ $block['status_text'] ?? 'PENDING' }}]</div>
+                            <div class="sig-space-wrapper">
+                                @if($block['image'])
+                                <img src="{{ $block['image'] }}" class="sig-image">
+                                @endif
+                            </div>
+                            <div class="name-output">{{ $block['name'] }}</div>
+                            <div style="font-size: 8pt; color:#444;">{{ $block['label'] }}</div>
+                        </td>
+                        @empty
+                        <td>
+                            <div style="font-size: 9pt;">Manajemen</div>
+                            <div class="status-badge">[PENDING]</div>
+                            <div class="sig-space-wrapper"></div>
+                            <div class="name-output">-</div>
+                        </td>
+                        @endforelse
+                    </tr>
+                </table>
                 </td>
             </tr>
         </table>

@@ -10,7 +10,7 @@ namespace App\Services;
  *   CASEMIX   : casemix (+pj_casemix) + hrd                 -> PJ -> Direktur (final)
  *   ADMISSION : admission (+pj_admission)                   -> PJ -> Kabag Marketing -> Manager Umum
  *   FINANCE   : accounting, finance (+pj_*)                 -> PJ -> Manager Finance (final)
- *   DIREKTUR  : direktur, manajer, kabag, dll              -> Direktur (final, tanpa PJ)
+ *   DIREKTUR  : direktur, manajer, kabag, sekre, supervisor -> Direktur (final, tanpa PJ)
  *
  * Konvensi: nama STAGE == nama ROLE approver == prefix kolom database.
  * (stage "kabag_umum" -> role "kabag_umum" -> kolom kabag_umum_status,
@@ -47,8 +47,8 @@ class ApprovalFlowService
     |--------------------------------------------------------------------------
     */
     public const STAGE_STATUS = [
-        // Status lama tetap dipetakan agar data lama tetap terbaca.
-        'medical_service' => 'waiting_medical_service',
+        // Stage medical_service memakai status baru 'waiting_yanmed';
+        // status lawas 'waiting_medical_service' dinormalisasi via LEGACY_STATUS_ALIASES.
         'medical_service'          => 'waiting_yanmed',
         'kabag_umum'      => 'waiting_kabag_umum',
         'manager_umum'    => 'waiting_manager_umum',
@@ -151,8 +151,9 @@ class ApprovalFlowService
         'head_pegawai' => 'direktur',
         'sekre' => 'direktur',
         'sekretariat' => 'direktur',
+        // Supervisor juga pengaju langsung: approval hanya ke Direktur (tanpa PJ).
+        'supervisor' => 'direktur',
         'director' => 'direktur',
-        'medical_service' => 'direktur',
         'medical_service' => 'direktur',
         'kabag_umum' => 'direktur',
         'manager_umum' => 'direktur',
@@ -176,7 +177,7 @@ class ApprovalFlowService
         'head_pegawai',
         'sekre',
         'sekretariat',
-        'medical_service',
+        'supervisor',
         'medical_service',
         'kabag_umum',
         'manager_umum',
@@ -319,7 +320,7 @@ class ApprovalFlowService
     public static function columnPrefixesForStage(string $stage): array
     {
         if ($stage === 'medical_service') {
-            return ['medical_service', 'medical_service'];
+            return ['yanmed', 'medical_service'];
         }
 
         return [$stage];
@@ -443,7 +444,9 @@ class ApprovalFlowService
         $stageStatuses = [];
 
         foreach (array_keys(self::APPROVER_STAGES) as $stage) {
-            $stageStatuses[$stage . '_status'] = 'pending';
+            foreach (self::columnPrefixesForStage($stage) as $prefix) {
+                $stageStatuses[$prefix . '_status'] = 'pending';
+            }
         }
 
         return array_merge([
