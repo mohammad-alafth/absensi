@@ -41,6 +41,8 @@ $pjUsers = \App\Models\User::where('role', $pjRole)->get();
                 </a>
             </div>
 
+            <x-flash-message />
+
             <form id="overtimeForm" action="{{ route('lembur.store') }}" method="POST" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 @csrf
 
@@ -168,6 +170,8 @@ $pjUsers = \App\Models\User::where('role', $pjRole)->get();
                 </div>
 
             </form>
+
+            <x-my-submissions type="overtime" :submissions="$overtimes ?? []" />
 
         </div>
     </div>

@@ -29,6 +29,8 @@
                 </div>
             </div>
 
+            <x-flash-message />
+
             @if($leaves->count() > 0)
 
             <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -89,6 +91,8 @@
                             </div>
                         </div>
 
+                        <x-rejection-banner :submission="$leave" />
+
                         <div class="grid grid-cols-2 gap-2 mt-2">
                             <button @click="showDetail = true" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
                                 📋 Detail
@@ -104,6 +108,8 @@
                             </button>
                             @endif
                         </div>
+
+                        <x-submission-edit-form type="leave" :submission="$leave" />
 
                         <div x-show="showDetail" x-transition.opacity class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 backdrop-blur-xs" style="display:none;">
                             <div @click.away="showDetail = false" class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
@@ -148,25 +154,7 @@
                                     @endif
                                 </div>
 
-                                @if($leave->pj_note || $leave->hrd_note)
-                                <div class="mt-4 grid grid-cols-1 gap-3 text-xs">
-                                    @if($leave->pj_note)
-                                    <div class="p-3 rounded-xl border {{ $leave->pj_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700' }}">
-                                        <p class="font-bold mb-1">💬 {{ $leave->pj_status == 'rejected' ? 'Alasan Penolakan PJ' : 'Catatan Penanggung Jawab' }}</p>
-                                        <p class="text-gray-700 italic">"{{ $leave->pj_note }}"</p>
-                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh: {{ $leave->pjApprover->name ?? '-' }}</p>
-                                    </div>
-                                    @endif
-
-                                    @if($leave->hrd_note)
-                                    <div class="p-3 rounded-xl border {{ $leave->hrd_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-700' }}">
-                                        <p class="font-bold mb-1">💬 {{ $leave->hrd_status == 'rejected' ? 'Alasan Penolakan HRD' : 'Catatan HRD Verifikator' }}</p>
-                                        <p class="text-gray-700 italic">"{{ $leave->hrd_note }}"</p>
-                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh: {{ $leave->hrdApprover->name ?? '-' }}</p>
-                                    </div>
-                                    @endif
-                                </div>
-                                @endif
+                                <x-approval-notes :submission="$leave" />
 
                                 <div class="mt-6 pt-3 border-t flex gap-2">
                                     @if($leave->pdf_file)

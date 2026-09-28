@@ -41,6 +41,8 @@
                 </div>
             </div>
 
+            <x-flash-message />
+
             @forelse($years as $year)
 
             <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -98,6 +100,8 @@
                                     </div>
                                 </div>
 
+                                <x-rejection-banner :submission="$leave" />
+
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('leave-{{ $leave->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
                                         📋 Detail
@@ -106,6 +110,8 @@
                                         🖨️ Cetak PDF
                                     </a>
                                 </div>
+
+                                <x-submission-edit-form type="leave" :submission="$leave" />
                             </div>
 
                             <div id="leave-{{ $leave->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
@@ -142,6 +148,8 @@
                                             <p class="font-medium text-gray-700 italic mt-1 bg-white p-2 rounded-lg border-dashed border">{{ $leave->reason }}</p>
                                         </div>
                                     </div>
+
+                                    <x-approval-notes :submission="$leave" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('leaves.download-pdf', $leave->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
                                             ⬇ Download Dokumen PDF Resmi
@@ -193,6 +201,8 @@
                                     </div>
                                 </div>
 
+                                <x-rejection-banner :submission="$permission" />
+
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('permission-{{ $permission->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
                                         📋 Detail
@@ -201,6 +211,8 @@
                                         🖨️ Cetak PDF
                                     </a>
                                 </div>
+
+                                <x-submission-edit-form type="permission" :submission="$permission" />
                             </div>
 
                             <div id="permission-{{ $permission->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
@@ -237,6 +249,8 @@
                                             <p class="font-medium text-gray-700 italic mt-1 bg-white p-2 rounded-lg border-dashed border">{{ $permission->alasan }}</p>
                                         </div>
                                     </div>
+
+                                    <x-approval-notes :submission="$permission" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('permissions.download-pdf', $permission->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
                                             ⬇ Download Dokumen PDF Resmi
@@ -290,6 +304,8 @@
                                     </div>
                                 </div>
 
+                                <x-rejection-banner :submission="$overtime" />
+
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('overtime-{{ $overtime->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
                                         📋 Detail
@@ -298,6 +314,8 @@
                                         🖨️ Cetak PDF
                                     </a>
                                 </div>
+
+                                <x-submission-edit-form type="overtime" :submission="$overtime" />
                             </div>
 
                             <div id="overtime-{{ $overtime->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
@@ -322,6 +340,8 @@
                                             <p class="font-medium text-gray-700 italic mt-1 bg-white p-2 rounded-lg border-dashed border">{{ $overtime->reason }}</p>
                                         </div>
                                     </div>
+
+                                    <x-approval-notes :submission="$overtime" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('overtimes.download-pdf', $overtime->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
                                             ⬇ Download Dokumen PDF Resmi

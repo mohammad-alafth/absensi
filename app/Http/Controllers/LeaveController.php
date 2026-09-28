@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ApprovalFlowService;
+use App\Support\SubmissionStatus;
 
 class LeaveController extends Controller
 {
@@ -20,9 +21,25 @@ class LeaveController extends Controller
     {
         $user = auth()->user();
 
+        /*
+        |--------------------------------------------------------------------------
+        | PENGAJUAN SAYA
+        |--------------------------------------------------------------------------
+        | Ditampilkan langsung di halaman pengajuan agar pengaju bisa memantau
+        | status dan merevisi pengajuannya sendiri tanpa membuka menu Riwayat.
+        */
+        $leaves = Leave::where('user_id', $user->id)
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        // Nama approver diambil sekali untuk semua pengajuan (hindari N+1).
+        SubmissionStatus::primeApproverNames($leaves);
+
         return view('cuti', [
             'usedLeave' => $user->used_leave,
             'remainingLeave' => $user->remaining_leave,
+            'leaves' => $leaves,
         ]);
     }
 
@@ -267,20 +284,159 @@ class LeaveController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | USER UBAH CUTI (REVISI SAAT PENDING / SETELAH DITOLAK)
+    |--------------------------------------------------------------------------
+    | Hanya pemilik pengajuan dan hanya selama status `pending` atau `rejected`.
+    | Revisi dari pengajuan yang ditolak otomatis dikirim ulang ke tahap awal
+    | approval, sedangkan catatan penolakan lama tetap disimpan agar bisa
+    | ditampilkan di menu Riwayat.
+    */
+    public function update(Request $request, $id)
+    {
+        $leave = Leave::findOrFail($id);
+
+        if ($leave->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!SubmissionStatus::isEditable($leave)) {
+            return back()->with(
+                'error',
+                'Pengajuan cuti yang sudah diverifikasi atau disetujui tidak dapat diubah lagi.'
+            );
+        }
+
+        $request->validate([
+
+            'recipient' => 'nullable|string|max:100',
+
+            'start_date' => 'required|date',
+
+            'end_date' => 'required|date',
+
+            'return_date' => 'nullable|date',
+
+            'leave_type' => 'required|string',
+
+            'reason' => 'required|string|min:2',
+
+            'delegate_name' => 'nullable|string|max:100',
+
+            'delegate_nik' => 'nullable|string|max:30',
+
+            'emergency_contact' => 'nullable|string|max:30',
+
+        ]);
+
+        $startDate = Carbon::parse($request->start_date);
+        $endDate = Carbon::parse($request->end_date);
+
+        if ($endDate->lt($startDate)) {
+
+            return back()
+                ->withErrors([
+                    'end_date' =>
+                    'Tanggal selesai tidak boleh lebih kecil dari tanggal mulai'
+                ])
+                ->withInput();
+        }
+
+        $totalDays = $startDate->diffInDays($endDate) + 1;
+
+        $user = auth()->user();
+
+        if ($totalDays > $user->remaining_leave) {
+
+            return back()
+                ->withErrors([
+                    'start_date' => 'Sisa cuti tidak mencukupi'
+                ])
+                ->withInput();
+        }
+
+        $wasRejected = $leave->status === 'rejected';
+
+        $leave->update([
+
+            'recipient' => $request->recipient,
+
+            'start_date' => $request->start_date,
+
+            'end_date' => $request->end_date,
+
+            'return_date' => $request->return_date,
+
+            'total_days' => $totalDays,
+
+            'leave_type' => $request->leave_type,
+
+            'reason' => $request->reason,
+
+            'delegate_name' => $request->delegate_name,
+
+            'delegate_nik' => $request->delegate_nik,
+
+            'emergency_contact' => $request->emergency_contact,
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM ULANG SETELAH PENOLAKAN
+        |--------------------------------------------------------------------------
+        */
+        if ($wasRejected) {
+            $leave->update(ApprovalFlowService::handle($user->role));
+        }
+
+        $leave = $leave->fresh();
+        $leave->load('user');
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERBARUI BERKAS PDF SURAT CUTI
+        |--------------------------------------------------------------------------
+        */
+        $pdf = Pdf::loadView(
+            'pdf.leave-letter',
+            [
+                'leave' => $leave,
+                'usedLeave' => $user->used_leave,
+                'remainingLeave' => $user->remaining_leave,
+            ]
+        );
+
+        $fileName = 'leave-pdf/' . $leave->id . '.pdf';
+
+        Storage::disk('public')->put(
+            $fileName,
+            $pdf->output()
+        );
+
+        $leave->update([
+            'pdf_file' => $fileName
+        ]);
+
+        return back()->with(
+            'success',
+            $wasRejected
+                ? 'Perubahan cuti tersimpan dan pengajuan dikirim ulang untuk persetujuan.'
+                : 'Perubahan pengajuan cuti berhasil disimpan.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | HISTORY CUTI
     |--------------------------------------------------------------------------
     */
     public function history()
     {
-        $leaves = Leave::with([
-            'pjApprover',
-            'hrdApprover',
-            'headApprover',
-            'directorApprover'
-        ])
-            ->where('user_id', auth()->id())
+        $leaves = Leave::where('user_id', auth()->id())
             ->latest()
             ->get();
+
+        // Nama approver diambil sekali untuk semua pengajuan (hindari N+1).
+        SubmissionStatus::primeApproverNames($leaves);
 
         return view(
             'cuti-history',

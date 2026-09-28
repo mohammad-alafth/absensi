@@ -36,6 +36,8 @@
                 </a>
             </div>
 
+            <x-flash-message />
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                 <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white rounded-xl p-4 shadow-sm flex items-center justify-between">
                     <p class="text-xs opacity-90 font-medium">Sisa Kuota Cuti</p>
@@ -164,6 +166,8 @@
 
                 </div>
             </form>
+
+            <x-my-submissions type="leave" :submissions="$leaves ?? []" />
 
         </div>
     </div>

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Overtime;
 use Carbon\Carbon;
 use App\Services\ApprovalFlowService;
+use App\Support\SubmissionStatus;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
@@ -18,7 +19,22 @@ class OvertimeController extends Controller
     */
     public function create()
     {
-        return view('lembur');
+        /*
+        |--------------------------------------------------------------------------
+        | PENGAJUAN SAYA
+        |--------------------------------------------------------------------------
+        | Ditampilkan langsung di halaman pengajuan agar pengaju bisa memantau
+        | status dan merevisi pengajuannya sendiri tanpa membuka menu Riwayat.
+        */
+        $overtimes = Overtime::where('user_id', auth()->id())
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        // Nama approver diambil sekali untuk semua pengajuan (hindari N+1).
+        SubmissionStatus::primeApproverNames($overtimes);
+
+        return view('lembur', compact('overtimes'));
     }
 
     /*
@@ -138,20 +154,113 @@ class OvertimeController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | USER UBAH LEMBUR (REVISI SAAT PENDING / SETELAH DITOLAK)
+    |--------------------------------------------------------------------------
+    | Hanya pemilik pengajuan dan hanya selama status `pending` atau `rejected`.
+    | Revisi dari pengajuan yang ditolak otomatis dikirim ulang ke tahap awal
+    | approval; catatan penolakan lama tetap tersimpan untuk menu Riwayat.
+    */
+    public function update(Request $request, $id)
+    {
+        $overtime = Overtime::findOrFail($id);
+
+        if ($overtime->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!SubmissionStatus::isEditable($overtime)) {
+            return back()->with(
+                'error',
+                'Pengajuan lembur yang sudah diverifikasi atau disetujui tidak dapat diubah lagi.'
+            );
+        }
+
+        $request->validate([
+            'overtime_date' => 'required|date',
+            'start_time' => 'required',
+            'end_time' => 'required',
+            'reason' => 'required|string',
+            'day_type' => 'required|string',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | HITUNG ULANG VOLUME JAM (sama seperti store)
+        |--------------------------------------------------------------------------
+        */
+        $start = Carbon::parse($request->start_time);
+        $end = Carbon::parse($request->end_time);
+
+        if ($end <= $start) {
+            $end->addDay();
+        }
+
+        $totalMinutes = $start->diffInMinutes($end);
+        $hoursDecimal = $totalMinutes / 60;
+
+        $wasRejected = $overtime->status === 'rejected';
+
+        $overtime->update([
+            'day_type' => $request->day_type,
+            'overtime_date' => $request->overtime_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'total_hours' => $hoursDecimal,
+            'reason' => $request->reason,
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM ULANG SETELAH PENOLAKAN
+        |--------------------------------------------------------------------------
+        */
+        if ($wasRejected) {
+            $overtime->update(ApprovalFlowService::handle(auth()->user()->role));
+        }
+
+        $overtime = $overtime->fresh();
+        $overtime->load('user');
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERBARUI BERKAS PDF SURAT PERINTAH LEMBUR
+        |--------------------------------------------------------------------------
+        */
+        $pdf = Pdf::loadView('pdf.overtime-letter', [
+            'overtime' => $overtime
+        ]);
+
+        $fileName = 'overtime-pdf/' . $overtime->id . '.pdf';
+
+        Storage::disk('public')->put($fileName, $pdf->output());
+
+        if (\Schema::hasColumn('overtimes', 'pdf_file')) {
+            $overtime->update([
+                'pdf_file' => $fileName
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            $wasRejected
+                ? 'Perubahan lembur tersimpan dan pengajuan dikirim ulang untuk persetujuan.'
+                : 'Perubahan pengajuan lembur berhasil disimpan.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | HISTORY
     |--------------------------------------------------------------------------
     */
     public function history()
     {
-        $overtimes = Overtime::with([
-            'pjApprover',
-            'hrdApprover',
-            'headApprover',
-            'directorApprover'
-        ])
-            ->where('user_id', auth()->id())
+        $overtimes = Overtime::where('user_id', auth()->id())
             ->latest()
             ->get();
+
+        // Nama approver diambil sekali untuk semua pengajuan (hindari N+1).
+        SubmissionStatus::primeApproverNames($overtimes);
 
         return view('lembur-history', compact('overtimes'));
     }

@@ -31,6 +31,14 @@
                 </div>
                 @endif
 
+                @if(session('error'))
+                <div class="px-5 pt-4">
+                    <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-xs">
+                        {{ session('error') }}
+                    </div>
+                </div>
+                @endif
+
                 @if($errors->any())
                 <div class="px-5 pt-4">
                     <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-xs">
@@ -147,6 +155,8 @@
                 </div>
 
             </form>
+
+            <x-my-submissions type="permission" :submissions="$permissions ?? []" />
 
         </div>
     </div>

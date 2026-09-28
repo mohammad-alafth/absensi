@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Overtime;
 use App\Models\EmployeeShift;
 use App\Support\PermissionRange;
+use App\Support\SubmissionStatus;
 use Carbon\Carbon;
 
 class HistoryController extends Controller
@@ -69,6 +70,18 @@ class HistoryController extends Controller
             ->get()
             ->groupBy(fn($item) => (int) Carbon::parse($item->overtime_date)->year)
             ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | NAMA APPROVER (satu query untuk seluruh pengajuan, tanpa N+1)
+        |--------------------------------------------------------------------------
+        */
+
+        SubmissionStatus::primeApproverNames(array_merge(
+            collect($leaves)->flatten(1)->all(),
+            collect($permissions)->flatten(1)->all(),
+            collect($overtimes)->flatten(1)->all()
+        ));
 
         /*
         |--------------------------------------------------------------------------

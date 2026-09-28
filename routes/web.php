@@ -109,6 +109,12 @@ Route::middleware([
         'history'
     ])->name('izin.history');
 
+    // Revisi izin (hanya saat status pending / rejected) dari menu Riwayat
+    Route::put('/izin/{id}', [
+        PermissionController::class,
+        'update'
+    ])->name('izin.update');
+
     /*
     |--------------------------------------------------------------------------
     | CUTI
@@ -130,6 +136,12 @@ Route::middleware([
         'history'
     ])->name('cuti.history');
 
+    // Revisi cuti (hanya saat status pending / rejected) dari menu Riwayat
+    Route::put('/cuti/{id}', [
+        LeaveController::class,
+        'update'
+    ])->name('cuti.update');
+
     /*
     |--------------------------------------------------------------------------
     | LEMBUR
@@ -150,6 +162,12 @@ Route::middleware([
         OvertimeController::class,
         'history'
     ])->name('lembur.history');
+
+    // Revisi lembur (hanya saat status pending / rejected) dari menu Riwayat
+    Route::put('/lembur/{id}', [
+        OvertimeController::class,
+        'update'
+    ])->name('lembur.update');
 
     /*
     |--------------------------------------------------------------------------

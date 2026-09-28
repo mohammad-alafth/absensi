@@ -29,6 +29,8 @@
                 </div>
             </div>
 
+            <x-flash-message />
+
             @if($overtimes->count() > 0)
 
             <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -89,6 +91,8 @@
                             </div>
                         </div>
 
+                        <x-rejection-banner :submission="$item" />
+
                         <div class="grid grid-cols-2 gap-2 mt-2">
                             <button @click="showDetail = true" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1">
                                 📋 Detail
@@ -104,6 +108,8 @@
                             </button>
                             @endif
                         </div>
+
+                        <x-submission-edit-form type="overtime" :submission="$item" />
 
                         <div x-show="showDetail" x-transition.opacity class="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 backdrop-blur-xs" style="display:none;">
                             <div @click.away="showDetail = false" class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
@@ -134,25 +140,7 @@
                                     </div>
                                 </div>
 
-                                @if($item->pj_note || $item->hrd_note)
-                                <div class="mt-4 grid grid-cols-1 gap-3 text-xs">
-                                    @if($item->pj_note)
-                                    <div class="p-3 rounded-xl border {{ $item->pj_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700' }}">
-                                        <p class="font-bold mb-1">💬 {{ $item->pj_status == 'rejected' ? 'Alasan Penolakan PJ' : 'Catatan Penanggung Jawab' }}</p>
-                                        <p class="text-gray-700 italic">"{{ $item->pj_note }}"</p>
-                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh: {{ $item->pjApprover->name ?? '-' }}</p>
-                                    </div>
-                                    @endif
-
-                                    @if($item->hrd_note)
-                                    <div class="p-3 rounded-xl border {{ $item->hrd_status == 'rejected' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-emerald-50 border-emerald-100 text-emerald-700' }}">
-                                        <p class="font-bold mb-1">💬 {{ $item->hrd_status == 'rejected' ? 'Alasan Penolakan HRD' : 'Catatan HRD Verifikator' }}</p>
-                                        <p class="text-gray-700 italic">"{{ $item->hrd_note }}"</p>
-                                        <p class="text-[10px] text-gray-400 mt-1.5 font-semibold">Oleh: {{ $item->hrdApprover->name ?? '-' }}</p>
-                                    </div>
-                                    @endif
-                                </div>
-                                @endif
+                                <x-approval-notes :submission="$item" />
 
                                 <div class="mt-6 pt-3 border-t flex gap-2">
                                     @if($item->pdf_file)
