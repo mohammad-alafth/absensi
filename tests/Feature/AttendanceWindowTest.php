@@ -45,7 +45,7 @@ class AttendanceWindowTest extends TestCase
             'start_time' => $start,
             'end_time' => $end,
             'work_hours' => 8,
-            'grace_minutes' => 15,
+            'grace_minutes' => 5,
             'is_overnight' => $isOvernight,
         ]);
     }

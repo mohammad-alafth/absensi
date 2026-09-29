@@ -49,7 +49,6 @@ trait CompressesSignatureAttributes
             'hrd_signature',
             'head_signature',
             'director_signature',
-            'yanmed_signature',
             'medical_service_signature',
             'kabag_umum_signature',
             'manager_umum_signature',

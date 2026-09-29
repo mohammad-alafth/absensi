@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  *
  * sehingga Kabag dan Manajemen selalu tampil sebagai dua blok terpisah.
  * Tahap yang dirender = tahap milik rantai role pengaju DITAMBAH tahap lama
- * (head / hrd / medical_service) yang sudah punya data, supaya surat lama
+ * (head / hrd) yang sudah punya data, supaya surat lama
  * tetap tampil lengkap.
  *
  * Konvensi kolom mengikuti ApprovalFlowService: nama stage == prefix kolom
@@ -95,7 +95,7 @@ class PdfSignatureBlocks
         $stages = $role === null ? [] : ApprovalFlowService::chainFor($role);
 
         // Data lama bisa disetujui pada tahap yang tidak lagi ada di rantai
-        // (head / hrd) atau pada stage yang datanya masih di kolom lama.
+        // (head / hrd). Tahap tersebut tetap ditampilkan bila ada datanya.
         $candidates = array_merge(
             self::LEGACY_STAGES,
             array_keys(ApprovalFlowService::APPROVER_STAGES)
@@ -191,8 +191,7 @@ class PdfSignatureBlocks
     }
 
     /**
-     * Status / tanda tangan / approver sebuah tahap, lengkap dengan fallback
-     * ke kolom lama (yanmed_* <-> medical_service_*).
+     * Status / tanda tangan / approver sebuah tahap.
      *
      * @return array{0: ?string, 1: ?string, 2: int|null}
      */
@@ -201,20 +200,6 @@ class PdfSignatureBlocks
         $status = $submission->{$stage . '_status'} ?? null;
         $signature = $submission->{$stage . '_signature'} ?? null;
         $approvedBy = $submission->{$stage . '_approved_by'} ?? null;
-
-        // Stage YANMED memakai dua set kolom: yanmed_* (baru) dan
-        // medical_service_* (kompatibilitas data lama). Bila kolom utama belum
-        // diproses, pakai kolom lawas agar surat lama tetap tampil benar.
-        if ($stage === 'medical_service' && !self::isDecided($status)) {
-            $status = $submission->yanmed_status ?: $status;
-            $signature = $signature ?: ($submission->yanmed_signature ?? null);
-            $approvedBy = $approvedBy ?: ($submission->yanmed_approved_by ?? null);
-        } elseif ($stage === 'medical_service' && self::isDecided($submission->yanmed_status ?? null)) {
-            // Bila yanmed_* sudah diproses, kolom itulah yang dipakai (lebih baru).
-            $status = $submission->yanmed_status;
-            $signature = $submission->yanmed_signature ?: $signature;
-            $approvedBy = $submission->yanmed_approved_by ?: $approvedBy;
-        }
 
         return [$status, $signature, $approvedBy];
     }

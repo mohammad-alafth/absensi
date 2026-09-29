@@ -5,9 +5,10 @@ namespace App\Services;
 /**
  * Pusat konfigurasi alur approval (single source of truth).
  *
- *   YANMED    : ugd, ranap, ok, pipp, ro, rm, gizi (+pj_*) -> PJ -> YANMED (final)
+ *   MEDICAL   : ugd, ranap, ok, pipp, ro, rm, gizi (+pj_*) -> PJ -> medical_service (final)
  *   UMUM      : it, security, cs (+pj_*)                   -> PJ -> Kabag Umum -> Manager Umum
- *   CASEMIX   : casemix (+pj_casemix) + hrd                 -> PJ -> Direktur (final)
+ *   CASEMIX   : casemix (+pj_casemix)                    -> PJ -> Direktur (final)
+ *   HRD       : hrd                                      -> Manager Umum -> Direktur (final, tanpa PJ)
  *   ADMISSION : admission (+pj_admission)                   -> PJ -> Kabag Marketing -> Manager Umum
  *   FINANCE   : accounting, finance (+pj_*)                 -> PJ -> Manager Finance (final)
  *   DIREKTUR  : direktur, manajer, kabag, sekre, supervisor -> Direktur (final, tanpa PJ)
@@ -47,9 +48,7 @@ class ApprovalFlowService
     |--------------------------------------------------------------------------
     */
     public const STAGE_STATUS = [
-        // Stage medical_service memakai status baru 'waiting_yanmed';
-        // status lawas 'waiting_medical_service' dinormalisasi via LEGACY_STATUS_ALIASES.
-        'medical_service'          => 'waiting_yanmed',
+        'medical_service'          => 'waiting_medical_service',
         'kabag_umum'      => 'waiting_kabag_umum',
         'manager_umum'    => 'waiting_manager_umum',
         'kabag_marketing' => 'waiting_kabag_marketing',
@@ -58,11 +57,12 @@ class ApprovalFlowService
     ];
 
     /**
-     * Status lama -> status baru. Data lama 'waiting_medical_service'
-     * diperlakukan sama dengan 'waiting_yanmed'.
+     * Status lama sesi development ('waiting_yanmed', nama kolom lama)
+     * diperlakukan sama dengan 'waiting_medical_service' agar pengajuan
+     * yang masih menyimpan status lama tetap terbaca dengan benar.
      */
     public const LEGACY_STATUS_ALIASES = [
-        'waiting_medical_service' => 'waiting_yanmed',
+        'waiting_yanmed' => 'waiting_medical_service',
     ];
 
     /*
@@ -74,6 +74,7 @@ class ApprovalFlowService
         'medical_service'    => ['medical_service'],
         'umum'      => ['kabag_umum', 'manager_umum'],
         'casemix'   => ['director'],
+        'hrd'       => ['manager_umum', 'director'],
         'admission' => ['kabag_marketing', 'manager_umum'],
         'finance'   => ['manager_finance'],
         'direktur'  => ['director'],
@@ -88,7 +89,7 @@ class ApprovalFlowService
     | Role yang tidak terdaftar otomatis masuk grup default (direktur).
     */
     public const ROLE_GROUPS = [
-        // ---- YANMED (penunjang medis) ----
+        // ---- medical_service / YANMED (penunjang medis) ----
         'ugd' => 'medical_service',
         'pj_ugd' => 'medical_service',
         'ranap' => 'medical_service',
@@ -142,10 +143,12 @@ class ApprovalFlowService
         'finance_mgr' => 'finance',
 
         // ---- DIRECT / DIREKTUR ----
-        // Pengajuan casemix, hrd, dan sekretariat tidak melewati PJ.
+        // Pengajuan casemix masih melewati PJ; sekretariat tidak.
         'casemix' => 'casemix',
         'pj_casemix' => 'casemix',
-        'hrd' => 'casemix',
+
+        // ---- HRD (tanpa PJ) : Manager Umum -> Direktur ----
+        'hrd' => 'hrd',
 
         // ---- DIREKTUR (langsung, tanpa PJ) ----
         'head_pegawai' => 'direktur',
@@ -210,8 +213,8 @@ class ApprovalFlowService
         'pending'                 => 'Pending PJ',
         'waiting_head'            => 'Waiting Kepala Bagian',
         'waiting_hrd'             => 'Waiting HRD',
-        'waiting_yanmed'          => 'Waiting YANMED',
-        'waiting_medical_service' => 'Waiting YANMED', // status lama, label sama
+        'waiting_medical_service' => 'Waiting YANMED',
+        'waiting_yanmed'          => 'Waiting YANMED', // status lama sesi development, label sama
         'waiting_kabag_umum'      => 'Waiting Kabag Umum',
         'waiting_manager_umum'    => 'Waiting Manager Umum',
         'waiting_kabag_marketing' => 'Waiting Kabag Marketing',
@@ -314,15 +317,10 @@ class ApprovalFlowService
 
     /**
      * Prefiks kolom yang harus ditulis saat sebuah stage disetujui/ditolak.
-     * Stage 'medical_service' menulis kolom 'yanmed_*' + kolom kompatibilitas
-     * 'medical_service_*' agar data lama & PDF lama tetap konsisten.
+     * Stage 'medical_service' hanya menulis kolom 'medical_service_*'.
      */
     public static function columnPrefixesForStage(string $stage): array
     {
-        if ($stage === 'medical_service') {
-            return ['yanmed', 'medical_service'];
-        }
-
         return [$stage];
     }
 

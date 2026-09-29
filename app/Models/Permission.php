@@ -55,12 +55,6 @@ class Permission extends Model
         'director_approved_at',
 
         // APPROVAL STAGE (konvensi: nama stage == prefix kolom)
-        'yanmed_status',
-        'yanmed_signature',
-        'yanmed_note',
-        'yanmed_approved_by',
-        'yanmed_approved_at',
-
         'medical_service_status',
         'medical_service_signature',
         'medical_service_note',
@@ -121,11 +115,6 @@ class Permission extends Model
     public function medicalServiceApprover()
     {
         return $this->belongsTo(User::class, 'medical_service_approved_by');
-    }
-
-    public function yanmedApprover()
-    {
-        return $this->belongsTo(User::class, 'yanmed_approved_by');
     }
 
     public function kabagUmumApprover()

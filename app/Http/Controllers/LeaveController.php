@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ApprovalFlowService;
+use App\Services\LeaveDayCalculator;
 use App\Support\SubmissionStatus;
 
 class LeaveController extends Controller
@@ -111,17 +112,27 @@ class LeaveController extends Controller
         | Hitung Total Hari
         |--------------------------------------------------------------------------
         */
-        $totalDays =
-            $startDate->diffInDays(
-                $endDate
-            ) + 1;
+        $user = auth()->user();
+
+        // Hari cuti efektif mengikuti jadwal kerja (lihat LeaveDayCalculator):
+        // hari tanpa jadwal (akhir pekan office / tanggal tanpa employee_shifts)
+        // tidak mengurangi kuota. Contoh: cuti tgl 1-5 dengan tgl 3 & 4 tanpa
+        // jadwal -> total_days = 3.
+        $totalDays = LeaveDayCalculator::count($user, $startDate, $endDate);
+
+        if ($totalDays < 1) {
+            return back()
+                ->withErrors([
+                    'start_date' =>
+                    'Tidak ada jadwal kerja pada rentang tanggal cuti. Hari libur/tanpa jadwal tidak dihitung sebagai hari cuti.'
+                ])
+                ->withInput();
+        }
         /*
 |--------------------------------------------------------------------------
 | VALIDASI QUOTA CUTI
 |--------------------------------------------------------------------------
 */
-        $user = auth()->user();
-
         if ($totalDays > $user->remaining_leave) {
 
             return back()
@@ -341,9 +352,20 @@ class LeaveController extends Controller
                 ->withInput();
         }
 
-        $totalDays = $startDate->diffInDays($endDate) + 1;
-
         $user = auth()->user();
+
+        // Hari cuti efektif mengikuti jadwal kerja; hari tanpa jadwal tidak
+        // mengurangi kuota (sama dengan saat pengajuan awal).
+        $totalDays = LeaveDayCalculator::count($user, $startDate, $endDate);
+
+        if ($totalDays < 1) {
+            return back()
+                ->withErrors([
+                    'start_date' =>
+                    'Tidak ada jadwal kerja pada rentang tanggal cuti. Hari libur/tanpa jadwal tidak dihitung sebagai hari cuti.'
+                ])
+                ->withInput();
+        }
 
         if ($totalDays > $user->remaining_leave) {
 

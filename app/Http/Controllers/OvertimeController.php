@@ -12,6 +12,13 @@ use Illuminate\Support\Facades\Storage;
 
 class OvertimeController extends Controller
 {
+    /**
+     * Durasi minimum pengajuan lembur (menit).
+     * Jam lembur dihitung per 60 menit penuh, jadi di bawah ini
+     * pengajuan akan menghasilkan surat tanpa jam lembur.
+     */
+    private const MIN_OVERTIME_MINUTES = 60;
+
     /*
     |--------------------------------------------------------------------------
     | FORM
@@ -55,10 +62,12 @@ class OvertimeController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | HITUNG JAM BERDASARKAN MENIT (DUKUNGAN DESIMAL JAM)
+        | HITUNG JAM LEMBUR (PEMBULATAN KE BAWAH PER 60 MENIT)
         |--------------------------------------------------------------------------
-        | Menghitung total selisih menit terlebih dahulu, kemudian mengonversinya
-        | ke satuan jam desimal agar presisi (Misal: 90 menit -> 1.5 Jam).
+        | Total selisih menit dihitung dulu, lalu setiap 60 menit penuh dihitung
+        | 1 jam dan sisa menit di bawah 60 tidak dihitung:
+        | 60 menit -> 1 jam, 110 menit -> 1 jam, 120 menit -> 2 jam.
+        | Durasi di bawah 60 menit ditolak agar surat tidak bernilai 0 jam.
         */
         $start = Carbon::parse($request->start_time);
         $end = Carbon::parse($request->end_time);
@@ -68,8 +77,17 @@ class OvertimeController extends Controller
             $end->addDay();
         }
 
-        $totalMinutes = $start->diffInMinutes($end);
-        $hoursDecimal = $totalMinutes / 60;
+        $totalMinutes = (int) $start->diffInMinutes($end);
+
+        if ($totalMinutes < self::MIN_OVERTIME_MINUTES) {
+            return back()
+                ->withErrors([
+                    'end_time' => 'Durasi lembur minimal ' . self::MIN_OVERTIME_MINUTES . ' menit',
+                ])
+                ->withInput();
+        }
+
+        $totalHours = intdiv($totalMinutes, 60);
 
         /*
         |--------------------------------------------------------------------------
@@ -91,7 +109,7 @@ class OvertimeController extends Controller
             'overtime_date' => $request->overtime_date,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
-            'total_hours' => $hoursDecimal, // Menyimpan nilai jam dalam bentuk pecahan desimal murni
+            'total_hours' => $totalHours, // Jam penuh; sisa menit di bawah 60 tidak dihitung
             'employee_signature' => $request->employee_signature,
             'reason' => $request->reason,
             // $flow membawa status global + seluruh kolom status stage approval
@@ -187,6 +205,8 @@ class OvertimeController extends Controller
         |--------------------------------------------------------------------------
         | HITUNG ULANG VOLUME JAM (sama seperti store)
         |--------------------------------------------------------------------------
+        | Setiap 60 menit penuh dihitung 1 jam; durasi di bawah 60 menit ditolak.
+        |--------------------------------------------------------------------------
         */
         $start = Carbon::parse($request->start_time);
         $end = Carbon::parse($request->end_time);
@@ -195,8 +215,17 @@ class OvertimeController extends Controller
             $end->addDay();
         }
 
-        $totalMinutes = $start->diffInMinutes($end);
-        $hoursDecimal = $totalMinutes / 60;
+        $totalMinutes = (int) $start->diffInMinutes($end);
+
+        if ($totalMinutes < self::MIN_OVERTIME_MINUTES) {
+            return back()
+                ->withErrors([
+                    'end_time' => 'Durasi lembur minimal ' . self::MIN_OVERTIME_MINUTES . ' menit',
+                ])
+                ->withInput();
+        }
+
+        $totalHours = intdiv($totalMinutes, 60);
 
         $wasRejected = $overtime->status === 'rejected';
 
@@ -205,7 +234,7 @@ class OvertimeController extends Controller
             'overtime_date' => $request->overtime_date,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
-            'total_hours' => $hoursDecimal,
+            'total_hours' => $totalHours,
             'reason' => $request->reason,
         ]);
 

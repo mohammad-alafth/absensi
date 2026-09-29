@@ -37,8 +37,8 @@ class SubmissionStatus
         'pending',
         'waiting_head',
         'waiting_hrd',
-        'waiting_yanmed',
         'waiting_medical_service',
+        'waiting_yanmed', // nama lama sesi development, tetap editable
         'waiting_kabag_umum',
         'waiting_manager_umum',
         'waiting_kabag_marketing',

@@ -9,7 +9,9 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 /**
- * 1. Alur approval role gizi (nutrition): pj_nurse -> hrd.
+ * 1. Alur approval role gizi (nutrition): pj_gizi -> YANMED (medical_service).
+ *    Catatan: struktur baru menempatkan gizi pada grup penunjang medis (YANMED),
+ *    bukan lagi di bawah PJ Perawat dan bukan lagi disetujui HRD.
  * 2. Form izin: tanggal mulai & tanggal selesai; jam wajib hanya bila izin 1 hari,
  *    izin lebih dari 1 hari tidak menyimpan jam.
  */
@@ -42,14 +44,14 @@ class GiziApprovalAndPermissionRangeTest extends TestCase
         ]);
     }
 
-    public function test_gizi_izin_muncul_di_daftar_pj_nurse(): void
+    public function test_gizi_izin_muncul_di_daftar_pj_gizi(): void
     {
         $gizi = $this->makeUser();
         $permission = $this->makePermission($gizi);
 
         $pj = $this->makeUser([
-            'role' => 'pj_nurse',
-            'name' => 'PJ Nurse ' . uniqid(),
+            'role' => 'pj_gizi',
+            'name' => 'PJ Gizi ' . uniqid(),
         ]);
 
         $this->actingAs($pj)
@@ -58,15 +60,15 @@ class GiziApprovalAndPermissionRangeTest extends TestCase
             ->assertSee($gizi->name);
     }
 
-    public function test_alur_approval_gizi_pj_nurse_lalu_hrd(): void
+    public function test_alur_approval_gizi_pj_gizi_lalu_yanmed(): void
     {
         $gizi = $this->makeUser();
         $permission = $this->makePermission($gizi);
 
-        // Langkah 1: PJ Nurse menyetujui
+        // Langkah 1: PJ Gizi menyetujui
         $pj = $this->makeUser([
-            'role' => 'pj_nurse',
-            'name' => 'PJ Nurse ' . uniqid(),
+            'role' => 'pj_gizi',
+            'name' => 'PJ Gizi ' . uniqid(),
         ]);
 
         $this->actingAs($pj)
@@ -77,30 +79,30 @@ class GiziApprovalAndPermissionRangeTest extends TestCase
 
         $permission->refresh();
         $this->assertSame('approved', $permission->pj_status);
-        $this->assertSame('waiting_hrd', $permission->status);
-        $this->assertSame('pending', $permission->hrd_status);
+        $this->assertSame('waiting_medical_service', $permission->status);
+        $this->assertSame('pending', $permission->medical_service_status);
 
-        // Izin gizi muncul di daftar menunggu HRD
-        // (route 'izin' ambigu dengan form user, pakai path HRD eksplisit)
-        $hrd = $this->makeUser([
-            'role' => 'hrd',
-            'name' => 'HRD Approver ' . uniqid(),
+        // Izin gizi muncul di daftar menunggu YANMED
+        // (role lama 'medical_service' tetap didukung lewat alias stage)
+        $medical_service = $this->makeUser([
+            'role' => 'medical_service',
+            'name' => 'YANMED ' . uniqid(),
         ]);
 
-        $this->actingAs($hrd)
+        $this->actingAs($medical_service)
             ->get('/hrd/izin')
             ->assertOk()
             ->assertSee($gizi->name);
 
-        // Langkah 2: HRD menyetujui final
-        $this->actingAs($hrd)
+        // Langkah 2: YANMED menyetujui final (tahap terakhir grup medical_service)
+        $this->actingAs($medical_service)
             ->post(route('hrd.izin.approve', $permission->id), [
                 'signature' => 'data:image/png;base64,AAA',
             ])
             ->assertRedirect();
 
         $permission->refresh();
-        $this->assertSame('approved', $permission->hrd_status);
+        $this->assertSame('approved', $permission->medical_service_status);
         $this->assertSame('approved', $permission->status);
     }
 
