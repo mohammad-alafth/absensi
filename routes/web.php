@@ -171,6 +171,35 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
+    | ABSEN LEMBUR REALTIME (BUKTI KEHADIRAN)
+    |--------------------------------------------------------------------------
+    | Jam absen diambil dari waktu server; GPS + selfie jadi bukti. Aturan
+    | jendela waktu & volume ada di App\Services\OvertimePunchService.
+    */
+
+    Route::get('/lembur-aktif', [
+        OvertimeController::class,
+        'activePunch'
+    ])->middleware('throttle:60,1')->name('lembur.punch.active');
+
+    Route::post('/lembur/{id}/mulai', [
+        OvertimeController::class,
+        'startPunch'
+    ])->middleware('throttle:20,1')->name('lembur.punch.start');
+
+    Route::post('/lembur/{id}/selesai', [
+        OvertimeController::class,
+        'finishPunch'
+    ])->middleware('throttle:20,1')->name('lembur.punch.finish');
+
+    // Koreksi jam nyata oleh PJ/HRD bila karyawan lupa absen
+    Route::post('/lembur/{id}/koreksi', [
+        OvertimeController::class,
+        'correctPunch'
+    ])->middleware('throttle:20,1')->name('lembur.punch.correct');
+
+    /*
+    |--------------------------------------------------------------------------
     | SHIFT CHANGE REQUEST (USER)
     |--------------------------------------------------------------------------
     */

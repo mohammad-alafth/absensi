@@ -286,7 +286,7 @@
                                                 {{ \Carbon\Carbon::parse($overtime->overtime_date)->translatedFormat('d M Y') }}
                                             </p>
                                             <p class="text-[10px] text-gray-400 font-medium mt-1 bg-white border px-2 py-0.5 rounded-lg inline-block">
-                                                ⏱️ {{ $overtime->start_time }} - {{ $overtime->end_time }}
+                                                ⏱️ {{ $overtime->planned_range_label }}
                                             </p>
                                         </div>
 
@@ -329,11 +329,11 @@
                                         </div>
                                         <div class="bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Total Volume Waktu</p>
-                                            <p class="font-bold text-cyan-600 mt-0.5 text-sm">{{ $overtime->total_hours }} Jam Kerja</p>
+                                            <p class="font-bold text-cyan-600 mt-0.5 text-sm">{{ $overtime->hours_label }}@unless($overtime->is_open_ended) Kerja @endunless</p>
                                         </div>
                                         <div class="col-span-2 bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Alokasi Jam Operasional</p>
-                                            <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ $overtime->start_time }} s/d {{ $overtime->end_time }} WIB</p>
+                                            <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ $overtime->planned_range_label }} WIB</p>
                                         </div>
                                         <div class="col-span-2 bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Uraian Alasan / Konteks Tugas Lembur</p>

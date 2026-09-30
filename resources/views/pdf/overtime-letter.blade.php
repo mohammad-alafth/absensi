@@ -290,7 +290,7 @@
                     <td style="text-align: left; padding-left: 8px; font-weight: bold;">{{ $overtime->user->name ?? '-' }}</td>
                     <td>{{ $overtime->user->role_label ?? '-' }}</td>
                     <td style="color: blue; font-weight: bold;">{{ $overtime->start_time ?? '-' }}</td>
-                    <td style="color: blue; font-weight: bold;">{{ $overtime->end_time ?? '-' }}</td>
+                    <td style="color: blue; font-weight: bold;">{{ $overtime->end_time_label }}</td>
                 </tr>
                 <tr>
                     <td>&nbsp;</td>
@@ -302,10 +302,35 @@
                 </tr>
                 <tr>
                     <td colspan="4" style="text-align: right; font-weight: bold; padding-right: 10px;">Total Durasi Akumulasi Jam:</td>
-                    <td colspan="2" style="font-weight: bold; background-color: #f2f2f2;">{{ intval($overtime->total_hours ?? 0) }} Jam</td>
+                    <td colspan="2" style="font-weight: bold; background-color: #f2f2f2;">
+                        {{ intval($overtime->total_hours ?? 0) }} Jam
+                        @if($overtime->is_open_ended && !$overtime->actual_end_at)
+                        (menunggu absen pulang)
+                        @endif
+                    </td>
                 </tr>
             </tbody>
         </table>
+
+        {{--
+        | Catatan kehadiran nyata: volume jam pada surat ini mengikuti hasil
+        | absen lembur (bukti GPS + selfie), bukan hanya jam rencana SPL.
+        --}}
+        @if($overtime->actual_range_label)
+        <table style="width: 100%; margin-top: 2px; border-collapse: collapse; font-size: 8pt;">
+            <tr>
+                <td style="padding: 3px 6px; border: 1px solid #eee; background-color: #fbfbfb;">
+                    <b>Kehadiran nyata (absen lembur):</b>
+                    {{ $overtime->actual_range_label }}
+                    &mdash; durasi {{ $overtime->actual_duration_label }}
+                    &middot; bukti: {{ strtolower($overtime->proof_label) }}
+                    @if($overtime->proof_corrected_by)
+                        (koreksi oleh {{ $overtime->proofCorrector->name ?? 'PJ/HRD' }})
+                    @endif
+                </td>
+            </tr>
+        </table>
+        @endif
 
     @php
     // Blok tanda tangan approver mengikuti rantai approval pengaju:

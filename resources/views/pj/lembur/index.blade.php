@@ -164,7 +164,7 @@
                                 </p>
 
                                 <p class="font-semibold">
-                                    {{ $item->end_time }}
+                                    {{ $item->end_time_label }}
                                 </p>
 
                             </div>
@@ -176,15 +176,19 @@
                                 </p>
 
                                 <p class="font-semibold">
-                                    {{ $item->total_hours }} Jam
+                                    {{ $item->hours_label }}
                                 </p>
 
                             </div>
 
                         </div>
 
+                        {{-- Bukti kehadiran: jam nyata absen + foto + koreksi PJ --}}
+                        <x-overtime-proof :item="$item" />
+
                         <!-- URAIAN -->
                         <div class="mt-5 bg-slate-50 border rounded-2xl p-4">
+
 
                             <p class="text-sm text-gray-500 mb-2">
                                 Uraian Tugas
@@ -249,9 +253,7 @@
                                         Jam:
                                     </span>
 
-                                    {{ $item->start_time }}
-                                    -
-                                    {{ $item->end_time }}
+                                    {{ $item->planned_range_label }}
 
                                 </p>
 
@@ -261,7 +263,7 @@
                                         Total:
                                     </span>
 
-                                    {{ $item->total_hours }} Jam
+                                    {{ $item->hours_label }}
 
                                 </p>
 

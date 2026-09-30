@@ -175,7 +175,15 @@
                     </div>
                     <div>
                         <label class="{{ $labelClass }}">Jam Selesai</label>
+                        @if($submission->is_open_ended)
+                        {{-- Lembur hari libur mode "sampai selesai": Jam Berakhir boleh kosong --}}
+                        <input type="time" name="end_time" value="{{ old('end_time') }}" placeholder="sampai selesai" class="{{ $inputClass }}">
+                        <p class="text-[10px] text-gray-400 mt-1">
+                            Biarkan kosong bila lembur berjalan sampai selesai; volume jam diambil dari absen pulang.
+                        </p>
+                        @else
                         <input type="time" name="end_time" value="{{ old('end_time', $timeValue($submission->end_time)) }}" required class="{{ $inputClass }}">
+                        @endif
                     </div>
                 </div>
 

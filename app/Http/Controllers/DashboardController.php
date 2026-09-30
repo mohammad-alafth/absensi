@@ -116,6 +116,15 @@ class DashboardController extends Controller
 
         /*
         |------------------------------------------------------------------
+        | ABSEN LEMBUR REALTIME
+        |------------------------------------------------------------------
+        | Bila ada sesi lembur yang berjalan, dashboard menampilkan penanda
+        | agar karyawan tidak lupa melakukan absen selesai.
+        */
+        $overtimePunchState = app(\App\Services\OvertimePunchService::class)->state($user);
+
+        /*
+        |------------------------------------------------------------------
         | SHIFT CHANGE REQUEST
         |------------------------------------------------------------------
         */
@@ -135,6 +144,7 @@ class DashboardController extends Controller
             'latestLeave',
             'pendingLeaveCount',
             'pendingOvertimeCount',
+            'overtimePunchState',
             'pendingShiftChangeCount',
             'isHoliday'
         ));

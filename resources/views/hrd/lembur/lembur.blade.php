@@ -91,11 +91,11 @@
                                 </div>
                                 <div>
                                     <p class="text-gray-500">Jam Selesai</p>
-                                    <p class="font-semibold">{{ $item->end_time }}</p>
+                                    <p class="font-semibold">{{ $item->end_time_label }}</p>
                                 </div>
                                 <div>
                                     <p class="text-gray-500">Total Jam</p>
-                                    <p class="font-semibold">{{ $item->total_hours }} Jam</p>
+                                    <p class="font-semibold">{{ $item->hours_label }}</p>
                                 </div>
                                 <div>
                                     <p class="text-gray-500">Disetujui PJ Oleh</p>
@@ -107,6 +107,9 @@
                                 <p class="text-sm text-gray-500 mb-2">Uraian Tugas</p>
                                 <p class="text-sm text-gray-700 leading-relaxed">{{ $item->reason }}</p>
                             </div>
+
+                            {{-- Bukti kehadiran: jam nyata absen + foto + koreksi HRD --}}
+                            <x-overtime-proof :item="$item" />
                         </div>
                     </div>
 
@@ -131,11 +134,11 @@
                                     </p>
                                     <p class="text-sm">
                                         <span class="font-semibold">Jam:</span>
-                                        {{ $item->start_time }} - {{ $item->end_time }}
+                                        {{ $item->planned_range_label }}
                                     </p>
                                     <p class="text-sm">
                                         <span class="font-semibold">Total:</span>
-                                        {{ $item->total_hours }} Jam
+                                        {{ $item->hours_label }}
                                     </p>
                                     <p class="text-sm">
                                         <span class="font-semibold">Jenis:</span>

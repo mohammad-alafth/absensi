@@ -81,16 +81,25 @@
                         @if($type === 'leave')
                         {{ $tanggal($submission->start_date) }} – {{ $tanggal($submission->end_date) }} &middot; {{ $submission->total_days }} hari
                         @elseif($type === 'overtime')
-                        {{ $tanggal($submission->overtime_date) }} &middot; {{ $jam($submission->start_time) }}–{{ $jam($submission->end_time) }} &middot; {{ $submission->total_hours }} jam
+                        {{ $tanggal($submission->overtime_date) }} &middot; {{ $submission->planned_range_label }} &middot; {{ $submission->hours_label }}
                         @else
                         {{ $tanggal($submission->tanggal) }}@if($submission->tanggal_selesai && (string) $submission->tanggal_selesai !== (string) $submission->tanggal) – {{ $tanggal($submission->tanggal_selesai) }}@elseif($submission->jam_mulai) &middot; {{ $jam($submission->jam_mulai) }}–{{ $jam($submission->jam_selesai) }}@endif
                         @endif
                     </p>
                 </div>
 
-                <span class="shrink-0 text-[10px] font-bold border px-2 py-1 rounded-full {{ \App\Support\SubmissionStatus::statusTone($submission) }}">
-                    {{ \App\Support\SubmissionStatus::statusLabel($submission) }}
-                </span>
+                <div class="shrink-0 flex flex-col items-end gap-1">
+                    <span class="text-[10px] font-bold border px-2 py-1 rounded-full {{ \App\Support\SubmissionStatus::statusTone($submission) }}">
+                        {{ \App\Support\SubmissionStatus::statusLabel($submission) }}
+                    </span>
+
+                    {{-- Bukti kehadiran lembur: absen realtime / koreksi / manual --}}
+                    @if($type === 'overtime')
+                    <span class="text-[9px] font-bold border px-2 py-0.5 rounded-full {{ $submission->proof_tone }}">
+                        {{ $submission->proof_label }}
+                    </span>
+                    @endif
+                </div>
             </div>
 
             <p class="text-[11px] text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 italic line-clamp-2">

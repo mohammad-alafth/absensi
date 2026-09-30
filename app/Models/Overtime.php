@@ -20,7 +20,27 @@ class Overtime extends Model
         'end_time',
 
         'total_hours',
+
+        /*
+        |---------------------------------------------------------------------
+        | ABSEN LEMBUR REALTIME (BUKTI KEHADIRAN)
+        |---------------------------------------------------------------------
+        | planned_hours = jam rencana dari form (snapshot, tidak berubah)
+        | total_hours   = volume sah yang disahkan, otomatis mengikuti jam
+        |                 nyata bila bukti absen tersedia
+        */
+        'planned_hours',
+        'actual_start_at',
+        'actual_end_at',
+        'actual_minutes',
+        'actual_hours',
+        'proof_type',
+        'proof_note',
+        'proof_corrected_by',
+        'needs_review',
+
         'employee_signature',
+
         'pj_signature',
         'hrd_signature',
         'pdf_file',
@@ -152,5 +172,124 @@ class Overtime extends Model
     {
         return $this->belongsTo(User::class, 'manager_finance_approved_by');
     }
-    
+
+    /*
+    |--------------------------------------------------------------------------
+    | ABSEN LEMBUR REALTIME
+    |--------------------------------------------------------------------------
+    | Log absen (bukti) per pengajuan. Kolom actual_* adalah ringkasan
+    | turunannya; lihat App\Services\OvertimePunchService.
+    */
+    protected $casts = [
+        'actual_start_at' => 'datetime',
+        'actual_end_at' => 'datetime',
+        'needs_review' => 'boolean',
+    ];
+
+    public function punches()
+    {
+        return $this->hasMany(OvertimePunch::class)->orderBy('punched_at');
+    }
+
+    /** Petugas PJ/HRD yang mengoreksi jam nyata. */
+    public function proofCorrector()
+    {
+        return $this->belongsTo(User::class, 'proof_corrected_by');
+    }
+
+    /** Sedang berjalan: sudah absen mulai tapi belum absen selesai. */
+    public function getIsRunningAttribute(): bool
+    {
+        return $this->actual_start_at !== null
+            && $this->actual_end_at === null;
+    }
+
+    /** Rentang jam nyata, mis. "10:00 - 14:10"; null bila belum ada absen. */
+    public function getActualRangeLabelAttribute(): ?string
+    {
+        if (!$this->actual_start_at) {
+            return null;
+        }
+
+        return $this->actual_start_at->format('H:i')
+            . ' - '
+            . ($this->actual_end_at
+                ? $this->actual_end_at->format('H:i')
+                : 'berjalan');
+    }
+
+    /**
+     * Label jam selesai pada SPL. Jam selesai boleh kosong: lembur hari libur
+     * mode "sampai selesai" tidak merencanakan jam pulang, jam nyatanya diambil
+     * dari absen pulang (lihat App\Services\OvertimePunchService).
+     */
+    public function getEndTimeLabelAttribute(): string
+    {
+        return $this->end_time
+            ? substr((string) $this->end_time, 0, 5)
+            : 'sampai selesai';
+    }
+
+    /** Rentang jam rencana, mis. "10:00 - 14:00" atau "10:00 - sampai selesai". */
+    public function getPlannedRangeLabelAttribute(): string
+    {
+        return ($this->start_time ? substr((string) $this->start_time, 0, 5) : '-')
+            . ' - '
+            . $this->end_time_label;
+    }
+
+    /**
+     * Label volume jam untuk daftar: angka resmi, atau keterangan bahwa volume
+     * masih menunggu absen pulang pada lembur "sampai selesai".
+     */
+    public function getHoursLabelAttribute(): string
+    {
+        if (blank($this->end_time) && !$this->actual_end_at) {
+            return 'menunggu absen pulang';
+        }
+
+        return (int) $this->total_hours . ' Jam';
+    }
+
+    /** Lembur tanpa Jam Berakhir: volume sepenuhnya ditentukan absen. */
+    public function getIsOpenEndedAttribute(): bool
+    {
+        return blank($this->end_time);
+    }
+
+    /** Durasi nyata, mis. "4 jam 10 menit". */
+    public function getActualDurationLabelAttribute(): ?string
+    {
+        if ($this->actual_minutes === null) {
+            return null;
+        }
+
+        $minutes = (int) $this->actual_minutes;
+
+        return intdiv($minutes, 60) . ' jam ' . ($minutes % 60) . ' menit';
+    }
+
+    /**
+     * Label bukti untuk badge pada daftar & layar approval.
+     */
+    public function getProofLabelAttribute(): string
+    {
+        return match ($this->proof_type) {
+            'realtime' => 'Absen realtime',
+            'dari_absen' => 'Dari absen harian',
+            'koreksi' => 'Koreksi PJ/HRD',
+            default => 'Tanpa absen (manual)',
+        };
+    }
+
+    /** Kelas warna badge bukti (Tailwind), senada dengan SubmissionStatus. */
+    public function getProofToneAttribute(): string
+    {
+        return match ($this->proof_type) {
+            'realtime', 'dari_absen' => 'text-emerald-700 bg-emerald-50 border-emerald-200',
+            'koreksi' => 'text-amber-700 bg-amber-50 border-amber-200',
+            default => 'text-slate-500 bg-slate-50 border-slate-200',
+        };
+    }
 }
+

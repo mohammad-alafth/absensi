@@ -890,7 +890,7 @@ class HRDController extends Controller
                     foreach ($userRows as $row) {
                         $start = Carbon::parse($row->overtime_date);
                         $jamMulai = $row->start_time ?? '-';
-                        $jamSelesai = $row->end_time ?? '-';
+                        $jamSelesai = $row->end_time_label;
                         $hours = floatval($row->total_hours ?? 0);
                         $totalHours += $hours;
                         $hoursFormatted = floor($hours) . ' Jam ' . round(($hours - floor($hours)) * 60) . ' Menit';

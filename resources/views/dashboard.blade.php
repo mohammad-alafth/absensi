@@ -27,6 +27,9 @@
 
             </div>
 
+            {{-- Sesi lembur berjalan: pengingat absen selesai --}}
+            <x-overtime-punch-banner :state="$overtimePunchState ?? null" />
+
             @if($scheduleData && isset($scheduleData['start_time']) && $scheduleData['start_time'] !== null)
 
             <div class="mt-5 bg-white rounded-3xl p-5 shadow-xl border border-blue-100">

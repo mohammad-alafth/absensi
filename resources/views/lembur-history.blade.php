@@ -57,7 +57,7 @@
                                         {{ \Carbon\Carbon::parse($item->overtime_date)->translatedFormat('d M Y') }}
                                     </h3>
                                     <p class="text-[11px] text-gray-400 font-medium mt-1 bg-white border px-2 py-0.5 rounded-lg inline-block">
-                                        ⏱️ {{ $item->start_time }} - {{ $item->end_time }}
+                                        ⏱️ {{ $item->planned_range_label }}
                                     </p>
                                 </div>
 
@@ -124,11 +124,14 @@
                                     </div>
                                     <div class="bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Total Volume Waktu</p>
-                                        <p class="font-bold text-cyan-600 mt-0.5 text-sm">{{ $item->total_hours }} Jam Kerja</p>
+                                        <p class="font-bold text-cyan-600 mt-0.5 text-sm">{{ $item->hours_label }}@unless($item->is_open_ended) Kerja @endunless</p>
                                     </div>
                                     <div class="col-span-2 bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Alokasi Jam Operasional</p>
-                                        <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ $item->start_time }} s/d {{ $item->end_time }} WIB</p>
+                                        <p class="font-bold text-gray-800 mt-0.5 text-sm">{{ $item->planned_range_label }} WIB</p>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <x-overtime-proof :item="$item" />
                                     </div>
                                     <div class="col-span-2 bg-slate-50 p-3 rounded-xl border">
                                         <p class="text-gray-400 font-medium">Klasifikasi Kategori Hari</p>
