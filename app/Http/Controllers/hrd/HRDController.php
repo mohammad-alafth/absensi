@@ -31,6 +31,7 @@ use App\Exports\CalendarUserExport;
 use App\Services\ScheduleService;
 use App\Exports\CalendarMultiExport;
 use App\Support\PermissionRange;
+use App\Support\SubmissionStatus;
 
 
 class HRDController extends Controller
@@ -819,30 +820,29 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
         
-        $statusList = [
-            'pending', 'waiting_head', 'waiting_director',
-            'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'
-        ];
-        
+        /*
+        | Rekap cuti / izin / lembur (layar & ekspor) hanya memuat pengajuan
+        | yang sudah disetujui, supaya isi Excel selalu sama dengan tabel.
+        */
         $data = collect();
         switch ($type) {
             case 'attendance':
                 $data = Attendance::whereBetween('tanggal', [$startDate, $endDate])->with('user')->get();
                 break;
             case 'leave':
-                $data = Leave::whereIn('status', $statusList)
+                $data = Leave::where('status', 'approved')
                     ->where(function ($q) use ($startDate, $endDate) {
                         $q->where('start_date', '<=', $endDate)
                           ->where('end_date', '>=', $startDate);
                     })->with('user')->latest()->get();
                 break;
             case 'permission':
-                $data = Permission::whereIn('status', $statusList)
+                $data = Permission::where('status', 'approved')
                     ->whereBetween('tanggal', [$startDate, $endDate])
                     ->with('user')->latest()->get();
                 break;
             case 'overtime':
-                $data = Overtime::whereIn('status', $statusList)
+                $data = Overtime::where('status', 'approved')
                     ->whereBetween('overtime_date', [$startDate, $endDate])
                     ->with('user')->latest()->get();
                 break;
@@ -1243,8 +1243,9 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Rekap cuti hanya menampilkan pengajuan yang SUDAH DISETUJUI.
         // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
-        $data = Leave::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
+        $data = Leave::where('status', 'approved')
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->where('start_date', '<=', $endDate)
                   ->where('end_date', '>=', $startDate);
@@ -1270,8 +1271,9 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Rekap izin hanya menampilkan pengajuan yang SUDAH DISETUJUI.
         // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
-        $data = Permission::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
+        $data = Permission::where('status', 'approved')
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->select('id', 'user_id', 'tanggal', 'tanggal_selesai', 'jenis', 'jam_mulai', 'jam_selesai', 'alasan', 'status', 'created_at')
             ->with('user:id,name')
@@ -1294,8 +1296,9 @@ class HRDController extends Controller
         $startDate = $request->start_date ?? Carbon::now()->startOfMonth()->format('Y-m-d');
         $endDate   = $request->end_date ?? Carbon::now()->format('Y-m-d');
 
+        // Rekap lembur hanya menampilkan pengajuan yang SUDAH DISETUJUI.
         // Kolom seperlunya saja (tanpa kolom signature base64) agar hemat memori.
-        $data = Overtime::whereIn('status', ['pending', 'waiting_head', 'waiting_director', 'waiting_medical_service', 'waiting_hrd', 'approved', 'rejected'])
+        $data = Overtime::where('status', 'approved')
             ->whereBetween('overtime_date', [$startDate, $endDate])
             ->select('id', 'user_id', 'overtime_date', 'start_time', 'end_time', 'total_hours', 'day_type', 'reason', 'status', 'created_at')
             ->with('user:id,name')
@@ -1310,6 +1313,78 @@ class HRDController extends Controller
             'start_date' => $startDate,
             'end_date' => $endDate,
             'reportType' => 'overtime'
+        ]);
+    }
+
+    /*
+    |------------------------------------------------------------------------
+    | DETAIL REKAP (CUTI / IZIN / LEMBUR)
+    |------------------------------------------------------------------------
+    | Dipanggil lewat AJAX oleh tombol Status pada halaman rekap
+    | (hrd.reports.leave / permission / overtime). Mengembalikan HTML siap
+    | tempel berisi detail pengajuan, riwayat persetujuan, surat (PDF), dan
+    | bukti (tanda tangan pengaju / foto absen lembur) bila ada.
+    */
+    public function reportDetail(string $type, int $id)
+    {
+        $model = match ($type) {
+            'leave' => Leave::class,
+            'permission' => Permission::class,
+            'overtime' => Overtime::class,
+            default => abort(404, 'Jenis rekap tidak dikenal.'),
+        };
+
+        $query = $model::with('user:id,name,role');
+
+        // Bukti absen lembur (foto + GPS) ikut dimuat untuk layar detail.
+        if ($type === 'overtime') {
+            $query->with(['punches' => fn ($q) => $q->oldest('punched_at')]);
+        }
+
+        $item = $query->findOrFail($id);
+
+        /*
+        | Riwayat keputusan tiap tahap approval: siapa yang menyetujui & kapan.
+        | Nama approver diambil lewat cache satu-per-request SubmissionStatus.
+        */
+        $approvalTrail = [];
+
+        foreach (SubmissionStatus::stages() as $stage => $label) {
+            $status = $item->{$stage . '_status'} ?? null;
+
+            if ($status === null || $status === 'pending') {
+                continue;
+            }
+
+            $approvalTrail[] = [
+                'label' => $label,
+                'status' => $status === 'approved'
+                    ? 'Disetujui'
+                    : ucfirst(str_replace('_', ' ', (string) $status)),
+                'approver' => SubmissionStatus::approverName(
+                    $item->{$stage . SubmissionStatus::APPROVED_BY_SUFFIX} ?? null
+                ),
+                'at' => $item->{$stage . '_approved_at'} ?? null,
+                'note' => $item->{$stage . '_note'} ?? null,
+            ];
+        }
+
+        $titles = [
+            'leave' => 'Detail Cuti',
+            'permission' => 'Detail Izin',
+            'overtime' => 'Detail Lembur',
+        ];
+
+        return view('hrd.reports.detail', [
+            'type' => $type,
+            'item' => $item,
+            'title' => $titles[$type],
+            'statusLabel' => SubmissionStatus::statusLabel($item),
+            'statusTone' => SubmissionStatus::statusTone($item),
+            'approvalTrail' => $approvalTrail,
+            'letterUrl' => filled($item->pdf_file)
+                ? asset('storage/' . $item->pdf_file)
+                : null,
         ]);
     }
 

@@ -69,19 +69,19 @@
                                 <td class="p-4 text-gray-600 italic">{{ $item->reason ?? $item->alasan ?? 'Tidak ada keterangan' }}</td>
 
                                 <td class="p-4">
-                                    @if(str_starts_with((string) $item->status, 'waiting_'))
-                                    {{-- Link ke halaman approval sesuai tipe laporan yang aktif --}}
-                                    <a href="{{ route('hrd.' . ($reportType == 'leave' ? 'cuti' : ($reportType == 'permission' ? 'izin' : 'lembur')), ['id' => $item->id]) }}"
-                                        class="inline-block bg-blue-600 text-white px-4 py-1.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm">
-                                        Proses Approval
-                                    </a>
-                                    @else
-                                    <span class="inline-block px-3 py-1 rounded-xl font-bold text-[10px] uppercase tracking-wide
-                                            {{ $item->status == 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                               ($item->status == 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-600') }}">
-                                        {{ str_replace('_', ' ', $item->status ?? 'Pending') }}
-                                    </span>
-                                    @endif
+                                    {{--
+                                        Klik badge Status untuk membuka detail pengajuan
+                                        (termasuk surat PDF & bukti) lewat modal AJAX.
+                                    --}}
+                                    <button type="button"
+                                        onclick="openReportDetail('{{ route('hrd.reports.detail', ['type' => $reportType, 'id' => '__ID__']) }}', {{ $item->id }})"
+                                        title="Klik untuk melihat detail, surat, dan bukti"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl font-bold text-[10px] uppercase tracking-wide cursor-pointer transition shadow-sm ring-1 ring-inset ring-black/5
+                                            {{ $item->status == 'approved' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                                               ($item->status == 'rejected' ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200') }}">
+                                        <span>{{ str_replace('_', ' ', $item->status ?? 'Pending') }}</span>
+                                        <span aria-hidden="true">👁 Detail</span>
+                                    </button>
                                 </td>
                             </tr>
                             @empty
@@ -95,4 +95,84 @@
             </div>
         </div>
     </div>
+
+    {{-- --}}
+    {{-- MODAL DETAIL (diisi lewat AJAX oleh tombol Status pada tabel) --}}
+    {{-- --}}
+    <div id="reportDetailModal" class="hidden fixed inset-0 z-[60] bg-black/60 px-4 py-8 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden">
+            <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+                <p id="reportDetailHeading" class="text-sm font-extrabold text-gray-900">Detail Pengajuan</p>
+                <button type="button" onclick="closeReportDetail()"
+                    class="w-8 h-8 shrink-0 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold transition"
+                    aria-label="Tutup">✕</button>
+            </div>
+
+            <div id="reportDetailBody" class="p-5">
+                <p class="text-xs text-gray-400 text-center py-6">Memuat detail...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const reportDetailModal = document.getElementById('reportDetailModal');
+        const reportDetailBody = document.getElementById('reportDetailBody');
+        const reportDetailHeading = document.getElementById('reportDetailHeading');
+
+        /*
+        |------------------------------------------------------------------
+        | DETAIL REKAP (CUTI / IZIN / LEMBUR)
+        |------------------------------------------------------------------
+        | Template URL berisi placeholder __ID__ yang diganti dengan id baris
+        | yang diklik. Server merender partial hrd.reports.detail berisi
+        | detail pengajuan + surat PDF + bukti (tanda tangan / foto absen).
+        */
+        async function openReportDetail(templateUrl, id) {
+            reportDetailModal.classList.remove('hidden');
+            reportDetailHeading.textContent = 'Detail Pengajuan';
+            reportDetailBody.innerHTML = '<p class="text-xs text-gray-400 text-center py-6">Memuat detail...</p>';
+
+            try {
+                const response = await fetch(templateUrl.replace('__ID__', id), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
+                reportDetailBody.innerHTML = await response.text();
+
+                // Judul diambil dari partial detail agar modal ikut berganti judul.
+                const heading = reportDetailBody.querySelector('p.text-sm.font-extrabold');
+
+                if (heading) {
+                    reportDetailHeading.textContent = heading.textContent.trim();
+                }
+            } catch (error) {
+                reportDetailBody.innerHTML =
+                    '<p class="text-xs text-rose-600 text-center py-6 font-semibold">' +
+                    'Detail tidak dapat dimuat. Silakan coba lagi.</p>';
+            }
+        }
+
+        function closeReportDetail() {
+            reportDetailModal.classList.add('hidden');
+            reportDetailBody.innerHTML = '';
+        }
+
+        // Klik area gelap di luar panel menutup modal.
+        reportDetailModal.addEventListener('click', (event) => {
+            if (event.target === reportDetailModal) {
+                closeReportDetail();
+            }
+        });
+
+        // Tombol Esc menutup modal.
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !reportDetailModal.classList.contains('hidden')) {
+                closeReportDetail();
+            }
+        });
+    </script>
 </x-app-layout>

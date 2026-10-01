@@ -498,6 +498,10 @@ Route::middleware([
                 Route::get('/overtime', [HRDController::class, 'reportOvertime'])->name('overtime');
                 Route::get('/attendance/monthly', [HRDController::class, 'index'])->name('attendance.monthly');
                 Route::get('/export', [HRDController::class, 'exportReport'])->name('export');
+                // Detail pengajuan (dibuka dari tombol Status pada tabel rekap).
+                Route::get('/{type}/detail/{id}', [HRDController::class, 'reportDetail'])
+                    ->whereNumber('id')
+                    ->name('detail');
             });
 
             /*
