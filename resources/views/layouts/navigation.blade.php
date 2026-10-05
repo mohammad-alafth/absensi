@@ -100,6 +100,32 @@
                             Approval Akun
                         </x-dropdown-link>
                         @endif
+                        @if(auth()->user()->role === 'admin')
+                        <x-dropdown-link :href="route('admin.approval-flows')">
+                            Alur Approval
+                        </x-dropdown-link>
+                        <x-dropdown-link :href="route('admin.face-settings.index')">
+                            Pengaturan Wajah
+                        </x-dropdown-link>
+                        <x-dropdown-link :href="route('admin.face-settings.audit')">
+                            Log Akses Wajah
+                        </x-dropdown-link>
+                        @endif
+                        {{-- Registrasi wajah dibuka untuk SEMUA role.
+
+                        Sebelumnya dibatasi admin + hrd saja (@if in_array role),
+                        padahal route /face/register memakai middleware auth biasa,
+                        dan halaman registrasi memang self-service: setiap karyawan
+                        daftar wajahnya sendiri. Akibatnya karyawan biasa tidak
+                        punya cara menemukan halaman ini dari menu, dan harus
+                        menghafal URL-nya.
+                    --}}
+                    <x-dropdown-link :href="route('face.register')">
+                        Register Wajah
+                    </x-dropdown-link>
+                    <x-dropdown-link :href="route('face.scan')">
+                        Scan Wajah
+                    </x-dropdown-link>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
 

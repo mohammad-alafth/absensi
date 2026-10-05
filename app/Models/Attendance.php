@@ -31,7 +31,21 @@ class Attendance extends Model
 
         'scheduled_checkin',
 
-        'scheduled_checkout'
+        'scheduled_checkout',
+
+        'face_image',
+
+        'face_score',
+
+        'face_match',
+
+        'face_method',
+
+        'face_verified_at',
+
+        'face_reviewed_by',
+
+        'face_review_note'
     ];
 
     protected $casts = [

@@ -342,6 +342,10 @@
         static fn ($block) => $block['key'] !== 'pj'
     ));
     $approvalWidth = \App\Support\PdfSignatureBlocks::columnWidth($approvalBlocks, 0);
+
+    // Pengaju yang role-nya PJ (pj_*) melewati tahap PJ: kolom "Atasan / PJ"
+    // disembunyikan agar yang tampil hanya ttd pengaju + tahap approval berikutnya.
+    $showPjBlock = \App\Support\PdfSignatureBlocks::showsPj($overtime);
     @endphp
 
     <table class="signature-section-table">
@@ -349,10 +353,10 @@
             <td>
                 <table class="inner-sig-table">
                     <tr>
-                        <th colspan="2">Diajukan Oleh :</th>
+                        <th colspan="{{ $showPjBlock ? 2 : 1 }}">Diajukan Oleh :</th>
                     </tr>
                     <tr>
-                        <td style="width: 50%; border-right: 1px solid #eee;">
+                        <td style="width: {{ $showPjBlock ? 50 : 100 }}%;{{ $showPjBlock ? ' border-right: 1px solid #eee;' : '' }}">
                             <div style="font-size: 9pt;">Karyawan</div>
                             <div class="sig-space-wrapper">
                                 @if($overtime->employee_signature)
@@ -362,6 +366,7 @@
                             <div class="name-output">{{ $overtime->user->name ?? '-' }}</div>
                             <div style="font-size: 8pt; color:#444;">NIK: {{ $overtime->user->nik ?? '-' }}</div>
                         </td>
+                        @if($showPjBlock)
                         <td style="width: 50%;">
                             <div style="font-size: 9pt;">Atasan / PJ</div>
                             <div class="status-badge">[{{ strtoupper($overtime->pj_status ?? 'PENDING') }}]</div>
@@ -373,6 +378,7 @@
                             <div class="name-output">{{ $overtime->pjApprover->name ?? '-' }}</div>
                             <div style="font-size: 8pt; color:#444;">Atasan Langsung</div>
                         </td>
+                        @endif
                     </tr>
                 </table>
             </td>

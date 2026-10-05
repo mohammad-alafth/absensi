@@ -21,3 +21,9 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Microservice face recognition (venv + bobot model lokal, jangan di-commit)
+/face-service/.venv/
+/face-service/models/
+/face-service/__pycache__/
+/face-service/*.log

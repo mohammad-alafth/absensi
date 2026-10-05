@@ -119,7 +119,8 @@ class PermissionController extends Controller
 |--------------------------------------------------------------------------
 */
         $flow = ApprovalFlowService::handle(
-            auth()->user()->role
+            auth()->user()->role,
+            'permission'
         );
 
         $status = $flow['status'];
@@ -276,7 +277,7 @@ class PermissionController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($wasRejected) {
-            $permission->update(ApprovalFlowService::handle(auth()->user()->role));
+            $permission->update(ApprovalFlowService::handle(auth()->user()->role, 'permission'));
         }
 
         $permission = $permission->fresh();

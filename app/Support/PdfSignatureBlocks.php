@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Services\ApprovalFlowConfig;
 use App\Services\ApprovalFlowService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -92,13 +93,17 @@ class PdfSignatureBlocks
         }
 
         $role = self::role($submission);
-        $stages = $role === null ? [] : ApprovalFlowService::chainFor($role);
+        $stages = $role === null
+            ? []
+            : ApprovalFlowService::chainFor($role, self::type($submission));
 
         // Data lama bisa disetujui pada tahap yang tidak lagi ada di rantai
         // (head / hrd). Tahap tersebut tetap ditampilkan bila ada datanya.
+        // Tahap PJ TIDAK ikut kandidat: blok PJ diatur terpisah oleh showsPj()
+        // supaya tidak muncul lagi saat alur melewati PJ.
         $candidates = array_merge(
             self::LEGACY_STAGES,
-            array_keys(ApprovalFlowService::APPROVER_STAGES)
+            array_diff(ApprovalFlowService::stageKeys(), [ApprovalFlowConfig::PJ_STAGE])
         );
 
         foreach ($candidates as $stage) {
@@ -227,19 +232,57 @@ class PdfSignatureBlocks
     }
 
     /**
-     * Blok PJ hanya tampil untuk role yang memang melewati PJ,
-     * atau bila tahap PJ sudah terlanjur diproses.
+     * Blok tanda tangan "Atasan Langsung (PJ)" perlu ditampilkan?
+     *
+     * Aturannya:
+     *  - Pengajuan yang pengajunya memang wajib lewat PJ
+     *    (ApprovalFlowService::needsPjApprovalFor()) -> blok PJ tampil.
+     *  - Pengaju sendiri orang PJ (role pj_*)  -> alur approval melompati tahap
+     *    PJ karena pengaju adalah PJ-nya sendiri, jadi di surat cukup tanda
+     *    tangan pengaju ("ttd dia saja") lalu lanjut ke tahap approval berikutnya.
+     *    Pengecualian: IZIN tetap lewat PJ (tanda tangannya diambil di menu
+     *    approval PJ), lihat ApprovalFlowService::PJ_APPROVAL_REQUIRED_TYPES.
+     *  - Role atasan (hrd / direktur / supervisor / kabag) juga melewati PJ;
+     *    blok PJ tetap disembunyikan kecuali memang ada PJ yang memproses.
+     *
+     * Data lama tetap aman: pengajuan yang benar-benar ditandatangani/disetujui
+     * PJ (pj_signature / pj_approved_by terisi) tetap menampilkan blok PJ.
      */
-    private static function showsPj(Model $submission): bool
+    public static function showsPj(?Model $submission): bool
     {
+        if (!$submission instanceof Model) {
+            return false;
+        }
+
         $role = self::role($submission);
 
-        if ($role !== null && ApprovalFlowService::needsPjApproval($role)) {
+        if ($role !== null && ApprovalFlowService::needsPjApprovalFor($role, self::type($submission))) {
             return true;
         }
 
-        return $submission->pj_approved_by !== null
-            || self::isDecided($submission->pj_status ?? null);
+        return self::hasRealPjDecision($submission);
+    }
+
+    /**
+     * Jenis pengajuan dari nama class model (leave / permission / overtime).
+     */
+    private static function type(?Model $submission): ?string
+    {
+        return $submission instanceof Model
+            ? strtolower(class_basename($submission))
+            : null;
+    }
+
+    /**
+     * Apakah ada PJ yang benar-benar memproses pengajuan (menyetujui/menandatangani)?
+     */
+    private static function hasRealPjDecision(Model $submission): bool
+    {
+        if ($submission->pj_approved_by !== null) {
+            return true;
+        }
+
+        return trim((string) ($submission->pj_signature ?? '')) !== '';
     }
 
     /**

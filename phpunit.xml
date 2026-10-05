@@ -19,6 +19,10 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Face recognition dimatikan saat test supaya hasil test tidak
+             bergantung pada isi .env mesin developer. -->
+        <env name="FACE_SERVICE_ENABLED" value="false" force="true"/>
+        <env name="FACE_ANTISPOOF_ENABLED" value="false" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>

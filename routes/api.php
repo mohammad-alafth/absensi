@@ -99,13 +99,12 @@ Route::prefix('device')
             'matchFace'
         ]);
 
-        Route::post('/fingerprint/register', [
-            FaceController::class,
-            'registerFingerprint'
-        ]);
-
-        Route::post('/fingerprint/scan', [
-            FaceController::class,
-            'fingerprint'
-        ]);
+        // Catatan: endpoint sidik jari BELUM diimplementasikan (perangkat
+        // fingerprint tidak dipakai). Akses ditolak dengan jelas, bukan error 500.
+        Route::any('/fingerprint/{action?}', function () {
+            return response()->json([
+                'success' => false,
+                'message' => 'Endpoint fingerprint belum diimplementasikan pada sistem ini.'
+            ], 501);
+        });
     });

@@ -93,10 +93,10 @@
 
                 <div class="grid grid-cols-2 gap-2 w-full max-w-xs mb-3">
                     <div id="gpsStatus" class="flex justify-center items-center gap-1.5 py-2.5 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/60 rounded-xl text-[11px] font-bold text-gray-600 shadow-3xs">
-                        📍 Mencari GPS...
+                        &#128205; Mencari GPS...
                     </div>
                     <div id="distanceStatus" class="flex justify-center items-center gap-1.5 py-2.5 bg-gradient-to-br from-blue-50 to-indigo-50/60 border border-blue-100 rounded-xl text-[11px] font-bold text-[#1E40AF] shadow-3xs">
-                        📏 Menghitung...
+                        &#128207; Menghitung...
                     </div>
                 </div>
 
@@ -114,8 +114,12 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        const officeLat = 0.4761258;
-        const officeLng = 101.4190600;
+        // Nilai koordinat & radius diambil dari pengaturan face recognition (FaceSettings),
+        // bukan angka yang ditulis mati di halaman ini.
+        const officeLat = {{ $officeLat }};
+        const officeLng = {{ $officeLng }};
+        const officeRadius = {{ $officeRadius }};
+        const officeName = @json($officeName);
 
         let currentLat = null;
         let currentLng = null;
@@ -160,11 +164,11 @@
 
                 currentDistance = calculateDistance(officeLat, officeLng, currentLat, currentLng);
 
-                document.getElementById('gpsStatus').innerHTML = `📍 Akurasi: ${Math.round(currentAccuracy)}m`;
-                document.getElementById('distanceStatus').innerHTML = `📏 Jarak: ${Math.round(currentDistance)}m`;
+                document.getElementById('gpsStatus').innerHTML = `&#128205; Akurasi: ${Math.round(currentAccuracy)}m`;
+                document.getElementById('distanceStatus').innerHTML = `&#128207; Jarak: ${Math.round(currentDistance)}m`;
                 document.getElementById('locationText').innerHTML = `
                     Akurasi GPS: ${Math.round(currentAccuracy)} meter<br>
-                    Jarak ke RS Mata PEK Eye Center: ${Math.round(currentDistance)} meter
+                    Jarak ke ${officeName}: ${Math.round(currentDistance)} meter (radius ${Math.round(officeRadius)} m)
                 `;
             },
             (err) => {
@@ -193,7 +197,7 @@
             }
         );
 
-        function captureImage() {
+                function captureImage() {
             const video = document.getElementById('video');
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -222,11 +226,11 @@
                 return;
             }
 
-            if (currentDistance > 200) {
+            if (currentDistance > officeRadius) {
                 Swal.fire({
                     icon: 'error',
                     title: 'Di Luar Radius Kantor',
-                    text: `Anda berada ${Math.round(currentDistance)} meter di luar area operasional rumah sakit.`
+                    text: `Anda berada ${Math.round(currentDistance - officeRadius)} meter di luar radius kantor ${Math.round(officeRadius)} meter.`
                 });
                 return;
             }
@@ -256,9 +260,29 @@
 
                 const data = await response.json();
 
+                // Fail-open: absen tetap dicatat walau verifikasi wajah
+                // gagal atau layanan mati. TANPA peringatan, absen wajah
+                // orang lain terlihat sama sahnya dengan absen asli.
+                if (data.degraded) {
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'Absen tercatat, TIDAK terverifikasi',
+                        html: '<div style="text-align:left;font-size:13px;line-height:1.5">'
+                            + (data.warning || 'Layanan pengenalan wajah sedang tidak tersedia.')
+                            + '<br><br><b>Wajah Anda tidak dibandingkan dengan data terdaftar.</b>'
+                            + '<br>Absen ini menunggu verifikasi HRD.</div>',
+                        confirmButtonText: 'Saya mengerti',
+                        confirmButtonColor: '#d97706',
+                        allowOutsideClick: false
+                    });
+
+                    window.location.href = '/dashboard';
+                    return;
+                }
+
                 Swal.fire({
                     icon: data.success ? 'success' : 'error',
-                    title: data.message,
+                    title: data.success ? 'Wajah terverifikasi - ' + data.message : data.message,
                     text: data.late_minutes ? `Terlambat masuk ${Math.round(data.late_minutes)} menit` : (data.distance ?? '')
                 }).then(() => {
                     if (data.success && data.type === 'checkin') {

@@ -39,6 +39,12 @@ use App\Http\Controllers\HRD\HRDLeaveController;
 use App\Http\Controllers\HRD\HRDPermissionController;
 use App\Http\Controllers\HRD\HRDOvertimeController;
 use App\Http\Controllers\HRD\ShiftManagementController;
+use App\Http\Controllers\Admin\ApprovalFlowController;
+use App\Http\Controllers\Admin\FaceAuditController;
+use App\Http\Controllers\Admin\FaceSettingsController;
+use App\Support\FaceSettings;
+use App\Http\Controllers\FaceController;
+use App\Http\Controllers\HRD\FaceReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -78,7 +84,21 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::view('/face', 'face')
+    /*
+ * formerly: Route::view('/face', 'face')
+ * Diubah menjadi closure agar halaman menerima radius & koordinat kantor dari
+ * FaceSettings. Sebelumnya radius di-hardcode 200 meter di dalam face.blade.php,
+ * sehingga mengubah radius di /admin/face-settings tidak berefek dan karyawan
+ * ditolak pada jarak 243 meter walau radiusnya 5000 meter.
+ */
+Route::get('/face', function () {
+    return view('face', [
+        'officeLat' => FaceSettings::float('office.latitude'),
+        'officeLng' => FaceSettings::float('office.longitude'),
+        'officeRadius' => FaceSettings::float('office.radius_meters'),
+        'officeName' => 'RS Mata PEK Eye Center',
+    ]);
+})
         ->middleware('auth')
         ->name('face');
 
@@ -388,7 +408,10 @@ Route::middleware([
     Route::prefix('hrd')
         ->middleware([
             'auth',
-            'role:medical_service,medical_service,kabag_umum,manager_umum,kabag_marketing,manager_finance,director'
+            // Daftar role approver dibaca dari katalog tahap (role:approver),
+            // sehingga tahap/role baru dari menu Alur Approval langsung bisa
+            // membuka pusat approval tanpa mengubah daftar di file ini.
+            'role:approver'
         ])
         ->name('hrd.')
         ->group(function () {
@@ -560,5 +583,113 @@ Route::middleware([
         )->middleware('role:hrd,director');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| FACE RECOGNITION (registrasi & scan wajah)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/face/register', [FaceController::class, 'showRegisterPage'])->name('face.register');
+    Route::post('/face/register', [FaceController::class, 'register'])->name('face.register.store');
+    Route::delete('/face/register', [FaceController::class, 'resetFace'])->name('face.register.destroy');
+    Route::post('/face/consent', [FaceController::class, 'consent'])->name('face.consent');
+    Route::post('/face/consent/revoke', [FaceController::class, 'revokeConsent'])->name('face.consent.revoke');
+
+    Route::get('/face/scan', [FaceController::class, 'showFacePage'])->name('face.scan');
+    // Handler TERPISAH dari /api/device/face/scan (matchFace). Alasan:
+    // matchFace fail-open setelah batas percobaan (kebijakan B3) sehingga
+    // cocok untuk /face yang sudah jadi alur absen utama. Di /face/scan,
+    // wajah yang DITOLAK tidak boleh menulis data absen sama sekali -
+    // cukup diarahkan ke /face.
+    Route::post('/face/scan', [FaceController::class, 'scanFace'])->name('face.scan.store');
+});
+
+/*
+|--------------------------------------------------------------------------
+| VERIFIKASI WAJAH OLEH HRD
+|--------------------------------------------------------------------------
+| Antrean absen yang wajahnya tidak dipastikan (zona abu / layanan mati /
+| belum terdaftar) sehingga perlu ditinjau manusia.
+*/
+Route::middleware(['auth', 'verified', 'role:hrd,director'])
+    ->prefix('hrd/face')
+    ->name('hrd.face.')
+    ->group(function () {
+        Route::get('/', [FaceReviewController::class, 'index'])->name('index');
+        Route::post('/{attendance}/approve', [FaceReviewController::class, 'approve'])->name('approve');
+        Route::post('/{attendance}/reject', [FaceReviewController::class, 'reject'])->name('reject');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN AREA - KONFIGURASI ALUR APPROVAL
+|--------------------------------------------------------------------------
+| Role `admin` mengatur alur approval (tree tahap, urutan, dan pemetaan role)
+| lewat UI. Seluruh aturan ini dibaca runtime oleh
+| App\Services\ApprovalFlowConfig, jadi tidak perlu ubah kode lagi.
+|
+*/
+
+Route::middleware(['auth', 'verified', 'role:admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+
+        Route::get('/approval-flows', [ApprovalFlowController::class, 'index'])
+            ->name('approval-flows');
+
+        // Katalog tahap
+        Route::post('/approval-flows/stages', [ApprovalFlowController::class, 'storeStage'])
+            ->name('approval-flows.stages.store');
+        Route::put('/approval-flows/stages/{stage}', [ApprovalFlowController::class, 'updateStage'])
+            ->name('approval-flows.stages.update');
+        Route::patch('/approval-flows/stages/{stage}/toggle', [ApprovalFlowController::class, 'toggleStage'])
+            ->name('approval-flows.stages.toggle');
+        Route::delete('/approval-flows/stages/{stage}', [ApprovalFlowController::class, 'destroyStage'])
+            ->name('approval-flows.stages.destroy');
+
+        // Tree alur
+        Route::post('/approval-flows', [ApprovalFlowController::class, 'storeFlow'])
+            ->name('approval-flows.store');
+        Route::put('/approval-flows/{flow}', [ApprovalFlowController::class, 'updateFlow'])
+            ->name('approval-flows.update');
+        Route::delete('/approval-flows/{flow}', [ApprovalFlowController::class, 'destroyFlow'])
+            ->name('approval-flows.destroy');
+
+        // Pemetaan role pengaju -> alur
+        Route::post('/approval-flows/role-mappings', [ApprovalFlowController::class, 'storeRoleFlow'])
+            ->name('approval-flows.role-mappings.store');
+        Route::delete('/approval-flows/role-mappings/{roleFlow}', [ApprovalFlowController::class, 'destroyRoleFlow'])
+            ->name('approval-flows.role-mappings.destroy');
+
+        // Pulihkan konfigurasi bawaan sistem
+        Route::post('/approval-flows/sync-defaults', [ApprovalFlowController::class, 'syncDefaults'])
+            ->name('approval-flows.sync-defaults');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN AREA - PENGATURAN FACE RECOGNITION
+|--------------------------------------------------------------------------
+| Threshold, maks percobaan, role bebas, retensi, dan endpoint layanan
+| disimpan di tabel attendance_settings (bukan kode).
+*/
+Route::middleware(['auth', 'verified', 'role:admin'])
+    ->prefix('admin/face-settings')
+    ->name('admin.face-settings.')
+    ->group(function () {
+        Route::get('/', [FaceSettingsController::class, 'index'])->name('index');
+        Route::post('/', [FaceSettingsController::class, 'update'])->name('update');
+        Route::post('/reset', [FaceSettingsController::class, 'reset'])->name('reset');
+        Route::post('/test-service', [FaceSettingsController::class, 'testService'])->name('test-service');
+        // Kendali proses microservice face recognition (start / stop / restart).
+        // Daftar aksi dibatasi di controller lewat in_array, bukan dari input mentah.
+        Route::post('/service/{action}', [FaceSettingsController::class, 'serviceControl'])
+            ->whereIn('action', ['start', 'stop', 'restart'])
+            ->name('service-control');
+        Route::get('/audit', [FaceAuditController::class, 'index'])->name('audit');
+        Route::post('/telegram-test', [FaceSettingsController::class, 'testTelegram'])->name('telegram-test');
+    });
 
 require __DIR__ . '/auth.php';

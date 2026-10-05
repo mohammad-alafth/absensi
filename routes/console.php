@@ -31,3 +31,9 @@ Schedule::command('cache:prune-stale-tags')->hourly();
 | bila schedule:work sudah berjalan).
 */
 Schedule::command('lembur:ingatkan-absen')->dailyAt('07:00');
+
+/*
+| Hapus foto bukti absen sesuai retensi face recognition (default 60 hari).
+|
+*/
+Schedule::command('face:housekeeping')->dailyAt('03:30');

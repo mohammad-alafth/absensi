@@ -31,6 +31,7 @@ use App\Exports\CalendarUserExport;
 use App\Services\ScheduleService;
 use App\Exports\CalendarMultiExport;
 use App\Support\PermissionRange;
+use App\Support\PdfSignatureBlocks;
 use App\Support\SubmissionStatus;
 
 
@@ -1353,6 +1354,13 @@ class HRDController extends Controller
             $status = $item->{$stage . '_status'} ?? null;
 
             if ($status === null || $status === 'pending') {
+                continue;
+            }
+
+            // Pengajuan milik PJ sendiri (role pj_*) melewati tahap PJ karena
+            // pengaju adalah PJ-nya: tidak ada orang lain yang menandatangani,
+            // jadi baris PJ tidak ditampilkan (sama seperti blok di surat PDF).
+            if ($stage === 'pj' && !PdfSignatureBlocks::showsPj($item)) {
                 continue;
             }
 

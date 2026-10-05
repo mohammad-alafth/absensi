@@ -6,6 +6,7 @@ use App\Models\EmployeeShift;
 use App\Models\Overtime;
 use App\Models\OvertimePunch;
 use App\Models\User;
+use App\Support\FaceSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -883,11 +884,24 @@ class OvertimePunchService
             (float) $data['longitude']
         );
 
-        if ($distance > self::RADIUS_METERS) {
+        if ($distance > self::radiusMeters()) {
             abort(403, 'Anda berada di luar radius kantor ('
                 . round($distance, 2) . ' meter dari batas '
-                . self::RADIUS_METERS . ' meter).');
+                . self::radiusMeters() . ' meter).');
         }
+    }
+
+    /**
+     * Radius GPS kantor dalam meter.
+     *
+     * Menghormati pengaturan di /admin/face-settings (office.radius_meters).
+     * Nilai lama 200 meter tetap dipakai hanya bila pengaturan belum diisi.
+     */
+    public static function radiusMeters(): float
+    {
+        $configured = FaceSettings::float('office.radius_meters');
+
+        return $configured > 0 ? $configured : (float) self::RADIUS_METERS;
     }
     /*
     |--------------------------------------------------------------------------
@@ -1054,17 +1068,23 @@ class OvertimePunchService
 
     /**
      * Jarak haversine dari kantor dalam meter (rumus sama seperti FaceController).
+     *
+     * Titik kantor & jari-jari radius mengikuti FaceSettings supaya perubahan
+     * di /admin/face-settings langsung berlaku untuk absen lembur juga.
      */
     public function distanceTo(float $lat, float $lng): float
     {
         $earthRadius = 637200;
 
-        $dLat = deg2rad($lat - self::OFFICE_LAT);
+        $officeLat = FaceSettings::float('office.latitude') ?: (float) self::OFFICE_LAT;
+        $officeLng = FaceSettings::float('office.longitude') ?: (float) self::OFFICE_LNG;
 
-        $dLon = deg2rad($lng - self::OFFICE_LNG);
+        $dLat = deg2rad($lat - $officeLat);
+
+        $dLon = deg2rad($lng - $officeLng);
 
         $a = sin($dLat / 2) * sin($dLat / 2)
-            + cos(deg2rad(self::OFFICE_LAT))
+            + cos(deg2rad($officeLat))
             * cos(deg2rad($lat))
             * sin($dLon / 2) * sin($dLon / 2);
 

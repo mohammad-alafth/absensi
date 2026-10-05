@@ -188,6 +188,28 @@ class ApprovalFlowService
         'manager_finance',
     ];
 
+    /**
+     * Jenis pengajuan yang tetap wajib melewati approval PJ walau pengajunya
+     * adalah PJ sendiri (role pj_*).
+     *
+     * Alasan: form IZIN tidak memungut tanda tangan pengaju, sehingga tanda
+     * tangan pengaju diambil di menu approval PJ. Setelah PJ menyetujui,
+     * pengajuan baru lanjut ke tahap berikutnya (lihat statusAfterPj()).
+     */
+    public const PJ_APPROVAL_REQUIRED_TYPES = [
+        'permission',
+    ];
+
+    /**
+     * Role sistem (bukan approver pengajuan).
+     *
+     * `admin` mengelola konfigurasi alur approval lewat menu
+     * "Alur Approval" (App\Http\Controllers\Admin\ApprovalFlowController).
+     */
+    public const ADMIN_ROLES = [
+        'admin',
+    ];
+
     /*
     |--------------------------------------------------------------------------
     | ALIAS DIVISI (nama role lama <-> baru pada divisi yang sama)
@@ -250,8 +272,15 @@ class ApprovalFlowService
     /**
      * Rantai stage approver untuk sebuah role pengaju (berurutan).
      */
-    public static function chainFor(?string $role): array
+    public static function chainFor(?string $role, ?string $type = null): array
     {
+        // Konfigurasi admin (database) punya prioritas; null = belum ada config.
+        $configured = ApprovalFlowConfig::chainFor((string) self::normalize($role), $type);
+
+        if ($configured !== null) {
+            return $configured;
+        }
+
         $group = self::groupFor($role);
 
         return self::GROUP_CHAINS[$group] ?? self::GROUP_CHAINS[self::DEFAULT_GROUP];
@@ -271,6 +300,41 @@ class ApprovalFlowService
         return !in_array($role, self::TOP_LEVEL_ROLES, true);
     }
 
+    /**
+     * Apakah pengajuan dengan jenis tertentu masih perlu approval PJ?
+     *
+     * Bedanya dengan needsPjApproval(): pengajuan IZIN dari PJ sendiri
+     * (role pj_*) tetap wajib lewat PJ karena tanda tangannya diambil di
+     * menu approval PJ (form izin tidak memungut tanda tangan pengaju).
+     * Role atasan (hrd / direktur / supervisor / kabag) tidak diubah aturan
+     *nya: mereka tetap melewati PJ seperti sebelumnya.
+     */
+    public static function needsPjApprovalFor(?string $role, ?string $type = null): bool
+    {
+        $role = self::normalize($role);
+
+        // Konfigurasi admin: apakah langkah pertama alur adalah tahap PJ?
+        $configured = ApprovalFlowConfig::startsWithPj((string) $role, $type);
+
+        if ($configured !== null) {
+            return $configured;
+        }
+
+        if (self::isPjRole($role) && self::requiresPjForType($type)) {
+            return true;
+        }
+
+        return self::needsPjApproval($role);
+    }
+
+    /**
+     * Apakah jenis pengajuan ini mewajibkan approval PJ untuk pengaju role pj_*?
+     */
+    public static function requiresPjForType(?string $type): bool
+    {
+        return in_array(self::normalize($type), self::PJ_APPROVAL_REQUIRED_TYPES, true);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | STAGE HELPERS
@@ -278,12 +342,48 @@ class ApprovalFlowService
     */
     public static function statusForStage(string $stage): ?string
     {
-        return self::STAGE_STATUS[$stage] ?? null;
+        // Konvensi status global: waiting_<key>. Stage hasil konfigurasi admin
+        // pun memakai konvensi yang sama, jadi tidak perlu daftar tambahan.
+        return self::STAGE_STATUS[$stage] ?? 'waiting_' . $stage;
+    }
+
+    /**
+     * Katalog tahap aktif.
+     *
+     * Selama konfigurasi admin belum dipakai, sumbernya tetap konstanta bawaan.
+     * Setelah admin menyimpan konfigurasi, database menjadi sumber kebenaran
+     * tunggal — tahap yang dinonaktifkan admin benar-benar hilang dari alur,
+     * antrean approval, dan surat PDF.
+     *
+     * @return array<string, array{role: string, label: string}>
+     */
+    public static function stagesConfig(): array
+    {
+        if (!ApprovalFlowConfig::isEnabled()) {
+            return self::APPROVER_STAGES;
+        }
+
+        $config = [];
+
+        foreach (ApprovalFlowConfig::activeStages() as $key => $stage) {
+            $config[$key] = [
+                'role' => $stage->role,
+                'label' => $stage->label,
+            ];
+        }
+
+        return $config;
+    }
+
+    /** Semua key tahap (konstanta + konfigurasi admin). */
+    public static function stageKeys(): array
+    {
+        return array_keys(self::stagesConfig());
     }
 
     public static function labelForStage(string $stage): string
     {
-        return self::APPROVER_STAGES[$stage]['label']
+        return self::stagesConfig()[$stage]['label']
             ?? strtoupper(str_replace('_', ' ', $stage));
     }
 
@@ -308,11 +408,18 @@ class ApprovalFlowService
     {
         $role = self::normalize($role);
 
+        // Stage dari konfigurasi admin (punya prioritas, bisa di-toggle admin).
+        $configured = ApprovalFlowConfig::stageForRole($role);
+
+        if ($configured !== null) {
+            return $configured;
+        }
+
         if (isset(self::APPROVER_ALIASES[$role])) {
             return self::APPROVER_ALIASES[$role];
         }
 
-        return array_key_exists($role, self::APPROVER_STAGES) ? $role : null;
+        return array_key_exists($role, self::stagesConfig()) ? $role : null;
     }
 
     /**
@@ -380,7 +487,7 @@ class ApprovalFlowService
      */
     public static function approverRoles(): array
     {
-        return array_keys(self::APPROVER_STAGES);
+        return array_keys(self::stagesConfig());
     }
 
     /**
@@ -405,25 +512,25 @@ class ApprovalFlowService
     /**
      * Status global saat pengajuan pertama kali dibuat.
      */
-    public static function initialStatus(?string $role): string
+    public static function initialStatus(?string $role, ?string $type = null): string
     {
-        if (self::needsPjApproval($role)) {
+        if (self::needsPjApprovalFor($role, $type)) {
             return 'pending';
         }
 
-        $chain = self::chainFor($role);
+        $chain = self::chainFor($role, $type);
 
-        return self::STAGE_STATUS[$chain[0]] ?? 'approved';
+        return isset($chain[0]) ? (self::statusForStage($chain[0]) ?? 'approved') : 'approved';
     }
 
     /**
      * Status global setelah PJ menyetujui (tahap PJ selesai).
      */
-    public static function statusAfterPj(?string $role): string
+    public static function statusAfterPj(?string $role, ?string $type = null): string
     {
-        $chain = self::chainFor($role);
+        $chain = self::chainFor($role, $type);
 
-        return self::STAGE_STATUS[$chain[0]] ?? 'approved';
+        return isset($chain[0]) ? (self::statusForStage($chain[0]) ?? 'approved') : 'approved';
     }
 
     /**
@@ -433,15 +540,26 @@ class ApprovalFlowService
      *  - status     : status global tahap berikutnya
      *  - pj_status  : 'pending' bila masih perlu PJ, 'approved' bila dilewati
      *  - hrd_status : tetap ada demi kompatibilitas kolom lama
+     *
+     * Parameter $type bersifat opsional. Contoh: handle('pj_gizi', 'permission') tetap
+     * menunggu approval PJ, sedangkan handle('pj_gizi', 'leave') langsung
+     * ke tahap berikutnya.
      */
-    public static function handle(?string $role): array
+    public static function handle(?string $role, ?string $type = null): array
     {
-        $chain = self::chainFor($role);
-        $needsPj = self::needsPjApproval($role);
+        $chain = self::chainFor($role, $type);
+        $needsPj = self::needsPjApprovalFor($role, $type);
 
         $stageStatuses = [];
 
-        foreach (array_keys(self::APPROVER_STAGES) as $stage) {
+        foreach (self::stageKeys() as $stage) {
+            // pj_status dihitung dari $needsPj (bukan selalu pending): tahap PJ
+            // dilewati untuk role PJ & role atasan. Tahap PJ pun bisa dimatikan
+            // admin lewat katalog tahap, jadi tidak ikut ditulis sebagai pending.
+            if ($stage === ApprovalFlowConfig::PJ_STAGE) {
+                continue;
+            }
+
             foreach (self::columnPrefixesForStage($stage) as $prefix) {
                 $stageStatuses[$prefix . '_status'] = 'pending';
             }
@@ -450,7 +568,7 @@ class ApprovalFlowService
         return array_merge([
             'status' => $needsPj
                 ? 'pending'
-                : (self::STAGE_STATUS[$chain[0]] ?? 'approved'),
+                : (self::statusForStage($chain[0]) ?? 'approved'),
             'pj_status' => $needsPj ? 'pending' : 'approved',
             'hrd_status' => 'pending',
         ], $stageStatuses);
@@ -506,7 +624,8 @@ class ApprovalFlowService
     {
         $roles = array_unique(array_merge(
             array_keys(self::ROLE_GROUPS),
-            array_keys(self::APPROVER_STAGES)
+            self::stageKeys(),
+            self::ADMIN_ROLES
         ));
 
         sort($roles);

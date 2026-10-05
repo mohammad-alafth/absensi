@@ -2,11 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\FaceVerifier;
+use App\Models\User;
+use App\Services\AttendancePunchService;
+use App\Services\FaceAuditLogger;
+use App\Services\Face\NullFaceVerifier;
+use App\Services\Face\RealFaceVerifier;
+use App\Support\FacePolicy;
+use App\Support\FaceResult;
+use App\Support\FaceSettings;
 use Illuminate\Http\Request;
-use App\Models\Attendance;
-use Carbon\Carbon;
-use App\Services\ScheduleService;
+use Illuminate\Support\Facades\Storage;
 
+/**
+ * Absensi biasa (tanpa halaman scan wajah).
+ *
+ * Jalur ini TIDAK lagi menjadi bypass: wajah diaktifkan dan pengguna
+ * diwajibkan memakai wajah, permintaan wajib menyertakan foto wajah sehingga
+ * tidak bisa memotong verifikasi dengan memakai endpoint biasa.
+ *
+ * Bila wajah tidak wajib atau layanan dimatikan, perilaku lama dipertahankan
+ * sepenuhnya (absen tetap jalan seperti sebelumnya).
+ */
 class AttendanceController extends Controller
 {
     public function store(Request $request)
@@ -20,177 +37,108 @@ class AttendanceController extends Controller
             ], 401);
         }
 
-        $now = Carbon::now();
+        $context = [
+            'latitude' => $request->input('latitude'),
+            'longitude' => $request->input('longitude'),
+            'accuracy' => $request->input('accuracy'),
+        ];
 
-        /*
-        |--------------------------------------------------------------------------
-        | SCHEDULE
-        |--------------------------------------------------------------------------
-        */
-        $schedule = ScheduleService::getTodaySchedule($user);
+        $faceResult = null;
 
-        if (!$schedule) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hari ini anda libur'
-            ], 403);
-        }
+        if (FacePolicy::isRequired($user)) {
+            $request->validate([
+                'image' => 'required|string',
+            ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | BUILD SHIFT DATETIME (dari ScheduleService - sudah handle cross-day)
-        |--------------------------------------------------------------------------
-        */
-        $shiftStart = $schedule['shift_start'];
-        $shiftEnd = $schedule['shift_end'];
-        $shiftDate = $schedule['shift_date'];
+            $faceResult = $this->verifier()->verify($user, $request->input('image'));
+            $attempt = (int) $request->input('attempt', 1);
+            $maxAttempts = max(1, FaceSettings::int('face.max_attempts'));
 
-        /*
-        |--------------------------------------------------------------------------
-        | GRACE PERIOD
-        |--------------------------------------------------------------------------
-        */
-        $graceMinutes = $schedule['grace_minutes'] ?? 5;
-        $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
-
-        /*
-        |--------------------------------------------------------------------------
-        | ATTENDANCE - Cari berdasarkan shift_date (bukan today)
-        |--------------------------------------------------------------------------
-        | Untuk cross-day shift, shift_date adalah tanggal mulai shift (kemarin).
-        | Jadi kita cari attendance berdasarkan shift_date dari schedule.
-        |--------------------------------------------------------------------------
-        */
-        $attendance = Attendance::where('user_id', $user->id)
-            ->where('tanggal', $shiftDate)
-            ->orderByDesc('jam_masuk')
-            ->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | CHECK IN
-        |--------------------------------------------------------------------------
-        */
-        if (!$attendance) {
-            $status = 'hadir';
-            $lateMinutes = 0;
-
-            /*
-            |--------------------------------------------------------------------------
-            | CEK KETERLAMBATAN
-            |--------------------------------------------------------------------------
-            */
-            if ($now->gt($lateLimit)) {
-                $status = 'terlambat';
-
-                /*
-                |--------------------------------------------------------------------------
-                | HITUNG TELAT SETELAH BATAS TOLERANSI
-                |--------------------------------------------------------------------------
-                */
-                $lateMinutes = $lateLimit->diffInMinutes($now);
-            }
-
-            // Check-in diperbolehkan paling awal 2 jam sebelum jam masuk shift
-            // dan paling lambat 2 jam setelah jam masuk shift.
-            // (diubah dari 1 jam -> 2 jam agar karyawan yang datang lebih awal
-            // tidak ditolak / kena error "diluar jam absensi" saat jadwal aktif)
-            $checkinStart = $shiftStart->copy()->subHours(ScheduleService::EARLY_CHECKIN_HOURS);
-            $checkinEnd   = $shiftStart->copy()->addHours(ScheduleService::LATE_CHECKIN_HOURS);
-
-            if ($now->lt($checkinStart)) {
+            // Tidak boleh absen bila wajah gagal diverifikasi dan tidak ada alternatif.
+            if (!$faceResult->allowsAttendance()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Belum masuk jam absensi (absensi dibuka mulai '
-                        . ScheduleService::EARLY_CHECKIN_HOURS . ' jam sebelum jam masuk)'
+                    'face' => $faceResult->toArray(),
+                    'message' => $faceResult->message,
+                    'attempt' => $attempt,
+                    'attempt_remaining' => max(0, $maxAttempts - $attempt),
                 ], 403);
             }
 
-            if ($now->gt($checkinEnd)) {
+            // Zona abu / tidak dikenali: minta coba lagi selagi masih ada kesempatan.
+            if ($faceResult->needsReview() && $attempt < $maxAttempts) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Diluar jam checkin (maksimal '
-                        . ScheduleService::LATE_CHECKIN_HOURS . ' jam setelah jam masuk)'
+                    'face' => $faceResult->toArray(),
+                    'message' => $faceResult->message,
+                    'attempt' => $attempt,
+                    'attempt_remaining' => $maxAttempts - $attempt,
+                    'retry' => true,
                 ], 403);
             }
-
-            Attendance::create([
-                'user_id' => $user->id,
-                'tanggal' => $shiftDate,
-                'jam_masuk' => $now,
-                'latitude' => $request->latitude,
-                'longitude' => $request->longitude,
-                'status' => $status,
-                'late_minutes' => $lateMinutes,
-                'scheduled_checkin' => $shiftStart,
-                'scheduled_checkout' => $shiftEnd
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'type' => 'checkin',
-                'status' => $status,
-                'late_minutes' => $lateMinutes,
-                'message' => $status === 'terlambat'
-                    ? 'Check in berhasil (Terlambat ' . $lateMinutes . ' menit)'
-                    : 'Check in berhasil'
-            ]);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SUDAH CHECKOUT
-        |--------------------------------------------------------------------------
-        */
-        if ($attendance->jam_keluar) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Anda sudah checkout'
-            ]);
+        app(FaceAuditLogger::class)->log(
+            FaceAuditLogger::VERIFY,
+            $user->id,
+            $faceResult?->status ?? 'not_required',
+            ['score' => $faceResult?->score, 'method' => $faceResult?->method],
+            $request
+        );
+
+        $punch = app(AttendancePunchService::class)->punch($user, $context, false);
+
+        if (!($punch['success'] ?? false)) {
+            // Menghormati status bawaan service (checkout terlalu awal dibalas 200).
+            return response()->json($punch, (int) ($punch['http_status'] ?? 403));
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | BELUM WAKTU PULANG
-        |--------------------------------------------------------------------------
-        | Check-out baru diperbolehkan mulai 5 menit sebelum jam selesai shift.
-        */
-        $checkoutLimit = $shiftEnd->copy()->subMinutes(ScheduleService::CHECKOUT_GRACE_MINUTES);
-
-        if ($now->lt($checkoutLimit)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Belum waktu checkout (baru bisa 5 menit sebelum jam pulang)'
-            ]);
+        if ($faceResult instanceof FaceResult) {
+            $imagePath = $this->storeImage($user, $request->input('image'));
+            app(AttendancePunchService::class)->attachFaceResult($user, $faceResult, $imagePath);
+            $punch['face'] = $faceResult->toArray();
+            $punch['face_image'] = $imagePath;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | REALITAS OVERTIME MURNI PRESENSI
-        |--------------------------------------------------------------------------
-        | Dihitung murni sejak menit pertama kelebihan setelah jadwal pulang shift selesai.
-        */
-        $overtimeMinutes = 0;
+        return response()->json($punch);
+    }
 
-        if ($now->gt($shiftEnd)) {
-            $overtimeMinutes = $shiftEnd->diffInMinutes($now);
+    /** Verifier aktif: layanan wajah bila aktif dan endpoint terisi. */
+    private function verifier(): FaceVerifier
+    {
+        if (!FacePolicy::enabled() || FaceSettings::str('face.service_url') === '') {
+            return new NullFaceVerifier('Layanan wajah belum dikonfigurasi.');
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PROCESS CHECKOUT
-        |--------------------------------------------------------------------------
-        */
-        $attendance->update([
-            'jam_keluar' => $now,
-            'overtime_minutes' => $overtimeMinutes
-        ]);
+        return new RealFaceVerifier();
+    }
 
-        return response()->json([
-            'success' => true,
-            'type' => 'checkout',
-            'message' => 'Checkout berhasil',
-            'overtime_minutes' => $overtimeMinutes
-        ]);
+    /** Simpan foto bukti absen. */
+    private function storeImage(?User $user, ?string $image): ?string
+    {
+        if ($user === null || !is_string($image) || trim($image) === '') {
+            return null;
+        }
+
+        $binary = base64_decode(
+            (string) preg_replace('/\s+/', '', (string) preg_replace(
+                '#^data:image/[a-zA-Z0-9.+-]+;base64,#',
+                '',
+                trim($image)
+            )),
+            true
+        );
+
+        if ($binary === false || $binary === '') {
+            return null;
+        }
+
+        $fileName = 'face-proof/' . $user->id . '_' . time() . '.jpg';
+
+        // Foto bukti TIDAK ditampilkan atau diunduh di mana pun (keputusan B1):
+        // disimpan di disk privat sehingga tidak punya URL publik.
+        Storage::disk('local')->put($fileName, $binary);
+
+        return $fileName;
     }
 }

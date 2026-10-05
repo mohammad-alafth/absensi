@@ -25,6 +25,11 @@ class User extends Authenticatable
         'password',
         'role',
         'face_descriptor',
+        'face_embedding',
+        'face_status',
+        'face_enrolled_at',
+        'face_samples',
+        'face_threshold',
         'finger_id',
         'leave_quota',
         'is_approved',
@@ -39,6 +44,7 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'face_embedding',
         'remember_token',
     ];
 
@@ -52,6 +58,10 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Vektor wajah disimpan terenkripsi (AES-256-CBC, kunci APP_KEY Laravel).
+            // Dipakai cast bawaan agar ringan tanpa infrastruktur tambahan, dan
+            // tidak perlu dienkripsi ulang saat dibaca.
+            'face_embedding' => 'encrypted',
         ];
     }
 

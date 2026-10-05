@@ -78,7 +78,7 @@ class SubmissionStatus
             'head' => 'Kepala Bagian',
         ];
 
-        foreach (ApprovalFlowService::APPROVER_STAGES as $stage => $config) {
+        foreach (ApprovalFlowService::stagesConfig() as $stage => $config) {
             $stages[$stage] = $config['label'];
         }
 
@@ -192,7 +192,28 @@ class SubmissionStatus
             return false;
         }
 
-        return in_array($submission->status, self::EDITABLE, true);
+        return in_array($submission->status, self::EDITABLE, true)
+            || self::isConfiguredStageStatus($submission->status);
+    }
+
+    /**
+     * Status `waiting_<stage>` dari tahap yang dikonfigurasi admin.
+     *
+     * Tahap baru hasil pengaturan admin tidak mungkin masuk ke konstanta
+     * EDITABLE, jadi status waiting_<key> tetap boleh diedit selama key-nya
+     * merupakan tahap yang terdaftar.
+     */
+    private static function isConfiguredStageStatus(?string $status): bool
+    {
+        $status = (string) $status;
+
+        if (!str_starts_with($status, 'waiting_')) {
+            return false;
+        }
+
+        $stage = substr($status, strlen('waiting_'));
+
+        return $stage !== '' && in_array($stage, ApprovalFlowService::stageKeys(), true);
     }
 
     /**
