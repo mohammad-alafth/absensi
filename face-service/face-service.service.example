@@ -1,0 +1,45 @@
+# Template systemd untuk mikroservice face recognition di produksi.
+#
+# OPSIONAL, tapi DISARANKAN: dengan ini service hidup otomatis setelah reboot
+# dan dijalankan ulang sendiri bila crash. Tanpa ini, kalau uvicorn mati,
+# absensi jalan TANPA verifikasi wajah (fail-open) sampai ada yang menekan
+# tombol Nyalakan.
+#
+# Pemasangan (sebagai root):
+#   1. Sesuaikan 4 baris berikut:
+#        /var/www/vhosts/DOMAIN/HTTPDOCS/face-service
+#        user=DOMAINUSER
+#        Environment=FACE_SERVICE_TOKEN=<sama dengan face.service_token>
+#   2. Salin file ini:
+#        cp face-service.service.example /etc/systemd/system/face-service.service
+#   3. Aktifkan:
+#        systemctl daemon-reload
+#        systemctl enable --now face-service
+#        systemctl status face-service
+#
+# Setelah memakai systemd, tombol Nyalakan/Stop di UI tetap berfungsi
+# (status di UI dibaca dari /health, bukan dari proses), tapi sebaiknya
+# kelola start/stop lewat `systemctl` di server.
+
+[Unit]
+Description=Mikroservice Face Recognition (InsightFace / uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=DOMAINUSER
+WorkingDirectory=/var/www/vhosts/DOMAIN/HTTPDOCS/face-service
+Environment=FACE_SERVICE_TOKEN=
+Environment=FACE_PORT=8100
+ExecStart=/var/www/vhosts/DOMAIN/HTTPDOCS/face-service/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8100
+Restart=always
+RestartSec=10
+# InsightFace + onnxruntime cukup berat; beri ruang sebelum dianggap gagal.
+TimeoutStartSec=180
+
+# Keamanan: hanya boleh membaca folder sendiri.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

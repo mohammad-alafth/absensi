@@ -47,8 +47,11 @@ class FaceServiceProcess
     {
         if (!$this->isInstalled()) {
             return $this->result('not_installed', 'Belum Terpasang', false,
-                'Virtual environment mikroservice belum ada. Jalankan sekali: cd face-service; '
-                . 'python -m venv .venv; python -m pip install -r requirements.txt');
+                $this->isWindows()
+                    ? 'Virtual environment mikroservice belum ada. Jalankan sekali: cd face-service; '
+                      . 'python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt'
+                    : 'Virtual environment mikroservice belum ada. Jalankan sekali lewat SSH/terminal Plesk: '
+                      . 'cd face-service && sh setup.sh');
         }
 
         $health = $this->service->health();
@@ -249,6 +252,27 @@ class FaceServiceProcess
                         $pids[] = (int) trim($line);
                     }
                 }
+
+                // lsof sering tidak terpasang di Plesk/distro minimal. Tanpa ini
+                // tombol Matikan tidak menemukan PID sehingga service tidak bisa
+                // dimatikan dari UI. ss (util-linux) hampir selalu tersedia.
+                if ($pids === []) {
+                    // Tanpa -H (kadang tidak didukung iproute2 lama); baris
+                    // header tetap aman karena tidak mengandung "LISTEN" + pid=.
+                    $ss = new Process(['ss', '-ltnp']);
+                    $ss->run();
+
+                    foreach (preg_split('/\R/', trim($ss->getOutput())) ?: [] as $line) {
+                        if (!preg_match(
+                            '/\bLISTEN\b.*:' . preg_quote((string) $port, '/') . '\s.*\bpid=(\d+)/i',
+                            $line,
+                            $m
+                        )) {
+                            continue;
+                        }
+                        $pids[] = (int) $m[1];
+                    }
+                }
             }
 
             return array_values(array_unique($pids));
@@ -268,10 +292,11 @@ class FaceServiceProcess
         return is_int($port) && $port > 0 ? $port : self::DEFAULT_PORT;
     }
 
-    /** Path skrip start yang dipakai UI. */
+    /** Path skrip start yang dipakai UI (menyesuaikan OS server). */
     public function script(): string
     {
-        return base_path('face-service' . DIRECTORY_SEPARATOR . 'startup.ps1');
+        return base_path('face-service' . DIRECTORY_SEPARATOR
+            . ($this->isWindows() ? 'startup.ps1' : 'start.sh'));
     }
 
     private function isInstalled(): bool
@@ -303,10 +328,20 @@ class FaceServiceProcess
             ];
         }
 
-        return ['bash', '-lc', 'cd ' . escapeshellarg(base_path('face-service'))
-            . ' && FACE_SERVICE_TOKEN=' . escapeshellarg(FaceSettings::str('face.service_token'))
-            . ' exec ' . escapeshellarg($this->interpreter())
-            . ' -m uvicorn app:app --host 127.0.0.1 --port ' . $this->port()];
+        // Linux/Plesk: lewat start.sh, BUKAN uvicorn langsung.
+        //
+        // Alasannya dua:
+        //  1. start.sh memakai `setsid -f` sehingga uvicorn berjalan di session
+        //     sendiri. Tanpa itu Process::__destruct() (yang memanggil stop(0))
+        //     mengirim SIGTERM/SIGKILL ke proses child begitu request HTTP
+        //     selesai - tombol "Nyalakan" akan mematikan service-nya sendiri.
+        //  2. start.sh mengarahkan stdout/stderr ke service.log, jadi uvicorn
+        //     tidak mewarisi pipe Symfony yang membuat request menunggu.
+        return [
+            'bash', '-c',
+            'FACE_SERVICE_TOKEN=' . escapeshellarg(FaceSettings::str('face.service_token'))
+            . ' exec sh ' . escapeshellarg(base_path('face-service' . DIRECTORY_SEPARATOR . 'start.sh')),
+        ];
     }
 
     /**

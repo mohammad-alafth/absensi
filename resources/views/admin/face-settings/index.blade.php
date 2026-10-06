@@ -251,9 +251,21 @@
                 </div>
 
                 <p class="mt-4 text-[11px] text-gray-500 leading-relaxed">
-                    Mikroservice juga menyala otomatis saat Windows dinyalakan. Bila tombol
-                    &ldquo;Nyalakan&rdquo; tidak berhasil, jalankan manual di server:
-                    <code class="bg-slate-100 px-1 py-0.5 rounded">face-service\start.ps1</code>
+                    @if(PHP_OS_FAMILY === 'Windows')
+                        Mikroservice juga menyala otomatis saat Windows dinyalakan. Bila tombol
+                        &ldquo;Nyalakan&rdquo; tidak berhasil, jalankan manual di server:
+                        <code class="bg-slate-100 px-1 py-0.5 rounded">face-service\start.ps1</code>
+                    @else
+                        Bila tombol &ldquo;Nyalakan&rdquo; tidak berhasil, jalankan sekali di server
+                        (SSH / Terminal Plesk):
+                        <code class="bg-slate-100 px-1 py-0.5 rounded">cd face-service &amp;&amp; sh setup.sh</code>
+                        untuk membuat <code class="bg-slate-100 px-1 py-0.5 rounded">.venv</code>,
+                        lalu
+                        <code class="bg-slate-100 px-1 py-0.5 rounded">sh start.sh</code>.
+                        Agar hidup lagi setelah reboot, pasang
+                        <code class="bg-slate-100 px-1 py-0.5 rounded">face-service.service.example</code>
+                        sebagai unit systemd.
+                    @endif
                 </p>
 
                 
