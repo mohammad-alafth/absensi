@@ -65,6 +65,13 @@ class PermissionController extends Controller
             ? $request->tanggal_selesai
             : $request->tanggal;
 
+        // Jenis "pulang lebih awal" hanya memakai tanggal mulai (1 hari),
+        // sehingga kolom jam wajib terisi dan tombol absen pulang dibuka
+        // dari jam mulai izin pada tanggal itu.
+        if (Permission::isEarlyLeaveType($request->jenis)) {
+            $tanggalSelesai = $request->tanggal;
+        }
+
         $isSingleDay = $tanggalSelesai === $request->tanggal;
 
         $jamMulai = null;
@@ -222,6 +229,13 @@ class PermissionController extends Controller
         $tanggalSelesai = $request->filled('tanggal_selesai')
             ? $request->tanggal_selesai
             : $request->tanggal;
+
+        // Jenis "pulang lebih awal" hanya memakai tanggal mulai (1 hari),
+        // sehingga kolom jam wajib terisi dan tombol absen pulang dibuka
+        // dari jam mulai izin pada tanggal itu.
+        if (Permission::isEarlyLeaveType($request->jenis)) {
+            $tanggalSelesai = $request->tanggal;
+        }
 
         $isSingleDay = $tanggalSelesai === $request->tanggal;
 

@@ -163,6 +163,7 @@
             $alreadyCheckout = $todayAttendance && $todayAttendance->jam_keluar;
 
             $canCheckout = false;
+            $checkoutAlertText = 'Checkout hanya bisa dilakukan mendekati jam pulang shift.';
             if ($scheduleData && !empty($scheduleData['shift_end'])) {
 
             // shift_end sudah dihitung ScheduleService (termasuk addDay untuk
@@ -175,6 +176,28 @@
             |--------------------------------------------------------------------------
             */
             $checkoutTime = $shiftEnd->copy()->subMinutes(5);
+
+            /*
+            |------------------------------------------------------------------------
+            | IZIN PULANG CEPAT: TOMBOL JUGA DIBUKA SEJAK JAM MULAI IZIN
+            |
+            | Izin "pulang lebih awal" (pulang cepat) yang sudah disetujui membuka
+            | tombol pulang sejak jam mulai izin — konsisten dengan aturan
+            | AttendancePunchService::checkOut yang dipakai saat absen.
+            |--------------------------------------------------------------------------
+            */
+            $earlyOpenAt = app(\App\Services\AttendancePunchService::class)
+                ->earlyCheckoutOpenAt(
+                    auth()->user(),
+                    $scheduleData['shift_date'] ?? today()->format('Y-m-d')
+                );
+
+            if ($earlyOpenAt && $earlyOpenAt->lt($checkoutTime)) {
+                $checkoutTime = $earlyOpenAt;
+                $checkoutAlertText = 'Absen pulang dibuka mulai pukul '
+                    . $checkoutTime->format('H:i') . ' WIB sesuai izin pulang cepat.';
+            }
+
             $canCheckout = now()->gte($checkoutTime);
             }
 
@@ -588,7 +611,7 @@
             Swal.fire({
                 icon: 'warning',
                 title: 'Belum Jam Pulang',
-                text: 'Checkout hanya bisa dilakukan mendekati jam pulang shift.',
+                text: @json($checkoutAlertText ?? 'Checkout hanya bisa dilakukan mendekati jam pulang shift.'),
                 confirmButtonColor: '#4F46E5',
                 confirmButtonText: 'OK',
                 borderRadius: '20px'

@@ -2,12 +2,34 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\CompressesSignatureAttributes;
 
 class Permission extends Model
 {
     use CompressesSignatureAttributes;
+
+    /**
+     * Jenis izin pulang cepat (pada form bernama "pulang lebih awal").
+     *
+     * Izin ini berjam-jam: absen pulang dibuka sejak `jam_mulai` izin yang
+     * sudah disetujui, dan riwayat absen menampilkan durasinya sesuai surat
+     * pengajuan (lihat AttendancePunchService & HistoryController::rekap).
+     * Jenis ini hanya memakai SATU tanggal (`tanggal` / tanggal mulai);
+     * `tanggal_selesai` selalu dipaksa sama dengan `tanggal` saat disimpan
+     * (lihat PermissionController::store & update).
+     */
+    public const EARLY_LEAVE_TYPES = ['pulang lebih awal', 'pulang cepat'];
+
+    /**
+     * Jenis izin terlambat masuk (pada form: "terlambat masuk").
+     *
+     * Izin ini berjam-jam: absen masuk dibuka sampai `jam_selesai` izin yang
+     * sudah disetujui, dan absen pada rentang izin tidak tercatat "terlambat"
+     * (lihat AttendancePunchService::checkIn).
+     */
+    public const LATE_ARRIVAL_TYPES = ['terlambat masuk'];
 
     protected $fillable = [
 
@@ -135,5 +157,66 @@ class Permission extends Model
     public function managerFinanceApprover()
     {
         return $this->belongsTo(User::class, 'manager_finance_approved_by');
+    }
+
+    /** Apakah nama jenis izin ini termasuk pulang cepat (pulang lebih awal)? */
+    public static function isEarlyLeaveType(string $jenis): bool
+    {
+        return in_array(strtolower(trim($jenis)), self::EARLY_LEAVE_TYPES, true);
+    }
+
+    /** Apakah izin ini termasuk jenis pulang cepat (pulang lebih awal)? */
+    public function isEarlyLeave(): bool
+    {
+        return self::isEarlyLeaveType((string) $this->jenis);
+    }
+
+    /** Apakah izin ini termasuk jenis terlambat masuk? */
+    public function isLateArrival(): bool
+    {
+        return in_array(
+            strtolower(trim((string) $this->jenis)),
+            self::LATE_ARRIVAL_TYPES,
+            true
+        );
+    }
+
+    /**
+     * Label durasi izin dari `jam_mulai` s/d `jam_selesai`
+     * ("2 jam", "1 jam 30 menit").
+     *
+     * Null bila jam belum diisi (mis. izin multi-hari). Rentang yang
+     * melewati tengah malam dihitung sampai hari berikutnya.
+     */
+    public function getDurationLabelAttribute(): ?string
+    {
+        if (!$this->jam_mulai || !$this->jam_selesai) {
+            return null;
+        }
+
+        try {
+            $start = Carbon::parse($this->jam_mulai);
+            $end   = Carbon::parse($this->jam_selesai);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($end->lte($start)) {
+            $end->addDay();
+        }
+
+        $minutes = (int) round($start->diffInMinutes($end));
+        $hours   = intdiv($minutes, 60);
+        $rest    = $minutes % 60;
+
+        $parts = [];
+        if ($hours > 0) {
+            $parts[] = $hours . ' jam';
+        }
+        if ($rest > 0) {
+            $parts[] = $rest . ' menit';
+        }
+
+        return $parts === [] ? '0 menit' : implode(' ', $parts);
     }
 }

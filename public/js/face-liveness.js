@@ -87,6 +87,8 @@
         this.openEar = 0;
         this.earCurrent = 0;
         this.earMin = 0;
+        this.earCloseAt = 0;
+        this.earOpenAt = 0;
     }
 
     Liveness.CHALLENGES = CHALLENGES;
@@ -102,6 +104,8 @@
         this.earWindow = [];
         this.lastBlinkAt = 0;
         this.openEar = 0;
+        this.earCloseAt = 0;
+        this.earOpenAt = 0;
         this.emit();
     };
 
@@ -125,6 +129,8 @@
                 baseline: this.openEar,
                 current: this.earCurrent,
                 min: this.earMin,
+                closeAt: this.earCloseAt,
+                openAt: this.earOpenAt,
                 blinks: this.blinks,
             },
         });
@@ -178,10 +184,57 @@
             this.earWindow = [];
             this.lastBlinkAt = 0;
             this.openEar = 0;
+            this.earCloseAt = 0;
+            this.earOpenAt = 0;
 
             if (this.index >= this.order.length) { this.pass(); }
         }
     };
+
+    /**
+     * Baseline EAR "mata terbuka" milik user, dihitung dari PERSENIL jendela
+     * (p75), bukan EWMA.
+     *
+     * EWMA lama bisa TERKUNCI selamanya pada satu frame rusak.
+     * eyeAspectRatio() membalikkan 1 saat landmark mata gagal dibaca; satu
+     * frame begitu menaikkan baseline (mis. 0.30 -> 0.405), dan sampel
+     * terbuka berikutnya (0.30) tidak lolos syarat update
+     * `ear >= baseline * 0.85`, sehingga baseline tak pernah pulih.
+     * Akibatnya ambang menutup (0.75 x baseline) berada DI ATAS EAR
+     * terbuka sungguhan: semua frame terbaca "menutup", pemulihan tak
+     * pernah tercapai, dan kedip TIDAK PERNAH terhitung sampai sesi bubar.
+     *
+     * Persentil tahan terhadap itu: frame anomali hanya menempati satu
+     * slot di jendela, dan BEGITU keluar dari jendela baseline langsung
+     * pulih sendiri. Anomali arah-atas disaring lebih dulu dengan batas
+     * 1.5 x median.
+     */
+    function blinkBaseline(win) {
+        if (!win || !win.length) return 0;
+
+        var ears = [];
+        for (var i = 0; i < win.length; i++) { ears.push(win[i].ear); }
+
+        ears.sort(function (a, b) { return a - b; });
+
+        // Median bawah: tetap stabil walau separuh jendela sedang terisi
+        // sample closure di tengah kedip.
+        var median = ears[Math.floor((ears.length - 1) / 2)];
+        var limit = median * 1.5;
+
+        var plausible = [];
+        for (var k = 0; k < ears.length; k++) {
+            if (ears[k] < limit) { plausible.push(ears[k]); }
+        }
+
+        if (!plausible.length) { plausible = ears; }
+
+        var idx = Math.floor(plausible.length * 0.75);
+
+        if (idx > plausible.length - 1) { idx = plausible.length - 1; }
+
+        return plausible[idx];
+    }
 
     /**
      * Deteksi kedip dari JENDELA WAKTU, bukan dua sample berturut-turut.
@@ -194,12 +247,12 @@
      * 50-70%. Versi lama karena itu sering tidak merespons meski
      * pengguna sudah berkedip dua kali.
      *
-     * Solusinya: simpan riwayat EAR sebentar, lalu nilai POLANYA. Satu
-     * kedipan dihitung bila nilai terendah di jendela berada di bawah
-     * ambang tertutup, dan ada sample SESUDAH nilai terendah itu yang
-     * sudah kembali terbuka. Dengan begitu sampling yang jarang tidak
-     * menjadi masalah: mata yang menutup tidak sempurna di tengah jalan
-     * tetap terdeteksi, karena yang dicari adalah pola turun-naik.
+     * Satu kedip dihitung bila ada PENURUNAN di bawah ambang tertutup yang
+     * diikuti PEMULIHAN: sampel sesudahnya (kapan pun, bukan harus persis
+     * berikutnya) sudah kembali terbuka. Pencarian maju itu penting karena
+     * mata manusia membuka perlahan (0.10 -> 0.24 -> 0.30): ambang
+     * pemulihan baru tercapai pada sampel KEDUA sesudah dip, dan versi
+     * lama yang hanya memeriksa i+1 melewatkannya.
      */
     Liveness.prototype.trackBlink = function (m) {
         var WINDOW_MS = 900;    // cukup memuat satu siklus kedip
@@ -217,31 +270,45 @@
         var CLOSE_RATIO = 0.75; // dianggap menutup bila turun ke 75% baseline
         var OPEN_RATIO = 0.85;  // dianggap kembali terbuka bila naik ke 85%
         var MIN_DROP = 0.025;   // minimal penurunan absolut (anti noise)
+        var MAX_EAR = 0.45;     // batas wajar EAR manusia; di atas ini frame rusak
 
         var now = Date.now();
+        var ear = m && typeof m.ear === 'number' ? m.ear : NaN;
+
+        // Frame rusak (NaN / Infinity / nol) JANGAN masuk jendela: satu
+        // nilai NaN membuat semua perbandingan sesudahnya false dan
+        // deteksi kedip lumpuh diam-diam.
+        if (!isFinite(ear) || ear <= 0) { return false; }
+
+        // eyeAspectRatio() membalikkan 1 saat landmark mata tidak terbaca.
+        // Dipangkas ke batas wajar supaya tidak mencemari baseline. Ambang
+        // tetap relatif, jadi mata dengan EAR wajar tetap terdeteksi.
+        if (ear > MAX_EAR) { ear = MAX_EAR; }
 
         if (!this.earWindow) this.earWindow = [];
 
-        this.earWindow.push({ ear: m.ear, at: now });
+        this.earWindow.push({ ear: ear, at: now });
 
         // Buang sampel yang terlalu lama.
         while (this.earWindow.length && now - this.earWindow[0].at > WINDOW_MS) {
             this.earWindow.shift();
         }
 
-        // Baseline = EAR rata-rata saat mata terbola terbuka. Di-update
-        // pelan (EWMA) dan HANYA dari sampel yang terlihat terbuka,
-        // supaya satu kedipan tidak ikut menarik baseline ke bawah.
-        if (!this.openEar) {
-            this.openEar = m.ear;
-        } else if (m.ear >= this.openEar * OPEN_RATIO) {
-            this.openEar = this.openEar * 0.85 + m.ear * 0.15;
-        }
+        // Baseline = persentil p75 sampel di jendela (lihat blinkBaseline).
+        // Berbeda dengan EWMA, ia SEMBUH sendiri begitu frame anomali
+        // keluar dari jendela.
+        var baseline = blinkBaseline(this.earWindow);
 
-        this.earCurrent = m.ear;
+        this.openEar = baseline;
+        this.earCurrent = ear;
 
-        var closedAt = this.openEar * CLOSE_RATIO;
-        var openAt = this.openEar * OPEN_RATIO;
+        var closedAt = baseline * CLOSE_RATIO;
+        var openAt = baseline * OPEN_RATIO;
+
+        // Ambang dikirim ke panel diagnostik supaya terlihat apakah
+        // baseline masuk akal untuk bentuk mata pengguna ini.
+        this.earCloseAt = closedAt;
+        this.earOpenAt = openAt;
 
         // Nilai terendah di jendela, hanya untuk ditampilkan di panel
         // diagnostik.
@@ -249,42 +316,66 @@
         for (var k = 0; k < this.earWindow.length; k++) {
             if (this.earWindow[k].ear < lowest) { lowest = this.earWindow[k].ear; }
         }
-        this.earMin = lowest === Infinity ? m.ear : lowest;
+        this.earMin = lowest === Infinity ? ear : lowest;
 
-        // Cari PENURUNAN TERAKHIR yang diikuti sampel terbuka. Dicari dari
-        // belakang, bukan nilai terendah global: mata bisa tertutup
-        // beberapa frame berturut-turut, sehingga titik terendah tidak
-        // selalu diikuti frame yang sudah terbuka.
-        var minAt = 0;
+        // Cari PENURUNAN yang diikuti PEMULIHAN. Dicari dari belakang,
+        // dan pemulihan dicari ke ARAH DEPAN (sampel berikutnya kapan pun
+        // yang sudah terbuka), bukan hanya sampel PERSIS sesudah dip:
+        // mata manusia membuka perlahan (0.10 -> 0.24 -> 0.30), ambang
+        // pemulihan baru tercapai pada sampel kedua setelah dip, dan
+        // versi lama hanya memeriksa i+1 sehingga kedip nyata lolos.
+        var win = this.earWindow;
+        var recoveredAt = 0;
         var found = false;
 
-        for (var i = this.earWindow.length - 2; i >= 0; i--) {
-            var dip = this.earWindow[i].ear;
-            var recovered = this.earWindow[i + 1].ear;
+        for (var i = win.length - 2; i >= 0; i--) {
+            var dip = win[i].ear;
 
-            var isClosed = dip < closedAt && (this.openEar - dip) >= MIN_DROP;
-            var isOpenAgain = recovered >= openAt;
-
-            if (isClosed && isOpenAgain) {
-                minAt = this.earWindow[i].at;
-                found = true;
-                break;
+            if (!(dip < closedAt && (baseline - dip) >= MIN_DROP)) {
+                continue;
             }
+
+            // Sebelum menutup, mata harus terlihat tidak-tertutup dulu.
+            // Mencegah jendela yang kebetulan DIMULAI di tengah closure
+            // menghitung state yang memang sudah tertutup sebagai "kedip".
+            if (i >= 1 && win[i - 1].ear < closedAt) {
+                continue;
+            }
+
+            var isOpenAgain = false;
+
+            for (var j = i + 1; j < win.length; j++) {
+                if (win[j].ear >= openAt) { isOpenAgain = true; break; }
+            }
+
+            if (!isOpenAgain) { continue; }
+
+            recoveredAt = win[j].at;
+            found = true;
+            break;
         }
 
         if (!found) { return false; }
 
-        // Satu penurunan = satu kedip. Timestamp dipakai supaya kedip
-        // yang sama tidak terhitung berkali-kali selama jendela yang
-        // sama masih aktif.
-        if (this.lastBlinkAt && minAt <= this.lastBlinkAt) {
+        // Satu closure = satu kedip. Acuannya WAKTU PEMULIHAN, bukan waktu
+        // dip: satu closure bisa punya beberapa sample tertutup, dan saat
+        // sample pertamanya terbuang keluar jendela, sample berikutnya dari
+        // closure YANG SAMA akan terlihat "baru". Dengan acuan pemulihan,
+        // closure yang sama tidak bisa terhitung dua kali; kedip berikutnya
+        // baru dihitung bila pemulihannya terjadi SESUDAH pemulihan kedip
+        // sebelumnya.
+        if (this.lastBlinkAt && recoveredAt <= this.lastBlinkAt) {
             return false;
         }
 
-        this.lastBlinkAt = minAt;
+        this.lastBlinkAt = recoveredAt;
         this.blinks += 1;
+
+        // Progres mengikuti jumlah kedip (1 dari 2 = 0.5), bukan langsung
+        // nyaris penuh: dulu satu kedip langsung memajukan progress ke
+        // 0.95 sehingga pengguna yang gagal kedip kedua merasa sudah selesai.
+        this.peak = this.blinks / 2;
         this.progress = Math.min(1, this.blinks / 2);
-        this.peak = 1;
 
         return this.blinks >= 2;
     };

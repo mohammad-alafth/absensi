@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\Permission;
 use App\Models\User;
 use App\Support\FaceResult;
 use App\Support\FaceSettings;
+use App\Support\PermissionRange;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -71,7 +73,7 @@ class AttendancePunchService
             return $this->fail('Anda sudah check out hari ini', 403);
         }
 
-        return $this->checkOut($attendance, $now, $shiftEnd, $context);
+        return $this->checkOut($user, $attendance, $now, $shiftEnd, $context);
     }
 
     /**
@@ -90,6 +92,22 @@ class AttendancePunchService
         $checkinStart = $shiftStart->copy()->subHours(ScheduleService::EARLY_CHECKIN_HOURS);
         $checkinEnd = $shiftStart->copy()->addHours(ScheduleService::LATE_CHECKIN_HOURS);
 
+        /*
+        |----------------------------------------------------------------------
+        | IZIN TERLAMBAT MASUK MEMBUKA ABSEN MASUK SAMPAI JAM SELESAI IZIN
+        |
+        | Izin "terlambat masuk" yang sudah disetujui menggeser batas akhir
+        | check-in ke `jam_selesai` izin (bila lebih akhir dari aturan normal),
+        | dan absen yang masuk pada rentang izin tidak tercatat "terlambat".
+        |----------------------------------------------------------------------
+        */
+        $lateArrivalUntil = $this->lateArrivalUntil($user, $shiftDate);
+        $extendedByPermission = $lateArrivalUntil !== null && $lateArrivalUntil->gt($checkinEnd);
+
+        if ($extendedByPermission) {
+            $checkinEnd = $lateArrivalUntil;
+        }
+
         if ($now->lt($checkinStart)) {
             return $this->fail(
                 'Belum masuk jam absensi (absensi dibuka mulai '
@@ -99,16 +117,21 @@ class AttendancePunchService
         }
 
         if ($now->gt($checkinEnd)) {
-            return $this->fail(
-                'Diluar jam checkin (maksimal ' . ScheduleService::LATE_CHECKIN_HOURS . ' jam setelah jam masuk)',
-                403
-            );
+            $message = $extendedByPermission
+                ? 'Diluar jam checkin (absen masuk ditutup jam '
+                    . $checkinEnd->format('H:i') . ' sesuai izin terlambat masuk)'
+                : 'Diluar jam checkin (maksimal '
+                    . ScheduleService::LATE_CHECKIN_HOURS . ' jam setelah jam masuk)';
+
+            return $this->fail($message, 403);
         }
 
         $status = 'hadir';
         $lateMinutes = 0;
 
-        if ($now->gt($lateLimit)) {
+        $allowedByPermission = $lateArrivalUntil !== null && $now->lte($lateArrivalUntil);
+
+        if ($now->gt($lateLimit) && !$allowedByPermission) {
             $status = 'terlambat';
             $lateMinutes = (int) round($lateLimit->diffInMinutes($now));
         }
@@ -140,18 +163,39 @@ class AttendancePunchService
     /**
      * @return array<string, mixed>
      */
-    private function checkOut(Attendance $attendance, Carbon $now, Carbon $shiftEnd, array $context): array
+    private function checkOut(User $user, Attendance $attendance, Carbon $now, Carbon $shiftEnd, array $context): array
     {
         $checkoutTime = $shiftEnd->copy()->subMinutes(ScheduleService::CHECKOUT_GRACE_MINUTES);
 
+        /*
+        |----------------------------------------------------------------------
+        | IZIN PULANG CEPAT MEMBUKA ABSEN PULANG LEBIH AWAL
+        |----------------------------------------------------------------------
+        | Contoh: masuk 08.00 dengan izin "pulang lebih awal" 11.00-12.00 yang
+        | sudah disetujui -> absen pulang dibuka dari jam 11.00 (jam MULAI
+        | izin), bukan menunggu mendekati jam pulang shift. Izin hanya memper-
+        | cepat pembukaan: bila tidak ada izin, atau jam izin lebih akhir
+        | daripada jam buka normal, aturan lama tetap berlaku.
+        */
+        $permissionTime = $this->earlyCheckoutOpenAt(
+            $user,
+            Carbon::parse($attendance->tanggal)->format('Y-m-d')
+        );
+        $openedByPermission = $permissionTime !== null && $permissionTime->lt($checkoutTime);
+
+        if ($openedByPermission) {
+            $checkoutTime = $permissionTime;
+        }
+
         if ($now->lt($checkoutTime)) {
             // Perilaku lama: endpoint biasa membalas 200 dengan success=false.
-            return $this->fail(
-                'Belum waktu checkout (baru bisa '
-                . ScheduleService::CHECKOUT_GRACE_MINUTES . ' menit sebelum jam pulang)',
-                200,
-                ['http_status' => 200]
-            );
+            $message = $openedByPermission
+                ? 'Belum waktu checkout (absen pulang dibuka jam '
+                    . $checkoutTime->format('H:i') . ' sesuai izin pulang lebih awal)'
+                : 'Belum waktu checkout (baru bisa '
+                    . ScheduleService::CHECKOUT_GRACE_MINUTES . ' menit sebelum jam pulang)';
+
+            return $this->fail($message, 200, ['http_status' => 200]);
         }
 
         $overtimeMinutes = $now->gt($shiftEnd) ? $shiftEnd->diffInMinutes($now) : 0;
@@ -171,6 +215,87 @@ class AttendancePunchService
                 'attendance_id' => $attendance->id,
             ]
         );
+    }
+
+    /**
+     * Jam dibukanya absen pulang menurut izin "pulang lebih awal" yang sudah
+     * disetujui dan menutup tanggal absen tsb.
+     *
+     * @return Carbon|null jam mulai izin (mis. 11.00), atau null bila tidak ada
+     */
+    public function earlyCheckoutOpenAt(User $user, string $date): ?Carbon
+    {
+        $permissions = PermissionRange::applyOverlapsPeriod(
+            Permission::where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->whereNotNull('jam_mulai'),
+            $date,
+            $date
+        )->orderBy('jam_mulai')->get();
+
+        foreach ($permissions as $permission) {
+            if (!$permission->isEarlyLeave()) {
+                continue;
+            }
+
+            try {
+                // Pembukaan izin selalu jatuh pada tanggal absen yang sama
+                // (jenis ini hanya memakai satu tanggal).
+                return Carbon::parse($date . ' ' . trim((string) $permission->jam_mulai));
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Batas akhir absen masuk menurut izin "terlambat masuk" yang sudah
+     * disetujui dan menutup tanggal absen tsb.
+     *
+     * Bila ada beberapa izin tumpang tindih, diambil jam selesai paling
+     * akhir (gabungan hak izinnya).
+     *
+     * @return Carbon|null jam selesai izin (mis. 12.00), atau null bila tidak ada
+     */
+    private function lateArrivalUntil(User $user, string $date): ?Carbon
+    {
+        $permissions = PermissionRange::applyOverlapsPeriod(
+            Permission::where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->whereNotNull('jam_selesai'),
+            $date,
+            $date
+        )->get();
+
+        $until = null;
+
+        foreach ($permissions as $permission) {
+            if (!$permission->isLateArrival()) {
+                continue;
+            }
+
+            try {
+                $closeAt = Carbon::parse($date . ' ' . trim((string) $permission->jam_selesai));
+
+                // Rentang jam melewati tengah malam: jam selesai jatuh
+                // keesokan hari bila lebih kecil daripada jam mulai.
+                if ($permission->jam_mulai
+                    && $closeAt->lt(Carbon::parse($date . ' ' . trim((string) $permission->jam_mulai)))
+                ) {
+                    $closeAt->addDay();
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if ($until === null || $closeAt->gt($until)) {
+                $until = $closeAt;
+            }
+        }
+
+        return $until;
     }
 /**
      * Cek akurasi & radius GPS terhadap titik kantor (dari FaceSettings).

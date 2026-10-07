@@ -106,6 +106,16 @@
             <td>Tanggal</td>
             <td>: {{ \Carbon\Carbon::parse($permission->tanggal)->format('d-m-Y') }}@if($permission->tanggal_selesai && $permission->tanggal_selesai != $permission->tanggal) s/d {{ \Carbon\Carbon::parse($permission->tanggal_selesai)->format('d-m-Y') }}@endif</td>
         </tr>
+        @if($permission->jam_mulai && $permission->jam_selesai)
+        <tr>
+            <td>Jam</td>
+            <td>: {{ substr((string) $permission->jam_mulai, 0, 5) }} - {{ substr((string) $permission->jam_selesai, 0, 5) }}</td>
+        </tr>
+        <tr>
+            <td>Durasi</td>
+            <td>: {{ $permission->duration_label }}</td>
+        </tr>
+        @endif
         <tr>
             <td>Alasan</td>
             <td>: {{ $permission->alasan }}</td>

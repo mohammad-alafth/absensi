@@ -92,13 +92,13 @@
                                     class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 bg-white">
                             </div>
 
-                            <div class="flex flex-col justify-between">
+                            <div id="col_tanggal_selesai" class="flex flex-col justify-between">
                                 <label class="block text-[11px] font-medium text-slate-700 mb-1">Tanggal Selesai</label>
                                 <input type="date" id="tanggal_selesai" name="tanggal_selesai" value="{{ old('tanggal_selesai') }}"
                                     class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 bg-white">
                             </div>
 
-                            <p class="md:col-span-2 text-[10px] text-slate-400 -mt-1">
+                            <p id="hint_tanggal" class="md:col-span-2 text-[10px] text-slate-400 -mt-1">
                                 Pilih rentang tanggal izin. Jika izin hanya 1 hari, kolom jam akan muncul otomatis.
                             </p>
 
@@ -220,8 +220,19 @@
             const sectionJam = document.getElementById('section_jam');
             const tanggalMulai = document.getElementById('tanggal');
             const tanggalSelesai = document.getElementById('tanggal_selesai');
+            const colTanggalSelesai = document.getElementById('col_tanggal_selesai');
+            const hintTanggal = document.getElementById('hint_tanggal');
             const jamMulaiInput = document.getElementById('jam_mulai');
             const jamSelesaiInput = document.getElementById('jam_selesai');
+
+            // Jenis ini hanya memakai SATU tanggal (tanggal mulai):
+            // tanggal selesai disembunyikan & disamakan dengan tanggal mulai.
+            const EARLY_LEAVE_JENIS = ['pulang lebih awal', 'pulang cepat'];
+
+            function isEarlyLeaveJenis() {
+                const checked = document.querySelector('input[name="jenis"]:checked');
+                return !!checked && EARLY_LEAVE_JENIS.includes(checked.value.trim());
+            }
 
             function isSingleDay() {
                 return tanggalMulai.value &&
@@ -248,6 +259,17 @@
 
             function updateTanggalSection() {
                 const jenisDipilih = Array.from(jenisInputs).some(input => input.checked);
+                const earlyLeave = isEarlyLeaveJenis();
+
+                // "Pulang lebih awal" cukup 1 tanggal: kolom tanggal selesai
+                // disembunyikan dan disamakan dengan tanggal mulai.
+                colTanggalSelesai.style.display = earlyLeave ? 'none' : '';
+                hintTanggal.innerText = earlyLeave
+                    ? 'Jenis ini hanya memakai 1 tanggal (tanggal mulai). Absen pulang terbuka dari Jam Mulai pada tanggal tersebut.'
+                    : 'Pilih rentang tanggal izin. Jika izin hanya 1 hari, kolom jam akan muncul otomatis.';
+                if (earlyLeave && tanggalMulai.value) {
+                    tanggalSelesai.value = tanggalMulai.value;
+                }
 
                 if (jenisDipilih) {
                     sectionTanggal.classList.remove('hidden');
@@ -271,6 +293,10 @@
                     if (!tanggalSelesai.value || tanggalSelesai.value < tanggalMulai.value) {
                         tanggalSelesai.value = tanggalMulai.value;
                     }
+                }
+
+                if (isEarlyLeaveJenis() && tanggalMulai.value) {
+                    tanggalSelesai.value = tanggalMulai.value;
                 }
 
                 updateJamSection();

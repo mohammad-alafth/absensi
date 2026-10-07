@@ -706,6 +706,8 @@
                                 <div>EAR baseline  : <span x-text="liveEar && liveEar.baseline ? Number(liveEar.baseline).toFixed(3) : '-'"></span></div>
                                 <div>EAR sekarang  : <span x-text="liveEar && liveEar.current ? Number(liveEar.current).toFixed(3) : '-'"></span></div>
                                 <div>EAR terendah  : <span x-text="liveEar && liveEar.min !== undefined ? Number(liveEar.min).toFixed(3) : '-'"></span></div>
+                                <div>ambang tutup  : <span x-text="liveEar && liveEar.closeAt ? Number(liveEar.closeAt).toFixed(3) : '-'"></span></div>
+                                <div>ambang buka   : <span x-text="liveEar && liveEar.openAt ? Number(liveEar.openAt).toFixed(3) : '-'"></span></div>
                                 <div>kedip terhitung: <span x-text="liveEar ? liveEar.blinks : '-'"></span></div>
                             </div>
                             <div class="text-amber-300" x-show="diag && diag.detectError">

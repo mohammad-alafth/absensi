@@ -272,6 +272,12 @@ class HistoryController extends Controller
                 // Anotasi izin/dinas luar walau tetap hadir
                 if ($permit) {
                     $note = ($note ? $note . ' • ' : '') . ucwords($permit->jenis);
+
+                    // Izin pulang cepat ikut menampilkan durasi jam sesuai
+                    // surat pengajuan (mis. izin 08.00-10.00 -> "Izin 2 jam").
+                    if ($permit->isEarlyLeave() && $permit->duration_label) {
+                        $note .= ' • Izin ' . $permit->duration_label;
+                    }
                 }
             } elseif ($leaveCover) {
                 $kind = 'cuti';
