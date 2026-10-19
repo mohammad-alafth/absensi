@@ -116,6 +116,7 @@ class User extends Authenticatable
             'kabag_umum' => 'KABAG UMUM',
             'manager_umum' => 'MANAGER UMUM',
             'kabag_marketing' => 'KABAG MARKETING',
+            'kabag_nurse' => 'KABAG PERAWAT',
             'manager_finance' => 'MANAGER KEUANGAN',
             'pipp' => 'PIPP',
             'it' => 'IT',

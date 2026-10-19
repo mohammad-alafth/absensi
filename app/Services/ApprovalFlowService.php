@@ -30,6 +30,7 @@ class ApprovalFlowService
         'kabag_umum'      => ['role' => 'kabag_umum',      'label' => 'Kabag Umum'],
         'manager_umum'    => ['role' => 'manager_umum',    'label' => 'Manager Umum'],
         'kabag_marketing' => ['role' => 'kabag_marketing', 'label' => 'Kabag Marketing'],
+        'kabag_nurse'     => ['role' => 'kabag_nurse',     'label' => 'Kabag Perawat'],
         'manager_finance' => ['role' => 'manager_finance', 'label' => 'Manager Finance'],
         'director'        => ['role' => 'director',        'label' => 'Direktur'],
     ];

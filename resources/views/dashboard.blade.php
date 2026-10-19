@@ -537,7 +537,7 @@
 
                     @endif
 
-                    @if(in_array(auth()->user()->role, ['medical_service', 'medical_service', 'kabag_umum', 'manager_umum', 'kabag_marketing', 'manager_finance', 'director']))
+                    @if(in_array(auth()->user()->role, ['medical_service', 'medical_service', 'kabag_umum', 'manager_umum', 'kabag_marketing', 'kabag_nurse', 'manager_finance', 'director']))
 
                     <a href="{{ route('hrd.dashboard') }}"
                         class="relative 
