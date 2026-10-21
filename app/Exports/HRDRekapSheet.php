@@ -29,14 +29,25 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
  *
  * Kolom:
  *   A NAMA PEGAWAI | B UNIT/ROLE | C TOTAL HADIR | D TOTAL TELAT
- *   E TOTAL WAKTU TERLAMBAT | F TOTAL JAM KERJA | G DENDA KETERLAMBATAN (formula)
- *   H TANGGAL IZIN | I JAM IZIN | J TANGGAL CUTI
- *   K TANGGAL LEMBUR | L JAM LEMBUR (per tanggal, format surat lembur: "X Jam")
- *   M RINCIAN TELAT PER HARI (menit aktual per tanggal, cth: "10/09: 7 mnt; 12/09: 5 mnt")
+ *   E TOTAL WAKTU TERLAMBAT | F TOTAL JAM KERJA
+ *   G TANGGAL IZIN | H JAM IZIN | I TANGGAL CUTI
+ *   J TANGGAL LEMBUR | K JAM LEMBUR (per tanggal, format surat lembur: "X Jam")
+ *   L RINCIAN TELAT PER HARI (menit aktual per tanggal, cth: "10/09: 7 mnt; 12/09: 5 mnt")
+ *   M TOTAL RINCIAN TELAT (MENIT) - jumlah menit dari kolom L
+ *   N DENDA KETERLAMBATAN (formula dari total menit telat)
+ *   O RINCIAN TIDAK ABSEN MASUK (tanggal tanpa jam masuk)
+ *   P RINCIAN TIDAK ABSEN KELUAR (tanggal tanpa jam keluar)
+ *   Q RINCIAN ALPHA (ada jadwal/hari kerja tetapi tidak ada absensi)
+ *   R DENDA ABSEN (tidak absen masuk & keluar Rp100.000 - termasuk alpha,
+ *     hanya salah satu Rp50.000)
+ *   S TOTAL DENDA (N + R)
  *
  * Baris terakhir tiap sheet adalah BARIS TOTAL (label "TOTAL" di kolom A):
- *   - kolom E = rumus =SUM(E7:E..) (total menit telat dalam format HH:MM via [h]:mm)
- *   - kolom G = rumus =SUM(G7:G..) (total denda, format "Rp"#,##0)
+ *   - kolom E = total waktu telat dalam format HH:MM
+ *   - kolom M = total menit telat
+ *   - kolom N = total denda keterlambatan
+ *   - kolom P = total denda absen
+ *   - kolom Q = total seluruh denda
  */
 class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithColumnWidths, WithTitle
 {
@@ -162,13 +173,19 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             'TOTAL TELAT',
             'TOTAL WAKTU TERLAMBAT',
             'TOTAL JAM KERJA',
-            'DENDA KETERLAMBATAN',
             'TANGGAL IZIN',
             'JAM IZIN',
             'TANGGAL CUTI',
             'TANGGAL LEMBUR',
             'JAM LEMBUR',
             'RINCIAN TELAT PER HARI (MENIT)',
+            'TOTAL RINCIAN TELAT (MENIT)',
+            'DENDA KETERLAMBATAN',
+            'RINCIAN TIDAK ABSEN MASUK',
+            'RINCIAN TIDAK ABSEN KELUAR',
+            'RINCIAN ALPHA',
+            'DENDA ABSEN',
+            'TOTAL DENDA',
         ];
     }
 
@@ -181,13 +198,19 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             'D' => 15,
             'E' => 30,
             'F' => 20,
-            'G' => 28,
-            'H' => 35,
-            'I' => 18,
-            'J' => 35,
-            'K' => 30,
-            'L' => 40,
-            'M' => 46,
+            'G' => 35,
+            'H' => 18,
+            'I' => 35,
+            'J' => 30,
+            'K' => 40,
+            'L' => 46,
+            'M' => 20,
+            'N' => 20,
+            'O' => 35,
+            'P' => 35,
+            'Q' => 35,
+            'R' => 20,
+            'S' => 20,
         ];
     }
 
@@ -227,7 +250,14 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                     'tanggal',
                     [$startDate, $endDate]
                 )
+                ->orderBy('tanggal')
                 ->get();
+
+            // Tanggal yang sudah punya record attendance (lengkap/tidak lengkap).
+            $attendanceDates = $attendances
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->unique();
 
             $hadir = 0;
             $telat = 0;
@@ -235,6 +265,13 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             $lateMinutes = 0;
             $totalWorkMinutes = 0;
             $lateDetails = [];
+
+            // Denda absen: dihitung per hari/kejadian dari data attendance.
+            // Rincian dipisah per jenis agar mudah dibaca di Excel.
+            $absentPenalty = 0;
+            $absentInDates = [];
+            $absentOutDates = [];
+            $alphaDates = [];
 
             foreach ($attendances as $attendance) {
 
@@ -308,6 +345,31 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                             $keluar
                         );
                 }
+
+                /*
+                |------------------------------------------------------------------
+                | DENDA ABSEN (jam masuk / jam keluar tidak lengkap)
+                |------------------------------------------------------------------
+                | - tidak absen masuk & tidak absen keluar : Rp100.000
+                | - hanya absen masuk (tanpa jam keluar)    : Rp50.000
+                | - hanya absen keluar (tanpa jam masuk)    : Rp50.000
+                */
+                $hasCheckIn = filled($attendance->jam_masuk);
+                $hasCheckOut = filled($attendance->jam_keluar);
+                $attendanceYmd = Carbon::parse($attendance->tanggal)->format('Y-m-d');
+                $attendanceDate = Carbon::parse($attendance->tanggal)->format('d/m');
+
+                if (!$hasCheckIn && !$hasCheckOut) {
+                    $absentPenalty += 100000;
+                    $absentInDates[$attendanceYmd] = $attendanceDate;
+                    $absentOutDates[$attendanceYmd] = $attendanceDate;
+                } elseif (!$hasCheckIn) {
+                    $absentPenalty += 50000;
+                    $absentInDates[$attendanceYmd] = $attendanceDate;
+                } elseif (!$hasCheckOut) {
+                    $absentPenalty += 50000;
+                    $absentOutDates[$attendanceYmd] = $attendanceDate;
+                }
             }
 
             /*
@@ -326,7 +388,9 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 ->orderBy('tanggal')
                 ->get();
 
-            $izinDates = PermissionRange::datesWithin($izinList, $startDate, $endDate)
+            $izinDateSet = PermissionRange::datesWithin($izinList, $startDate, $endDate);
+
+            $izinDates = $izinDateSet
                 ->map(fn($date) => Carbon::parse($date)->format('d/m'))
                 ->sort()
                 ->unique()
@@ -370,7 +434,7 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 ->where('end_date', '>=', $startDate->format('Y-m-d'))
                 ->get();
 
-            $cutiDates = collect();
+            $cutiDateSet = collect();
 
             foreach ($leaves as $leave) {
                 $cursor = Carbon::parse($leave->start_date)
@@ -379,12 +443,76 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                     ->min($endDate->copy()->startOfDay());
 
                 while ($cursor->lte($limit)) {
-                    $cutiDates->push($cursor->format('d/m'));
+                    $cutiDateSet->push($cursor->format('Y-m-d'));
                     $cursor->addDay();
                 }
             }
 
-            $cutiDates = $cutiDates->sort()->unique()->values()->implode(', ');
+            $cutiDateSet = $cutiDateSet->sort()->unique()->values();
+
+            $cutiDates = $cutiDateSet
+                ->map(fn($date) => Carbon::parse($date)->format('d/m'))
+                ->implode(', ');
+
+            /*
+            |----------------------------------------------------------------------
+            | ALPHA (ada jadwal kerja tetapi tidak absen)
+            |----------------------------------------------------------------------
+            | - Pegawai shift : tanggal pada jadwal shift.
+            | - Office 5/6    : hari kerja (Senin-Jumat / Senin-Sabtu).
+            | Bila pada tanggal tersebut tidak ada attendance, izin approved,
+            | maupun cuti approved => alpha, didenda Rp100.000 (tidak absen
+            | masuk & keluar). Tanggal setelah hari ini tidak dihitung agar
+            | jadwal yang belum berjalan tidak langsung menjadi denda.
+            */
+            $alphaEnd = $endDate->copy()->startOfDay();
+            $today = Carbon::today()->startOfDay();
+
+            if ($alphaEnd->gt($today)) {
+                $alphaEnd = $today->copy();
+            }
+
+            $workDates = collect();
+
+            if ($startDate->copy()->startOfDay()->lte($alphaEnd)) {
+                if ($employee->work_type === 'shift') {
+                    $workDates = EmployeeShift::where('user_id', $employee->id)
+                        ->whereBetween('shift_date', [
+                            $startDate->format('Y-m-d'),
+                            $alphaEnd->format('Y-m-d'),
+                        ])
+                        ->pluck('shift_date')
+                        ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                        ->unique();
+                } elseif (in_array($employee->work_type, ['office_5', 'office_6'], true)) {
+                    $cursor = $startDate->copy()->startOfDay();
+
+                    while ($cursor->lte($alphaEnd)) {
+                        $isWorkday = $employee->work_type === 'office_5'
+                            ? !$cursor->isWeekend()
+                            : $cursor->dayOfWeek !== Carbon::SUNDAY;
+
+                        if ($isWorkday) {
+                            $workDates->push($cursor->format('Y-m-d'));
+                        }
+
+                        $cursor->addDay();
+                    }
+                }
+            }
+
+            foreach ($workDates as $workDate) {
+                if (
+                    $attendanceDates->contains($workDate) ||
+                    $izinDateSet->contains($workDate) ||
+                    $cutiDateSet->contains($workDate)
+                ) {
+                    continue;
+                }
+
+                $absentPenalty += 100000;
+                $alphaDates[$workDate] = Carbon::parse($workDate)->format('d/m');
+            }
 
             /*
             |----------------------------------------------------------------------
@@ -417,6 +545,11 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 ->map(fn($ot) => Carbon::parse($ot->overtime_date)->format('d/m') . ': ' . intval($ot->total_hours) . ' Jam')
                 ->implode('; ');
 
+            // Urutkan rincian absen berdasarkan tanggal (key Y-m-d).
+            ksort($absentInDates);
+            ksort($absentOutDates);
+            ksort($alphaDates);
+
             return [
 
                 $employee->name,
@@ -446,11 +579,6 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                     $totalWorkMinutes % 60
                 ),
 
-                // Placeholder kolom formula denda.
-                // Formula-nya diisi pada event AfterSheet() setelah baris
-                // header di-insert, agar referensi baris (mis. $E7) selalu benar.
-                null,
-
                 $izinDates,
 
                 $jamIzinText,
@@ -461,7 +589,29 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
 
                 $overtimeTotalJam . ' Jam',
 
+                // L: rincian telat per hari
                 implode('; ', $lateDetails),
+
+                // M: total menit telat (angka, dipakai rumus denda)
+                $lateMinutes,
+
+                // N: placeholder formula denda keterlambatan (diisi di AfterSheet)
+                null,
+
+                // O: rincian tanggal tanpa jam masuk
+                empty($absentInDates) ? '-' : implode(', ', $absentInDates),
+
+                // P: rincian tanggal tanpa jam keluar
+                empty($absentOutDates) ? '-' : implode(', ', $absentOutDates),
+
+                // Q: rincian tanggal alpha
+                empty($alphaDates) ? '-' : implode(', ', $alphaDates),
+
+                // R: total denda absen periode ini
+                $absentPenalty,
+
+                // S: placeholder formula total denda (N + R), diisi di AfterSheet
+                null,
             ];
         })->values();
 
@@ -469,32 +619,38 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
         // sebagai baris data terakhir (indeks numerik).
         $rows = $rows->values();
 
-        // Placeholder baris TOTAL: rumus E & G diisi di AfterSheet agar
+        // Placeholder baris TOTAL: rumus E, M, N, R, S diisi di AfterSheet agar
         // referensi baris selalu benar setelah 5 baris header di-insert.
         $totalRow = [
             'TOTAL',
             '',
             '',
             '',
-            null, // E: rumus =SUM(E7:E..) diisi di AfterSheet (total jam telat)
-            '',
-            null, // G: rumus =SUM(G7:G..) diisi di AfterSheet (total denda)
+            null, // E: total waktu telat (HH:MM)
             '',
             '',
             '',
             '',
             '',
             '',
+            '',
+            null, // M: total menit telat
+            null, // N: total denda keterlambatan
+            '',   // O
+            '',   // P
+            '',   // Q
+            null, // R: total denda absen
+            null, // S: total seluruh denda
         ];
 
-        // Total jam lembur semua user (format surat lembur: "X Jam") untuk baris TOTAL kolom L.
+        // Total jam lembur semua user (format surat lembur: "X Jam") untuk baris TOTAL kolom K.
         $totalLemburJam = 0;
         foreach ($rows as $r) {
-            if (preg_match('/(\d+)\s*Jam/', (string) ($r[11] ?? ''), $m)) {
+            if (preg_match('/(\d+)\s*Jam/', (string) ($r[10] ?? ''), $m)) {
                 $totalLemburJam += (int) $m[1];
             }
         }
-        $totalRow[11] = $totalLemburJam . ' Jam';
+        $totalRow[10] = $totalLemburJam . ' Jam';
 
         return $rows->push($totalRow)->values();
     }
@@ -508,7 +664,13 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 // Geser data ke bawah untuk memberi ruang header (Baris 1-5)
                 $sheet->insertNewRowBefore(1, 5);
 
-                // Masukkan Teks Header (Baris 1-4)
+                /*
+                |------------------------------------------------------------------
+                | HEADER SURAT (disamakan dengan export Rekap Izin/Cuti/Lembur)
+                |------------------------------------------------------------------
+                | Teks instansi di kolom B:C, logo kiri di A1 dan logo kanan di D1
+                | supaya tampilan semua laporan rekap HRD konsisten.
+                */
                 $sheet->setCellValue('B1', 'RS MATA Pekanbaru Eye Center');
                 $sheet->setCellValue('B2', 'Jl. Soekarno Hatta No. 236 – Pekanbaru – Riau');
                 $sheet->setCellValue('B3', 'Telp. (0761) 7875191, 0811 7605191 Fax. (0761) 7875195');
@@ -521,21 +683,23 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                     'Periode: ' . $periodStart->format('d/m/Y') . ' s/d ' . $periodEnd->format('d/m/Y')
                 );
 
-                $sheet->mergeCells('B1:I1');
-                $sheet->mergeCells('B2:I2');
-                $sheet->mergeCells('B3:I3');
-                $sheet->mergeCells('B4:I4');
-                $sheet->mergeCells('B5:I5');
+                $sheet->mergeCells('B1:C1');
+                $sheet->mergeCells('B2:C2');
+                $sheet->mergeCells('B3:C3');
+                $sheet->mergeCells('B4:C4');
+                $sheet->mergeCells('B5:C5');
                 $sheet->getStyle('B1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('5a6ea8');
                 $sheet->getStyle('B5')->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('5a6ea8');
-                $sheet->getStyle('B1:I5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B1:C5')->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                    ->setVertical(Alignment::VERTICAL_CENTER);
 
-                // Tambah Logo
+                // Tambah Logo (posisi sama seperti export Rekap Izin/Cuti/Lembur)
                 $this->addLogo($sheet, 'A1', public_path('images/rsprofile.png'));
-                $this->addLogo($sheet, 'J1', public_path('images/Picture1.png'));
+                $this->addLogo($sheet, 'D1', public_path('images/Picture1.png'), 180);
 
-                // Styling Heading Tabel (Baris 6)
-                $sheet->getStyle('A6:J6')->applyFromArray([
+                // Styling Heading Tabel (Baris 6) - seluruh kolom A:S
+                $sheet->getStyle('A6:S6')->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 12],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E40AF']],
                     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
@@ -546,9 +710,9 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
 
                 /*
                 |--------------------------------------------------------------------------
-                | KOLOM G : FORMULA DENDA KETERLAMBATAN
+                | KOLOM M-N : TOTAL MENIT TELAT & FORMULA DENDA KETERLAMBATAN
                 |--------------------------------------------------------------------------
-                | Ketentuan: bila akumulasi keterlambatan dalam 1 bulan melebihi
+                | Ketentuan: bila akumulasi keterlambatan dalam 1 periode melebihi
                 | toleransi 30 menit, kelebihannya didenda Rp10.000 untuk SETIAP
                 | kelipatan 5 menit (dibulatkan ke atas ke kelipatan terdekat).
                 |
@@ -556,48 +720,45 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 |   35 mnt -> Rp10.000  |  45 mnt -> Rp30.000
                 |   50 mnt -> Rp40.000  |  dst.
                 |
-                | Sumber: kolom E ("TOTAL WAKTU TERLAMBAT") berupa teks "HH:MM".
-                | Menit dihitung dengan FIND(":") + LEFT/MID (bukan TIMEVALUE agar
-                | tetap benar untuk akumulasi > 24 jam, mis. "120:30").
-                | Formula ditulis per baris di sini (bukan di collection()) agar
-                | referensi $E{row} selalu benar setelah header 5 baris di-insert.
+                | Sumber: kolom M ("TOTAL RINCIAN TELAT (MENIT)") yang sudah
+                | berupa angka, sehingga tidak perlu mem-parsing teks "HH:MM"
+                | dan tetap benar untuk akumulasi > 24 jam (mis. 155 menit).
                 |--------------------------------------------------------------------------
                 */
                 for ($row = 7; $row < $lastRow; $row++) {
-                    // Ekspresi "total menit terlambat" dari teks kolom E.
-                    $lateMinutesFormula = sprintf(
-                        '(VALUE(LEFT($E%1$d,FIND(":",$E%1$d)-1))*60'
-                            . '+VALUE(MID($E%1$d,FIND(":",$E%1$d)+1,2)))',
-                        $row
-                    );
-
                     $sheet->setCellValue(
-                        'G' . $row,
+                        'N' . $row,
                         sprintf(
-                            '=IF(%s<=30,0,CEILING((%s-30)/5,1)*10000)',
-                            $lateMinutesFormula,
-                            $lateMinutesFormula
+                            '=IF($M%1$d<=30,0,CEILING(($M%1$d-30)/5,1)*10000)',
+                            $row
                         )
                     );
 
                     // Format tampilan Rupiah: nilai tetap numerik (bisa di-SUM),
                     // hanya tampilannya diberi prefix "Rp" dan pemisah ribuan.
-                    $sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+                    $sheet->getStyle('N' . $row)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+
+                    // Total denda = denda keterlambatan + denda absen.
+                    $sheet->setCellValue('S' . $row, sprintf('=N%d+R%d', $row, $row));
+                    $sheet->getStyle('S' . $row)->getNumberFormat()->setFormatCode('"Rp"#,##0');
                 }
 
-                // BARIS TOTAL (baris terakhir): jumlah jam telat (kolom E, format [h]:mm
-                // agar akumulasi > 24 jam tetap benar) + jumlah denda (kolom G, format Rp).
+                // Format kolom menit & denda absen untuk seluruh baris data.
+                $sheet->getStyle('M7:M' . $lastRow)->getNumberFormat()->setFormatCode('0');
+                $sheet->getStyle('R7:R' . $lastRow)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+
+                // BARIS TOTAL (baris terakhir): total waktu telat, total menit,
+                // total denda keterlambatan, total denda absen, dan total denda.
                 $sheet->setCellValue('A' . $lastRow, 'TOTAL');
                 $sheet->getStyle('A' . $lastRow)->getFont()->setBold(true);
-                $sheet->getStyle('A' . $lastRow . ':M' . $lastRow)->applyFromArray([
+                $sheet->getStyle('A' . $lastRow . ':S' . $lastRow)->applyFromArray([
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'DBEAFE']],
                     'font' => ['bold' => true],
                 ]);
 
                 if ($lastRow > 7) {
                     // Kolom E berisi TEKS "HH:MM" (bukan durasi Excel), jadi totalnya
-                    // dihitung dari komponen jam & menit dengan rumus yang sama
-                    // seperti rumus denda per baris (mendukung > 24 jam).
+                    // dihitung dari komponen jam & menit (mendukung > 24 jam).
                     $jamSum = [];
                     $mntSum = [];
 
@@ -617,35 +778,52 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                             $totalMntExpr
                         )
                     );
-                    $sheet->setCellValue('G' . $lastRow, sprintf('=SUM(G7:G%d)', $lastRow - 1));
-                    $sheet->getStyle('G' . $lastRow)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+
+                    $sheet->setCellValue('M' . $lastRow, sprintf('=SUM(M7:M%d)', $lastRow - 1));
+                    $sheet->setCellValue('N' . $lastRow, sprintf('=SUM(N7:N%d)', $lastRow - 1));
+                    $sheet->setCellValue('R' . $lastRow, sprintf('=SUM(R7:R%d)', $lastRow - 1));
+                    $sheet->setCellValue('S' . $lastRow, sprintf('=SUM(S7:S%d)', $lastRow - 1));
+
+                    $sheet->getStyle('N' . $lastRow)->getNumberFormat()->setFormatCode('"Rp"#,##0');
+                    $sheet->getStyle('S' . $lastRow)->getNumberFormat()->setFormatCode('"Rp"#,##0');
                 }
 
                 // Border dan Vertical Alignment untuk data di bawah baris 6
-                $sheet->getStyle('A6:M' . $lastRow)->applyFromArray([
+                $sheet->getStyle('A6:S' . $lastRow)->applyFromArray([
                     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
                     'alignment' => ['vertical' => Alignment::VERTICAL_CENTER]
                 ]);
 
-                // Kolom rincian (tanggal izin/cuti/lembur, jam, rincian telat): wrap text
-                $sheet->getStyle('H7:M' . $lastRow)->applyFromArray([
+                // Semua sel data: wrap text (sama seperti export Rekap Izin/Cuti/Lembur)
+                $sheet->getStyle('A7:S' . $lastRow)->getAlignment()->setWrapText(true);
+
+                // Kolom rincian (tanggal izin/cuti/lembur, jam, rincian telat/absen): rata tengah
+                $sheet->getStyle('L7:S' . $lastRow)->applyFromArray([
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
                         'vertical' => Alignment::VERTICAL_CENTER,
                         'wrapText' => true,
                     ],
                 ]);
+
+                // Cetak menyesuaikan lebar halaman (sama seperti export Rekap Izin/Cuti/Lembur)
+                $sheet->getPageSetup()->setFitToWidth(1);
             },
         ];
     }
 
-    private function addLogo($sheet, $coordinate, $path)
+    private function addLogo($sheet, $coordinate, $path, ?int $offsetX = null)
     {
         if (file_exists($path)) {
             $drawing = new Drawing();
             $drawing->setPath($path);
             $drawing->setHeight(50);
             $drawing->setCoordinates($coordinate);
+
+            if ($offsetX !== null) {
+                $drawing->setOffsetX($offsetX);
+            }
+
             $drawing->setWorksheet($sheet->getDelegate());
         }
     }
