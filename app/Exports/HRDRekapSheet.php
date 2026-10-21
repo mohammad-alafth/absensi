@@ -127,6 +127,17 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
      * Nama sheet untuk sebuah unit/role.
      * Excel membatasi 31 karakter dan melarang karakter \ / ? * [ ] :
      */
+    /**
+     * Label tanggal untuk kolom rincian: "05/10/2026 (Senin)".
+     * Satu tanggal ditulis pada satu baris di dalam sel.
+     */
+    private static function dateLabel($date): string
+    {
+        return Carbon::parse($date)
+            ->locale('id')
+            ->translatedFormat('d/m/Y (l)');
+    }
+
     public static function sheetTitleFor($role): string
     {
         $labels = self::roleLabels();
@@ -357,18 +368,17 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 $hasCheckIn = filled($attendance->jam_masuk);
                 $hasCheckOut = filled($attendance->jam_keluar);
                 $attendanceYmd = Carbon::parse($attendance->tanggal)->format('Y-m-d');
-                $attendanceDate = Carbon::parse($attendance->tanggal)->format('d/m');
 
                 if (!$hasCheckIn && !$hasCheckOut) {
                     $absentPenalty += 100000;
-                    $absentInDates[$attendanceYmd] = $attendanceDate;
-                    $absentOutDates[$attendanceYmd] = $attendanceDate;
+                    $absentInDates[$attendanceYmd] = self::dateLabel($attendanceYmd);
+                    $absentOutDates[$attendanceYmd] = self::dateLabel($attendanceYmd);
                 } elseif (!$hasCheckIn) {
                     $absentPenalty += 50000;
-                    $absentInDates[$attendanceYmd] = $attendanceDate;
+                    $absentInDates[$attendanceYmd] = self::dateLabel($attendanceYmd);
                 } elseif (!$hasCheckOut) {
                     $absentPenalty += 50000;
-                    $absentOutDates[$attendanceYmd] = $attendanceDate;
+                    $absentOutDates[$attendanceYmd] = self::dateLabel($attendanceYmd);
                 }
             }
 
@@ -391,11 +401,11 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             $izinDateSet = PermissionRange::datesWithin($izinList, $startDate, $endDate);
 
             $izinDates = $izinDateSet
-                ->map(fn($date) => Carbon::parse($date)->format('d/m'))
                 ->sort()
                 ->unique()
                 ->values()
-                ->implode(', ');
+                ->map(fn($date) => self::dateLabel($date))
+                ->implode("\n");
 
             // Jam izin: selisih jam_mulai - jam_selesai (bila 1 hari & ada jamnya),
             // dijumlahkan akumulasi; bila 0 tampil '-'.
@@ -451,8 +461,8 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
             $cutiDateSet = $cutiDateSet->sort()->unique()->values();
 
             $cutiDates = $cutiDateSet
-                ->map(fn($date) => Carbon::parse($date)->format('d/m'))
-                ->implode(', ');
+                ->map(fn($date) => self::dateLabel($date))
+                ->implode("\n");
 
             /*
             |----------------------------------------------------------------------
@@ -511,7 +521,7 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 }
 
                 $absentPenalty += 100000;
-                $alphaDates[$workDate] = Carbon::parse($workDate)->format('d/m');
+                $alphaDates[$workDate] = self::dateLabel($workDate);
             }
 
             /*
@@ -532,11 +542,12 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 ->get();
 
             $overtimeDates = $overtimeJam
-                ->map(fn($ot) => Carbon::parse($ot->overtime_date)->format('d/m'))
+                ->map(fn($ot) => Carbon::parse($ot->overtime_date)->format('Y-m-d'))
                 ->sort()
                 ->unique()
                 ->values()
-                ->implode(', ');
+                ->map(fn($date) => self::dateLabel($date))
+                ->implode("\n");
 
             $overtimeTotalJam = $overtimeJam->sum(fn($ot) => intval($ot->total_hours));
 
@@ -599,13 +610,13 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 null,
 
                 // O: rincian tanggal tanpa jam masuk
-                empty($absentInDates) ? '-' : implode(', ', $absentInDates),
+                empty($absentInDates) ? '-' : implode("\n", $absentInDates),
 
                 // P: rincian tanggal tanpa jam keluar
-                empty($absentOutDates) ? '-' : implode(', ', $absentOutDates),
+                empty($absentOutDates) ? '-' : implode("\n", $absentOutDates),
 
                 // Q: rincian tanggal alpha
-                empty($alphaDates) ? '-' : implode(', ', $alphaDates),
+                empty($alphaDates) ? '-' : implode("\n", $alphaDates),
 
                 // R: total denda absen periode ini
                 $absentPenalty,
@@ -798,13 +809,34 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
                 $sheet->getStyle('A7:S' . $lastRow)->getAlignment()->setWrapText(true);
 
                 // Kolom rincian (tanggal izin/cuti/lembur, jam, rincian telat/absen): rata tengah
-                $sheet->getStyle('L7:S' . $lastRow)->applyFromArray([
+                $sheet->getStyle('G7:S' . $lastRow)->applyFromArray([
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
                         'vertical' => Alignment::VERTICAL_CENTER,
                         'wrapText' => true,
                     ],
                 ]);
+
+                /*
+                |------------------------------------------------------------------
+                | TINGGI BARIS MENGIKUTI JUMLAH TANGGAL
+                |------------------------------------------------------------------
+                | Kolom G (izin), I (cuti), J (lembur), O/P/Q (rincian absen)
+                | menampilkan satu tanggal per baris. Tinggi baris disesuaikan
+                | agar seluruh tanggal terlihat tanpa perlu auto-fit manual.
+                */
+                for ($row = 7; $row < $lastRow; $row++) {
+                    $maxLines = 1;
+
+                    foreach (['G', 'I', 'J', 'O', 'P', 'Q'] as $column) {
+                        $value = (string) $sheet->getCell($column . $row)->getValue();
+                        $maxLines = max($maxLines, substr_count($value, "\n") + 1);
+                    }
+
+                    if ($maxLines > 1) {
+                        $sheet->getRowDimension($row)->setRowHeight(16 * $maxLines);
+                    }
+                }
 
                 // Cetak menyesuaikan lebar halaman (sama seperti export Rekap Izin/Cuti/Lembur)
                 $sheet->getPageSetup()->setFitToWidth(1);
