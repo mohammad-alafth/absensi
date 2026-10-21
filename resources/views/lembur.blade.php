@@ -227,7 +227,7 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                 </div>
 
                 <div class="bg-gray-50/50 border-t px-5 py-3.5">
-                    <button type="button" onclick="submitOvertime()" class="w-full bg-[#1E40AF] hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-bold shadow-xs transition tracking-wide">
+                    <button type="button" id="overtimeSubmit" onclick="submitOvertime()" class="w-full bg-[#1E40AF] hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-bold shadow-xs transition tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
                         Kirim Formulir Pengajuan Lembur Resmi
                     </button>
                 </div>
@@ -378,6 +378,14 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
         });
 
         function submitOvertime() {
+            const form = document.getElementById('overtimeForm');
+            const submitButton = document.getElementById('overtimeSubmit');
+
+            // Jangan buka dialog/kirim ulang saat request masih berjalan.
+            if (!form || form.dataset.submitting === '1' || form.dataset.confirming === '1') {
+                return;
+            }
+
             const signature = document.getElementById('employee_signature').value;
             const startTime = document.getElementById('start_time').value;
             const endTime = document.getElementById('end_time').value;
@@ -421,6 +429,8 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                 return;
             }
 
+            form.dataset.confirming = '1';
+
             Swal.fire({
                 title: isOpenEndedMode() ? 'Catat absen awal sekarang?' : 'Kirim lembur?',
                 text: isOpenEndedMode()
@@ -433,11 +443,58 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                 confirmButtonText: isOpenEndedMode() ? 'Ya, Catat Absen Awal' : 'Ya, Ajukan',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('overtimeForm').submit();
+                if (!result.isConfirmed) {
+                    delete form.dataset.confirming;
+                    return;
+                }
+
+                // Kunci form segera setelah konfirmasi agar tidak terkirim ganda.
+                form.dataset.submitting = '1';
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Mengirim...';
+                }
+
+                form.submit();
+            });
+        }
+
+        // Guard tambahan untuk submit implisit (mis. tombol Enter).
+        const overtimeFormGuard = document.getElementById('overtimeForm');
+
+        if (overtimeFormGuard) {
+            overtimeFormGuard.addEventListener('submit', function(event) {
+                if (overtimeFormGuard.dataset.submitting === '1') {
+                    event.preventDefault();
+                    return;
+                }
+
+                overtimeFormGuard.dataset.submitting = '1';
+
+                const submitButton = document.getElementById('overtimeSubmit');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Mengirim...';
                 }
             });
         }
+
+        // Pulihkan tombol bila halaman dibuka kembali dari bfcache.
+        window.addEventListener('pageshow', function() {
+            const form = document.getElementById('overtimeForm');
+            const button = document.getElementById('overtimeSubmit');
+
+            if (form) {
+                delete form.dataset.submitting;
+                delete form.dataset.confirming;
+            }
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Kirim Formulir Pengajuan Lembur Resmi';
+            }
+        });
 
         let signaturePad;
 

@@ -13,7 +13,7 @@
                 </a>
             </div>
 
-            <form action="{{ route('izin.store') }}" method="POST" enctype="multipart/form-data" class="bg-white shadow-sm rounded-2xl overflow-hidden border border-slate-200">
+            <form id="permissionForm" action="{{ route('izin.store') }}" method="POST" enctype="multipart/form-data" class="bg-white shadow-sm rounded-2xl overflow-hidden border border-slate-200">
                 @csrf
 
                 <div class="border-b border-slate-200 px-5 py-4 bg-gray-50/50 flex items-center justify-between">
@@ -148,7 +148,7 @@
                         <a href="{{ route('dashboard') }}" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold text-center hover:bg-slate-100 transition">
                             Batal
                         </a>
-                        <button type="submit" class="px-5 py-2 rounded-xl bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-semibold shadow-xs transition">
+                        <button type="submit" id="permissionSubmit" class="px-5 py-2 rounded-xl bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-semibold shadow-xs transition disabled:opacity-60 disabled:cursor-not-allowed">
                             Kirim Pengajuan
                         </button>
                     </div>
@@ -307,6 +307,48 @@
 
             // Inisialisasi awal (mendukung old() setelah validasi gagal)
             updateTanggalSection();
+
+            /*
+            |------------------------------------------------------------------
+            | CEGAH KLIK "KIRIM PENGAJUAN" BERULANG
+            |------------------------------------------------------------------
+            | Proses simpan + generate PDF bisa memakan beberapa detik. Tanpa
+            | guard, user yang menekan tombol berkali-kali mengirim beberapa
+            | POST sekaligus. Tombol langsung dinonaktifkan saat submit pertama.
+            */
+            const permissionForm = document.getElementById('permissionForm');
+            const permissionSubmit = document.getElementById('permissionSubmit');
+
+            if (permissionForm) {
+                permissionForm.addEventListener('submit', function(event) {
+                    if (permissionForm.dataset.submitting === '1') {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    permissionForm.dataset.submitting = '1';
+
+                    if (permissionSubmit) {
+                        permissionSubmit.disabled = true;
+                        permissionSubmit.textContent = 'Mengirim...';
+                    }
+                });
+            }
+        });
+
+        // Kembalikan tombol bila halaman dipulihkan dari bfcache.
+        window.addEventListener('pageshow', function() {
+            const form = document.getElementById('permissionForm');
+            const button = document.getElementById('permissionSubmit');
+
+            if (form) {
+                delete form.dataset.submitting;
+            }
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Kirim Pengajuan';
+            }
         });
     </script>
 

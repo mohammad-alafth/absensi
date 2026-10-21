@@ -159,7 +159,7 @@
                     </div>
 
                     <div class="bg-gray-50/50 border-t px-5 py-3.5">
-                        <button type="button" onclick="submitLeave()" class="w-full bg-[#1E40AF] hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-bold shadow-xs transition tracking-wide">
+                        <button type="button" id="leaveSubmit" onclick="submitLeave()" class="w-full bg-[#1E40AF] hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-bold shadow-xs transition tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
                             Kirim Berkas Permohonan Cuti Resmi
                         </button>
                     </div>
@@ -241,6 +241,14 @@
         });
 
         function submitLeave() {
+            const form = document.getElementById('leaveForm');
+            const submitButton = document.getElementById('leaveSubmit');
+
+            // Jangan buka dialog/kirim ulang saat request masih berjalan.
+            if (!form || form.dataset.submitting === '1' || form.dataset.confirming === '1') {
+                return;
+            }
+
             const signature = document.getElementById('employee_signature').value;
 
             if (!signature) {
@@ -252,6 +260,8 @@
                 return;
             }
 
+            form.dataset.confirming = '1';
+
             Swal.fire({
                 title: 'Kirim pengajuan?',
                 html: `Sisa hak cuti Anda saat ini: <b>{{ $remainingLeave ?? 12 }} Hari</b>`,
@@ -262,11 +272,58 @@
                 confirmButtonText: 'Ya, Kirim',
                 cancelButtonText: 'Batal'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('leaveForm').submit();
+                if (!result.isConfirmed) {
+                    delete form.dataset.confirming;
+                    return;
+                }
+
+                // Kunci form segera setelah konfirmasi agar tidak terkirim ganda.
+                form.dataset.submitting = '1';
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Mengirim...';
+                }
+
+                form.submit();
+            });
+        }
+
+        // Guard tambahan untuk submit implisit (mis. tombol Enter).
+        const leaveFormGuard = document.getElementById('leaveForm');
+
+        if (leaveFormGuard) {
+            leaveFormGuard.addEventListener('submit', function(event) {
+                if (leaveFormGuard.dataset.submitting === '1') {
+                    event.preventDefault();
+                    return;
+                }
+
+                leaveFormGuard.dataset.submitting = '1';
+
+                const submitButton = document.getElementById('leaveSubmit');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Mengirim...';
                 }
             });
         }
+
+        // Pulihkan tombol bila halaman dibuka kembali dari bfcache.
+        window.addEventListener('pageshow', function() {
+            const form = document.getElementById('leaveForm');
+            const button = document.getElementById('leaveSubmit');
+
+            if (form) {
+                delete form.dataset.submitting;
+                delete form.dataset.confirming;
+            }
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Kirim Berkas Permohonan Cuti Resmi';
+            }
+        });
 
         let signaturePad;
 

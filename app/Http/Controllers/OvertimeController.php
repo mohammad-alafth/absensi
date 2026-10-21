@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Overtime;
+use App\Models\User;
 use Carbon\Carbon;
 use App\Services\ApprovalFlowService;
 use App\Services\OvertimePunchService;
@@ -179,6 +180,31 @@ class OvertimeController extends Controller
                 $openEnded,
                 $evidence
             ) {
+                /*
+                |------------------------------------------------------------------
+                | CEGAH PENGIRIMAN GANDA
+                |------------------------------------------------------------------
+                | Klik berulang / retry jaringan dapat mengirim POST yang sama
+                | beberapa kali. Kunci baris user membuat pengecekan & insert
+                | berurutan, lalu pengajuan identik dalam 30 detik terakhir
+                | dianggap duplikat (termasuk absen mulai mode "sampai selesai").
+                */
+                User::whereKey($user->id)->lockForUpdate()->first();
+
+                $duplicate = Overtime::where('user_id', $user->id)
+                    ->where('overtime_date', $request->overtime_date)
+                    ->where('start_time', $request->start_time)
+                    ->where('end_time', $openEnded ? null : $request->end_time)
+                    ->where('day_type', $request->day_type)
+                    ->where('reason', $request->reason)
+                    ->where('created_at', '>=', now()->subSeconds(30))
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($duplicate) {
+                    return null;
+                }
+
                 $overtime = Overtime::create([
                     'user_id' => $user->id,
                     'department' => $user->role, // Menyimpan role pengaju sebagai department
@@ -204,6 +230,14 @@ class OvertimeController extends Controller
             return back()
                 ->withErrors(['start_time' => $exception->getMessage()])
                 ->withInput();
+        }
+
+        // Request duplikat: jangan buat lembur/absen/surat baru.
+        if (!$overtime) {
+            return redirect('/dashboard')->with(
+                'success',
+                'Pengajuan lembur sudah terkirim sebelumnya.'
+            );
         }
 
         /*

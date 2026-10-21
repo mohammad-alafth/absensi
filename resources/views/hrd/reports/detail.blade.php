@@ -141,11 +141,17 @@
         @endif
     </div>
 
-    {{-- BUKTI (tanda tangan pengaju / foto absen lembur) --}}
+    {{-- BUKTI (lampiran izin / tanda tangan pengaju / foto absen lembur) --}}
     @php
+        // Lampiran yang diunggah pengaju saat membuat izin (foto/PDF).
+        $attachmentPath = $isPermission && filled($item->lampiran) ? $item->lampiran : null;
+        $attachmentUrl = $attachmentPath ? asset('storage/' . $attachmentPath) : null;
+        $attachmentIsImage = $attachmentPath
+            && in_array(strtolower(pathinfo($attachmentPath, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true);
+
         $hasSignature = filled($item->employee_signature);
         $punches = $isOvertime ? ($item->punches ?? collect()) : collect();
-        $hasProof = $hasSignature || $punches->isNotEmpty();
+        $hasProof = $hasSignature || $punches->isNotEmpty() || filled($attachmentUrl);
     @endphp
 
     <div class="border border-sky-100 bg-sky-50/50 rounded-xl px-3 py-3">
@@ -155,6 +161,30 @@
         <p class="text-[11px] text-gray-500">Tidak ada bukti terlampir pada pengajuan ini.</p>
         @else
         <div class="space-y-3">
+            @if($attachmentUrl)
+            <div>
+                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Lampiran Bukti dari Pengaju</p>
+
+                @if($attachmentIsImage)
+                <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" class="inline-block mt-1">
+                    <img src="{{ $attachmentUrl }}" alt="Lampiran bukti izin"
+                         class="max-h-48 max-w-full bg-white border border-sky-100 rounded-lg p-1 object-contain hover:opacity-90 transition">
+                </a>
+                <div class="mt-1">
+                    <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 hover:underline">
+                        🔍 Buka ukuran penuh
+                    </a>
+                </div>
+                @else
+                <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener"
+                   class="mt-1 inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+                    <span>📎</span> Buka Lampiran (PDF)
+                </a>
+                @endif
+            </div>
+            @endif
+
             @if($hasSignature)
             <div>
                 <p class="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Tanda Tangan Pengaju</p>

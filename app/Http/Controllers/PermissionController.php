@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Services\ApprovalFlowService;
 use App\Support\SubmissionStatus;
 use Barryvdh\DomPDF\Facade\Pdf; // <-- TAMBAHKAN INI
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage; // <-- TAMBAHKAN INI
 
 class PermissionController extends Controller
@@ -112,51 +114,67 @@ class PermissionController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Upload lampiran
+        | FLOW APPROVAL
         |--------------------------------------------------------------------------
         */
-        $lampiran = null;
-        if ($request->hasFile('lampiran')) {
-            $lampiran = $request->file('lampiran')->store('izin', 'public');
-        }
-
-        /*
-|--------------------------------------------------------------------------
-| FLOW APPROVAL
-|--------------------------------------------------------------------------
-*/
         $flow = ApprovalFlowService::handle(
             auth()->user()->role,
             'permission'
         );
 
-        $status = $flow['status'];
-
-        $pjStatus = $flow['pj_status'];
-
-        $hrdStatus = $flow['hrd_status'];
-
-
         /*
         |--------------------------------------------------------------------------
-        | Simpan Data Izin
+        | SIMPAN DATA IZIN + CEGAH PENGIRIMAN GANDA
         |--------------------------------------------------------------------------
+        | Klik tombol berulang / retry jaringan dapat mengirim POST yang sama
+        | berkali-kali. Kunci baris user membuat pengecekan dan insert berjalan
+        | berurutan, lalu pengajuan identik dalam 30 detik terakhir dianggap
+        | duplikat dan tidak disimpan lagi.
         */
-        $permission = Permission::create([
-            'user_id' => auth()->id(),
-            'tanggal' => $request->tanggal,
-            'tanggal_selesai' => $tanggalSelesai,
-            'jenis' => $request->jenis,
-            'jam_mulai' => $jamMulai,
-            'jam_selesai' => $jamSelesai,
-            'alasan' => $request->alasan,
-            'lampiran' => $lampiran,
-            'status' => $status,
-            'pj_status' => $pjStatus,
-            // 'employee_signature' => $request->employee_signature,
-            'hrd_status' => $hrdStatus,
-            // $flow membawa seluruh kolom status stage approval
-        ] + $flow);
+        $permission = DB::transaction(function () use ($request, $tanggalSelesai, $jamMulai, $jamSelesai, $flow) {
+            // Serialisasi pengajuan milik user yang sama.
+            User::whereKey(auth()->id())->lockForUpdate()->first();
+
+            $duplicate = Permission::where('user_id', auth()->id())
+                ->where('tanggal', $request->tanggal)
+                ->where('tanggal_selesai', $tanggalSelesai)
+                ->where('jenis', $request->jenis)
+                ->where('jam_mulai', $jamMulai)
+                ->where('jam_selesai', $jamSelesai)
+                ->where('alasan', $request->alasan)
+                ->where('created_at', '>=', now()->subSeconds(30))
+                ->lockForUpdate()
+                ->first();
+
+            if ($duplicate) {
+                return null;
+            }
+
+            $lampiran = null;
+            if ($request->hasFile('lampiran')) {
+                $lampiran = $request->file('lampiran')->store('izin', 'public');
+            }
+
+            return Permission::create([
+                'user_id' => auth()->id(),
+                'tanggal' => $request->tanggal,
+                'tanggal_selesai' => $tanggalSelesai,
+                'jenis' => $request->jenis,
+                'jam_mulai' => $jamMulai,
+                'jam_selesai' => $jamSelesai,
+                'alasan' => $request->alasan,
+                'lampiran' => $lampiran,
+                // $flow membawa status + seluruh kolom stage approval.
+            ] + $flow);
+        });
+
+        // Request duplikat: jangan buat pengajuan/surat baru.
+        if (!$permission) {
+            return redirect('/dashboard')->with(
+                'success',
+                'Pengajuan izin sudah terkirim sebelumnya.'
+            );
+        }
 
         /*
         |--------------------------------------------------------------------------

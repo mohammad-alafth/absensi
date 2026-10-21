@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Leave;
+use App\Models\User;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Services\ApprovalFlowService;
 use App\Services\LeaveDayCalculator;
@@ -151,52 +153,67 @@ class LeaveController extends Controller
 
         $flow = ApprovalFlowService::handle($userRole);
 
-        $status = $flow['status'];
-
-        $pjStatus = $flow['pj_status'];
-
-        $hrdStatus = $flow['hrd_status'];
-
         /*
         |--------------------------------------------------------------------------
-        | Simpan
+        | SIMPAN + CEGAH PENGIRIMAN GANDA
         |--------------------------------------------------------------------------
+        | Klik berulang / retry jaringan bisa mengirim POST yang sama beberapa
+        | kali. Baris user dikunci agar pengecekan & insert berurutan, lalu
+        | pengajuan identik dalam 30 detik terakhir dianggap duplikat.
         */
-        $leave = Leave::create([
+        $leave = DB::transaction(function () use ($request, $totalDays, $flow) {
+            // Serialisasi pengajuan milik user yang sama.
+            User::whereKey(auth()->id())->lockForUpdate()->first();
 
-            'user_id' => auth()->id(),
+            $duplicate = Leave::where('user_id', auth()->id())
+                ->where('start_date', $request->start_date)
+                ->where('end_date', $request->end_date)
+                ->where('leave_type', $request->leave_type)
+                ->where('reason', $request->reason)
+                ->where('created_at', '>=', now()->subSeconds(30))
+                ->lockForUpdate()
+                ->first();
 
-            'recipient' => $request->recipient,
+            if ($duplicate) {
+                return null;
+            }
 
-            'start_date' => $request->start_date,
+            return Leave::create([
 
-            'end_date' => $request->end_date,
+                'user_id' => auth()->id(),
 
-            'return_date' => $request->return_date,
+                'recipient' => $request->recipient,
 
-            'total_days' => $totalDays,
+                'start_date' => $request->start_date,
 
-            'leave_type' => $request->leave_type,
+                'end_date' => $request->end_date,
 
-            'reason' => $request->reason,
+                'return_date' => $request->return_date,
 
-            'delegate_name' => $request->delegate_name,
+                'total_days' => $totalDays,
 
-            'delegate_nik' => $request->delegate_nik,
+                'leave_type' => $request->leave_type,
 
-            'emergency_contact' => $request->emergency_contact,
+                'reason' => $request->reason,
 
-            'employee_signature' => $request->employee_signature,
+                'delegate_name' => $request->delegate_name,
 
-            'status' => $status,
+                'delegate_nik' => $request->delegate_nik,
 
-            'pj_status' => $pjStatus,
+                'emergency_contact' => $request->emergency_contact,
 
-            'hrd_status' => $hrdStatus,
-            // $flow membawa seluruh kolom status stage (medical_service,
-            // kabag_umum, manager_umum, kabag_marketing, manager_finance,
-            // director) sehingga semua tahap terinisialisasi 'pending'.
-        ] + $flow);
+                'employee_signature' => $request->employee_signature,
+                // $flow membawa status + seluruh kolom stage approval.
+            ] + $flow);
+        });
+
+        // Request duplikat: jangan buat cuti/surat baru.
+        if (!$leave) {
+            return redirect('/dashboard')->with(
+                'success',
+                'Pengajuan cuti sudah terkirim sebelumnya.'
+            );
+        }
         /*
     |--------------------------------------------------------------------------
     | GENERATE PDF
