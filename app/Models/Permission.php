@@ -50,6 +50,9 @@ class Permission extends Model
         'pdf_file',
 
         'status',
+        'approval_workflow_version_id',
+        'approval_workflow_snapshot',
+        'approval_workflow_snapshot_hash',
 
         // PJ
         'pj_status',

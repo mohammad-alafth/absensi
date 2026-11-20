@@ -1,57 +1,62 @@
-<div id="mobileBottomNav" class="fixed bottom-0 left-0 right-0 md:hidden z-50 px-2 pb-3 transition-all duration-300">
+@php
+    $isHistoryPage = request()->routeIs('history*')
+        || request()->routeIs('cuti.history')
+        || request()->routeIs('izin.history')
+        || request()->routeIs('lembur.history')
+        || request()->routeIs('shift-change.history');
 
-    @php
-    $isHrd = auth()->user()->role === 'hrd';
-    $menuCount = $isHrd ? 4 : 3;
-    @endphp
-    <div class="relative bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl p-1 overflow-hidden">
+    $roleMenu = app(\App\Services\RoleMenuService::class);
+    $items = collect($roleMenu->leaves(\App\Services\RoleMenuService::BOTTOM, auth()->user()))
+        ->map(function (array $item) use ($isHistoryPage): array {
+            $active = match ($item['route']) {
+                'dashboard' => request()->routeIs('dashboard'),
+                'face' => request()->routeIs('face') || request()->routeIs('face.scan*'),
+                'history' => $isHistoryPage,
+                default => false,
+            };
 
-        <div
-            class="absolute top-1 bottom-1 rounded-xl transition-all duration-500 ease-out shadow-lg
-    {{ request()->routeIs('dashboard') ? 'bg-gradient-to-r from-indigo-500 to-violet-500' : '' }}
-    {{ request()->routeIs('history') ? 'bg-gradient-to-r from-pink-500 to-rose-500' : '' }}
-    {{ request()->routeIs('profile.edit') ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : '' }}
-    {{ request()->routeIs('hrd.users.approval') ? 'bg-gradient-to-r from-amber-500 to-orange-500' : '' }}"
-            style="
-        width: calc(100% / {{ $menuCount }});
-        left:
-        @if(request()->routeIs('dashboard'))
-            0%;
-        @elseif(request()->routeIs('history'))
-            calc(100% / {{ $menuCount }});
-        @elseif(request()->routeIs('profile.edit'))
-            calc(200% / {{ $menuCount }});
-        @elseif(request()->routeIs('hrd.users.approval'))
-            calc(300% / {{ $menuCount }});
-        @endif
-    ">
-        </div>
+            return [
+                'route' => $item['route'],
+                'label' => match ($item['route']) {
+                    'dashboard' => 'Beranda',
+                    default => $item['label'],
+                },
+                'icon' => $item['icon'] ?? 'chevron_right',
+                'active' => $active,
+            ];
+        })
+        ->values()
+        ->all();
 
-        <!-- {{-- Tambahkan conditional pada grid-cols agar kolom menyesuaikan jumlah menu --}} -->
-        <div class="relative grid {{ auth()->user()->role === 'hrd' ? 'grid-cols-4' : 'grid-cols-3' }} z-10">
+    $items[] = [
+        'route' => 'profile.edit',
+        'label' => 'Profil',
+        'icon' => 'person',
+        'active' => request()->routeIs('profile.*'),
+    ];
 
-            <a href="{{ route('dashboard') }}" class="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 {{ request()->routeIs('dashboard') ? 'text-white' : 'text-gray-600' }}">
-                <div class="text-lg">🏠</div>
-                <p class="text-[9px] font-bold mt-0.5">Home</p>
+    $columnCount = max(1, count($items));
+@endphp
+
+<nav id="mobileBottomNav" aria-label="Navigasi utama" class="font-app-body fixed inset-x-0 bottom-0 z-50 border border-[#c4c5d7]/50 bg-white/95 shadow-[0_-2px_10px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
+    <div class="mx-auto grid h-[68px] w-full items-end px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]" style="grid-template-columns: repeat({{ $columnCount }}, minmax(0, 1fr));">
+        @foreach($items as $index => $item)
+            @php $isCenterTab = $item['route'] === 'face'; @endphp
+            <a
+                href="{{ route($item['route']) }}"
+                class="relative flex min-w-0 -translate-y-1 flex-col items-center justify-end gap-0.5 rounded-xl py-1.5 transition active:scale-95 {{ $isCenterTab || $item['active'] ? '-mt-5' : '' }} {{ $item['active'] ? 'font-bold text-[#0037b0]' : 'text-[#565e74] hover:text-[#0037b0]' }}"
+                @if($item['active']) aria-current="page" @endif
+            >
+                @if($item['active'])
+                    <span class="mb-0.5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-[#1d4ed8] text-white shadow-[0_6px_16px_-4px_rgba(29,78,216,0.55)]">
+                        <span class="material-symbols-outlined text-[27px]">{{ $item['icon'] }}</span>
+                    </span>
+                @else
+                    <span class="material-symbols-outlined text-[22px]" @if($item['active']) style="font-variation-settings: 'FILL' 1;" @endif>{{ $item['icon'] }}</span>
+                @endif
+
+                <span class="max-w-full truncate text-[10px] leading-3">{{ $item['label'] }}</span>
             </a>
-
-            <a href="{{ route('history') }}" class="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 {{ request()->routeIs('history') ? 'text-white' : 'text-gray-600' }}">
-                <div class="text-lg">📋</div>
-                <p class="text-[9px] font-bold mt-0.5">History</p>
-            </a>
-
-            <a href="{{ route('profile.edit') }}" class="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 {{ request()->routeIs('profile.edit') ? 'text-white' : 'text-gray-600' }}">
-                <div class="text-lg">👤</div>
-                <p class="text-[9px] font-bold mt-0.5">Profile</p>
-            </a>
-
-            @if(auth()->user()->role === 'hrd')
-            <a href="{{ route('hrd.users.approval') }}" class="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 {{ request()->routeIs('hrd.users.approval') ? 'text-white' : 'text-gray-600' }}">
-                <div class="text-lg">✅</div>
-                <p class="text-[9px] font-bold mt-0.5">Approval</p>
-            </a>
-            @endif
-
-        </div>
+        @endforeach
     </div>
-</div>
+</nav>

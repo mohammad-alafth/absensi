@@ -7,8 +7,11 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 use Illuminate\Validation\ValidationException;
+use App\Services\PermissionDecision;
+use App\Services\PermissionResolver;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -68,7 +71,34 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
+        if ($this->shouldOpenAdminControlCenter($request, $user)) {
+            return redirect()->route('admin.control-center');
+        }
+
         return redirect()->intended('/dashboard');
+    }
+
+    private function shouldOpenAdminControlCenter(Request $request, $user): bool
+    {
+        if ($user->role !== 'admin'
+            || $request->session()->has('url.intended')
+            || !config('admin_control_center.enabled', false)
+            || !Route::has('admin.control-center')) {
+            return false;
+        }
+
+        $permissionKey = (string) config(
+            'admin_control_center.permission_key',
+            'admin.control-center.view'
+        );
+
+        try {
+            return app(PermissionResolver::class)
+                ->resolve('admin', $permissionKey)
+                ->decision === PermissionDecision::GRANTED;
+        } catch (\Throwable) {
+            return false;
+        }
     }
     /**
      * Destroy an authenticated session.

@@ -27,9 +27,17 @@ class HRDOvertimeController extends Controller
         }
 
         $overtimes = Overtime::with('user')
-            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
+            ->where(function ($query) {
+                $query->where('status', 'like', 'waiting_%')
+                    ->orWhere('status', 'pending');
+            })
             ->latest()
-            ->get();
+            ->get()
+            ->filter(function (Overtime $overtime) {
+                $resolved = ApprovalFlowService::stageForSubmission($overtime, auth()->user()->role, 'overtime');
+                return $resolved !== null
+                    && in_array($overtime->status, ApprovalFlowService::statusesForStage($resolved), true);
+            });
 
         $stageLabel = ApprovalFlowService::labelForStage($stage);
 
@@ -47,7 +55,7 @@ class HRDOvertimeController extends Controller
 
         $overtime = Overtime::with('user')->findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($overtime, auth()->user()->role, 'overtime');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
@@ -59,7 +67,7 @@ class HRDOvertimeController extends Controller
         }
 
         // Rantai approval mengikuti grup role pengaju
-        $chain = ApprovalFlowService::chainFor($overtime->user->role ?? null);
+        $chain = ApprovalFlowService::chainForSubmission($overtime, $overtime->user->role ?? null, 'overtime');
 
         $overtime->update(array_merge(
             ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
@@ -113,7 +121,7 @@ class HRDOvertimeController extends Controller
 
         $overtime = Overtime::findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($overtime, auth()->user()->role, 'overtime');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');

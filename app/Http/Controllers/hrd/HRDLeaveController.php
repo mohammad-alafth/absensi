@@ -28,9 +28,17 @@ class HRDLeaveController extends Controller
         }
 
         $leaves = Leave::with('user')
-            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
+            ->where(function ($query) {
+                $query->where('status', 'like', 'waiting_%')
+                    ->orWhere('status', 'pending');
+            })
             ->latest()
-            ->get();
+            ->get()
+            ->filter(function (Leave $leave) {
+                $resolved = ApprovalFlowService::stageForSubmission($leave, auth()->user()->role, 'leave');
+                return $resolved !== null
+                    && in_array($leave->status, ApprovalFlowService::statusesForStage($resolved), true);
+            });
 
         $stageLabel = ApprovalFlowService::labelForStage($stage);
 
@@ -50,7 +58,7 @@ class HRDLeaveController extends Controller
 
         $leave = Leave::with('user')->findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($leave, auth()->user()->role, 'leave');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
@@ -62,7 +70,7 @@ class HRDLeaveController extends Controller
         }
 
         // Rantai approval mengikuti grup role pengaju
-        $chain = ApprovalFlowService::chainFor($leave->user->role ?? null);
+        $chain = ApprovalFlowService::chainForSubmission($leave, $leave->user->role ?? null, 'leave');
 
         $leave->update(array_merge(
             ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
@@ -88,7 +96,7 @@ class HRDLeaveController extends Controller
 
         $leave = Leave::findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($leave, auth()->user()->role, 'leave');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');

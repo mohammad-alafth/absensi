@@ -260,4 +260,20 @@ class FaceSettingsController extends Controller
             $sent ? 'Notifikasi Telegram terkirim.' : 'Telegram menolak permintaan. Periksa token bot dan chat id.'
         );
     }
+
+    /** Daftarkan Webhook Telegram ke URL sistem ini. */
+    public function setTelegramWebhook(Request $request)
+    {
+        $webhookUrl = trim((string) $request->input('webhook_url', ''));
+        if ($webhookUrl === '') {
+            $webhookUrl = url('/telegram/webhook');
+        }
+
+        $result = app(TelegramNotifier::class)->setWebhook($webhookUrl);
+
+        return back()->with(
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? 'Webhook Telegram berhasil didaftarkan: ' . $webhookUrl : 'Gagal set webhook: ' . ($result['message'] ?? 'Error')
+        );
+    }
 }

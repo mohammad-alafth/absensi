@@ -21,17 +21,35 @@ class ShiftChangeController extends Controller
             return redirect()->route('dashboard')->with('error', 'Fitur ini hanya untuk karyawan tipe kerja Shift.');
         }
 
-        // Ambil shift yang diizinkan untuk role user ini
+        // Null/empty means unrestricted; every other policy value must be a
+        // valid list of exact role strings. Invalid policy data fails closed.
         $availableShifts = Shift::all()->filter(function ($shift) use ($user) {
-            if (empty($shift->allowed_roles)) return true;
-            return in_array($user->role, $shift->allowed_roles) ||
-                   in_array('pj_' . $user->role, $shift->allowed_roles);
-        });
+            $rawAllowedRoles = $shift->getRawOriginal('allowed_roles');
 
-        // Jika filter kosong, tampilkan semua shift sebagai fallback
-        if ($availableShifts->isEmpty()) {
-            $availableShifts = Shift::all();
-        }
+            if ($rawAllowedRoles === null) {
+                return true;
+            }
+
+            $allowedRoles = is_array($rawAllowedRoles)
+                ? $rawAllowedRoles
+                : json_decode((string) $rawAllowedRoles, true);
+
+            if (!is_array($allowedRoles) || !array_is_list($allowedRoles)) {
+                return false;
+            }
+
+            if ($allowedRoles === []) {
+                return true;
+            }
+
+            foreach ($allowedRoles as $allowedRole) {
+                if (!is_string($allowedRole) || $allowedRole === '') {
+                    return false;
+                }
+            }
+
+            return in_array((string) $user->role, $allowedRoles, true);
+        });
 
         return view('shift-change.create', compact('availableShifts'));
     }
@@ -102,8 +120,45 @@ class ShiftChangeController extends Controller
 
         // Nilai 'off' = minta libur / tidak ada shift (jadwal kosong), disimpan sebagai NULL
         $requestedShiftId = $request->input('requested_shift_id');
-        if ($requestedShiftId !== 'off' && !Shift::whereKey($requestedShiftId)->exists()) {
-            return back()->withErrors(['requested_shift_id' => 'Shift yang dipilih tidak valid.'])->withInput();
+        if ($requestedShiftId !== 'off') {
+            $requestedShift = is_scalar($requestedShiftId)
+                ? Shift::find($requestedShiftId)
+                : null;
+
+            $isAllowed = false;
+            if ($requestedShift) {
+                $rawAllowedRoles = $requestedShift->getRawOriginal('allowed_roles');
+
+                if ($rawAllowedRoles === null) {
+                    $isAllowed = true;
+                } else {
+                    $allowedRoles = is_array($rawAllowedRoles)
+                        ? $rawAllowedRoles
+                        : json_decode((string) $rawAllowedRoles, true);
+
+                    if (is_array($allowedRoles) && array_is_list($allowedRoles)) {
+                        $isAllowed = $allowedRoles === [];
+
+                        if (!$isAllowed) {
+                            $isAllowed = true;
+                            foreach ($allowedRoles as $allowedRole) {
+                                if (!is_string($allowedRole) || $allowedRole === '') {
+                                    $isAllowed = false;
+                                    break;
+                                }
+                            }
+
+                            if ($isAllowed) {
+                                $isAllowed = in_array((string) $user->role, $allowedRoles, true);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!$isAllowed) {
+                return back()->withErrors(['requested_shift_id' => 'Shift yang dipilih tidak valid untuk role Anda.'])->withInput();
+            }
         }
 
         // Cari shift saat ini

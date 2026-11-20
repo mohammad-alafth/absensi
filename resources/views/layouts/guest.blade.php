@@ -97,21 +97,12 @@
     <!-- Background -->
     <div class="min-h-screen flex flex-col justify-center items-center relative px-4 overflow-hidden">
 
-        <!-- Background -->
-        <img
-            src="{{ asset('storage/pbec/pbechall.jpeg') }}"
-            alt="Background"
-            class="absolute inset-0 w-full h-full object-cover">
-
-        <!-- Overlay -->
-        <div class="absolute inset-0 bg-black/50"></div>
-
         <!-- Content -->
         <div class="relative z-10 flex flex-col items-center w-full">
 
             <!-- Card -->
             <div
-                class="w-full sm:max-w-md px-6 py-6 bg-white/95 backdrop-blur shadow-2xl rounded-3xl">
+                class="w-full sm:max-w-md px-6 py-6 bg-white/95 {{ request()->routeIs('login') ? '' : 'backdrop-blur' }} shadow-2xl rounded-3xl">
 
                 {{ $slot }}
 
@@ -120,6 +111,8 @@
         </div>
 
     </div>
+
+    <x-system-announcement />
 
 </body>
 

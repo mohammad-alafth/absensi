@@ -1,38 +1,80 @@
 {{-- Scan wajah: selfie + GPS, verifikasi server, retry sampai cocok. --}}
 <x-app-layout>
-    <div class="min-h-screen bg-[#f0f2f9] px-4 py-8 pb-28">
-        <div class="max-w-2xl mx-auto space-y-6">
 
-            <div class="bg-white rounded-[2rem] p-6 sm:p-10 shadow-xl shadow-slate-200/50 border border-white">
-                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1.5 text-[#1E40AF] font-bold text-xs hover:underline mb-2">
-                    &larr; Kembali ke Dashboard
-                </a>
+    <style>
+        @keyframes radarPulse {
+            0%   { transform: scale(0.98); opacity: 0.9; }
+            50%  { transform: scale(1.02); opacity: 0.65; }
+            100% { transform: scale(0.98); opacity: 0.9; }
+        }
+        .animate-oval-breathe {
+            animation: radarPulse 3s ease-in-out infinite;
+        }
+        @keyframes scanLine {
+            0%   { top: 12%; opacity: 0.2; }
+            50%  { opacity: 0.85; }
+            100% { top: 88%; opacity: 0.2; }
+        }
+        .animate-scan {
+            animation: scanLine 2.6s ease-in-out infinite alternate;
+        }
+        @keyframes spinnerRing {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-ring {
+            animation: spinnerRing 0.9s linear infinite;
+        }
+    </style>
 
-                <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Scan Wajah</h1>
+    <div class="min-h-screen bg-[#f8f9ff] px-4 py-6 sm:py-8 pb-28">
+        <div class="max-w-xl mx-auto space-y-5">
 
-                <div class="mt-4 space-y-2 text-sm">
+            {{-- ── Header Card ── --}}
+            <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between">
+                    <a href="{{ route('dashboard') }}"
+                       class="inline-flex items-center gap-1.5 text-[#1E40AF] font-bold text-xs hover:underline">
+                        <span>&larr;</span> Kembali ke Dashboard
+                    </a>
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Biometrik PBEC</span>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Presensi Wajah &amp; GPS</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">RS Mata PBEC &bull; Sentra Operasional</p>
+                </div>
+
+                {{-- Role &amp; enrollment status banners --}}
+                <div class="mt-4 space-y-2">
                     @if($faceRequired)
-                        <p class="rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-800 px-4 py-3 font-semibold">
-                            Wajah wajib untuk role Anda.
-                        </p>
+                        <div class="rounded-xl bg-blue-50/80 border border-blue-200 text-blue-900 px-4 py-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2">
+                            <span>👤</span>
+                            <span>Verifikasi wajah wajib untuk role Anda.</span>
+                        </div>
                         @unless($enrolled)
-                            <p class="rounded-xl bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 font-semibold">
-                                Wajah Anda belum terdaftar. Hubungi HRD untuk registrasi.
-                            </p>
+                            <div class="rounded-xl bg-rose-50 border border-rose-200 text-rose-800 px-4 py-2.5 text-xs font-semibold flex items-center gap-2">
+                                <span>⚠️</span>
+                                <span>Wajah Anda belum terdaftar. Hubungi HRD untuk registrasi.</span>
+                            </div>
                         @endunless
                     @else
-                        <p class="rounded-xl bg-slate-50 border border-slate-200 text-slate-700 px-4 py-3">
-                            Role Anda bebas verifikasi wajah.
-                        </p>
+                        <div class="rounded-xl bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 text-xs flex items-center gap-2">
+                            <span>ℹ️</span>
+                            <span>Role Anda bebas verifikasi wajah.</span>
+                        </div>
                     @endif
 
-                    <p class="text-[11px] text-gray-500">
-                        Maksimum percobaan {{ $maxAttempts }}x &middot; ambang similarity {{ number_format($matchThreshold, 2) }}
+                    <p class="text-[11px] text-slate-400 pt-1">
+                        Maks. {{ $maxAttempts }}x percobaan &middot; Ambang similarity {{ number_format($matchThreshold, 2) }} &middot; Threshold 0.62
                     </p>
                 </div>
             </div>
 
-            <div class="bg-white rounded-[2rem] p-6 sm:p-10 shadow-xl shadow-slate-200/50 border border-white"
+            {{-- ── Camera + Status Card ── --}}
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
                  x-data="{
     stream: null,
     video: null,
@@ -131,66 +173,63 @@
     async shoot(coords) {
         const video = this.video;
         const canvas = document.createElement('canvas');
-
-        // Resolusi NATIVE dari kamera, bukan 480x360 hardcode.
-        // Microservice InsightFace (SCRFD) butuh wajah cukup besar;
-        // foto 480x360 membuat wajah kecil dan embedding tidak stabil,
-        // sehingga skor match ikut turun.
-        canvas.width = video.videoWidth || 1280;
+        canvas.width  = video.videoWidth  || 1280;
         canvas.height = video.videoHeight || 720;
         canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
         const body = new FormData();
-        body.append('latitude', coords.latitude);
+        body.append('latitude',  coords.latitude);
         body.append('longitude', coords.longitude);
-        body.append('accuracy', coords.accuracy ?? '');
-        body.append('image', canvas.toDataURL('image/jpeg', 0.9));
-        body.append('attempt', this.attempt);
+        body.append('accuracy',  coords.accuracy ?? '');
+        body.append('image',     canvas.toDataURL('image/jpeg', 0.9));
+        body.append('attempt',   this.attempt);
 
         try {
             const response = await fetch('{{ route('face.scan.store') }}', {
                 method: 'POST',
-                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'X-Device-Id': (() => {
+                        try { return localStorage.getItem('absensi.device_uuid') || ''; } catch (error) { return ''; }
+                    })(),
+                },
                 body: body,
             });
             const json = await response.json();
 
-            this.score = json.face?.score ?? null;
+            this.score     = json.face?.score ?? null;
             this.remaining = json.attempt_remaining ?? 0;
 
             if (json.success) {
-                this.done = true;
+                this.done     = true;
                 this.autoScan = false;
                 this.stopCamera();
-                this.message = json.message;
+                this.message  = json.message;
 
                 // Fail-open: absen tetap dicatat, TETAPI wajah tidak
                 // diverifikasi karena layanannya mati. Ini wajib
-                // ditampilkan mencolok - kalau tidak, absen wajah
-                // orang lain terlihat sama sahnya dengan absen asli.
+                // ditampilkan mencolok supaya tidak bisa disalahgunakan.
                 this.degraded = !!json.degraded;
-                this.warning = json.warning || '';
+                this.warning  = json.warning || '';
+
+                if (json.device_unverified && json.warning) {
+                    this.message = json.warning;
+                }
 
                 if (this.degraded) {
-                    // Arahkan ke /face (alur absen utama) setelah
-                    // pengguna sempat membaca peringatan.
                     this.redirectTimer = setTimeout(() => {
                         window.location.href = '/face';
                     }, 6000);
                 }
-
                 return;
             }
 
             this.message = json.message || 'Wajah belum dikenali.';
 
-            // Server TIDAK menulis data absen saat wajah ditolak; dia
-            // mengirim `redirect` ke /face (alur absen lama). Hentikan
-            // retry di sini - retry lagi tidak akan pernah berhasil dan
-            // hanya membuang waktu pengguna.
             if (json.redirect) {
-                this.rejected = true;
-                this.autoScan = false;
+                this.rejected   = true;
+                this.autoScan   = false;
                 this.redirectTo = json.redirect;
                 this.stopCamera();
                 this.redirectTimer = setTimeout(() => {
@@ -225,8 +264,8 @@
     retryNow() {
         if (this.busy || this.done) return;
         clearTimeout(this.retryTimer);
-        this.autoScan = true;
-        this.attempt = 1;
+        this.autoScan  = true;
+        this.attempt   = 1;
         this.remaining = {{ $maxAttempts }};
         this.scan();
     },
@@ -240,130 +279,173 @@
         this.openCamera();
     }
 }"
+                 @keydown.window.escape="/* noop */">
 
-                <div class="flex flex-col items-center gap-4">
-                    <div class="relative w-full aspect-video rounded-3xl bg-slate-900 overflow-hidden border border-slate-200">
+                {{-- ── Step indicator chips ── --}}
+                <div class="px-5 pt-5 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> GPS Siap
+                        </div>
+                        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#1E40AF] text-[11px] font-bold">
+                            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                            <span x-text="busy ? 'Memproses...' : (done ? 'Selesai' : 'Pemindaian Wajah')">Pemindaian Wajah</span>
+                        </div>
+                        <div x-show="remaining > 0 && !done"
+                             class="ml-auto text-[11px] font-semibold text-slate-400">
+                            Percobaan <span x-text="attempt"></span>/<span>{{ $maxAttempts }}</span>
+                        </div>
+                    </div>
+                </div>
 
-                        {{-- Live preview; kamera dibuka otomatis oleh init() --}}
-                        <video x-ref="video" autoplay playsinline muted
-                            class="absolute inset-0 w-full h-full object-cover"
-                            style="transform: scaleX(-1);"></video>
+                {{-- ── Camera viewport with oval guide ── --}}
+                <div class="relative w-full bg-slate-950 overflow-hidden" style="aspect-ratio: 4/5;">
 
-                        {{-- Bingkai oval + status, menimpa video --}}
-                        <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
-                            <div class="w-36 h-48 rounded-full border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"></div>
+                    {{-- Live video --}}
+                    <video x-ref="video" autoplay playsinline muted
+                           class="absolute inset-0 w-full h-full object-cover"
+                           :class="{ 'opacity-30': done }"
+                           style="transform: scaleX(-1);"></video>
 
-                            <template x-if="!ready">
-                                <p class="text-xs font-bold text-white bg-slate-900/70 px-3 py-1 rounded-full">
-                                    Menyiapkan kamera...
-                                </p>
-                            </template>
+                    {{-- Dark gradient overlay --}}
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/40 pointer-events-none"></div>
 
-                            <template x-if="ready && busy">
-                                <div class="flex items-center gap-2 bg-slate-900/70 px-3 py-1 rounded-full">
-                                    <div class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    <p class="text-xs font-bold text-white" x-text="message"></p>
-                                </div>
-                            </template>
-
-                            <template x-if="ready && !busy && !done">
-                                <p class="text-xs font-bold text-white bg-slate-900/70 px-3 py-1 rounded-full text-center max-w-[90%]" x-text="message"></p>
-                            </template>
+                    {{-- Oval scanning guide --}}
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div class="relative w-[62%] h-[76%] rounded-[50%] border-2 border-blue-300/80 shadow-[0_0_24px_rgba(29,78,216,0.4)] animate-oval-breathe flex items-center justify-center">
+                            {{-- Corner guides --}}
+                            <div class="absolute -top-1 -left-1 w-5 h-5 border-t-2 border-l-2 border-blue-300"></div>
+                            <div class="absolute -top-1 -right-1 w-5 h-5 border-t-2 border-r-2 border-blue-300"></div>
+                            <div class="absolute -bottom-1 -left-1 w-5 h-5 border-b-2 border-l-2 border-blue-300"></div>
+                            <div class="absolute -bottom-1 -right-1 w-5 h-5 border-b-2 border-r-2 border-blue-300"></div>
+                            {{-- Laser scan line --}}
+                            <div class="absolute w-[86%] h-0.5 bg-gradient-to-r from-transparent via-sky-300 to-transparent animate-scan pointer-events-none shadow-[0_0_10px_rgba(56,189,248,0.8)]"></div>
+                            {{-- Centre reticle --}}
+                            <div class="w-8 h-8 rounded-full border border-blue-300/40 flex items-center justify-center opacity-50">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-300"></span>
+                            </div>
                         </div>
                     </div>
 
-                    <p x-show="score !== null" class="text-xs text-gray-500 text-center">
-                        Skor similarity: <span x-text="score"></span>
-                    </p>
+                    {{-- Bottom live-feed pill --}}
+                    <div class="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-sm border border-white/10 text-white">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span class="text-[11px] font-medium tracking-wide" x-text="message">Menyiapkan kamera...</span>
+                        </div>
+                        <template x-if="busy">
+                            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-ring"></div>
+                        </template>
+                    </div>
 
-                    <p x-show="!done && remaining > 0" class="text-xs font-bold text-amber-700 text-center">
-                        Percobaan tersisa: <span x-text="remaining"></span>
-                    </p>
+                    {{-- Score overlay (when available) --}}
+                    <template x-if="score !== null && !done">
+                        <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-sm text-[11px] text-slate-200 font-mono">
+                            Score: <span x-text="parseFloat(score).toFixed(2)"></span>
+                        </div>
+                    </template>
+                </div>
 
-                    {{-- WAJAH DITOLAK: tidak ada absen yang tercatat. Arahkan ke /face. --}}
+                {{-- ── Instruction note ── --}}
+                <div class="px-5 py-3 border-b border-slate-100 text-[11px] text-slate-500 text-center">
+                    Posisikan wajah tepat di dalam bingkai oval &bull; Buka kacamata &amp; masker &bull; Pastikan pencahayaan cukup
+                </div>
+
+                {{-- ── Action area ── --}}
+                <div class="px-5 py-5 space-y-3">
+
+                    {{-- WAJAH DITOLAK: semua percobaan habis --}}
                     <template x-if="rejected">
-                        <div class="w-full rounded-2xl bg-rose-50 border-2 border-rose-400 px-4 py-4 text-center">
-                            <p class="text-sm font-black text-rose-900">✕ Wajah Tidak Dikenali</p>
-                            <p class="text-xs font-bold text-rose-800 mt-2 leading-relaxed" x-text="message"></p>
-                            <p class="text-[11px] text-rose-700 mt-2">
+                        <div class="w-full rounded-2xl bg-rose-50 border-2 border-rose-300 p-4 text-center">
+                            <p class="text-sm font-black text-rose-900">✗ Verifikasi Gagal</p>
+                            <p class="text-xs font-bold text-rose-800 mt-2 leading-relaxed">
+                                Wajah Anda tidak dapat dikenali setelah {{ $maxAttempts }} percobaan.
                                 <b>Tidak ada data absen yang tercatat.</b>
                             </p>
-                            <div class="mt-3 flex flex-col gap-2">
+                            <div class="mt-3 flex flex-col sm:flex-row gap-2">
                                 <a :href="redirectTo"
-                                    class="w-full px-4 py-2.5 rounded-xl text-xs font-black bg-rose-600 text-white hover:bg-rose-700 transition">
+                                   class="w-full sm:flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition shadow-sm">
                                     Lanjut ke Absen Biasa
                                 </a>
                                 <button type="button" @click="window.location.reload()"
-                                    class="w-full px-4 py-2 rounded-xl text-[11px] font-bold text-rose-800 border border-rose-300 hover:bg-rose-100 transition">
+                                        class="w-full sm:flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-800 border border-rose-300 hover:bg-rose-100 transition">
                                     Coba Pindai Lagi
                                 </button>
                             </div>
-                            <p class="text-[10px] text-rose-600 mt-2">
+                            <p class="text-[10px] text-rose-500 mt-2">
                                 Dialihkan otomatis ke halaman absen biasa dalam 6 detik.
                             </p>
                         </div>
                     </template>
 
-                    {{-- PERINGATAN KERASAN: absen tercatat TANPA verifikasi wajah.
-
-                         Fail-open disengaja supaya karyawan tidak terkunci
-                         absen saat layanan mati. Tapi kalau tidak diberi
-                         tanda, absen wajah orang lain terlihat sama sahnya
-                         dengan absen asli - itu lubang keamanan. --}}
+                    {{-- PERINGATAN: absen tercatat TANPA verifikasi wajah (fail-open / degraded).
+                         Wajib ditampilkan mencolok — kalau tidak, absen wajah
+                         orang lain terlihat sama sahnya dengan absen asli. --}}
                     <template x-if="degraded">
-                        <div class="w-full rounded-2xl bg-amber-50 border-2 border-amber-400 px-4 py-4 text-center">
+                        <div class="w-full rounded-2xl bg-amber-50 border-2 border-amber-400 p-4 text-center">
                             <p class="text-sm font-black text-amber-900">⚠ TIDAK TERVERIFIKASI ⚠</p>
                             <p class="text-xs font-bold text-amber-800 mt-2 leading-relaxed" x-text="warning"></p>
                             <p class="text-[11px] text-amber-700 mt-2">
-                                Absen tercatat, tetapi WAJAH TIDAK DICOMPARASIKAN dengan data Anda.
+                                Absen tercatat, tetapi WAJAH TIDAK DIBANDINGKAN dengan data Anda.
                             </p>
-                            <div class="mt-3 flex flex-col gap-2">
+                            <div class="mt-3 flex flex-col sm:flex-row gap-2">
                                 <a href="/face"
-                                    class="w-full px-4 py-2.5 rounded-xl text-xs font-black bg-amber-600 text-white hover:bg-amber-700 transition">
+                                   class="w-full sm:flex-1 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition shadow-sm">
                                     Lanjut ke Halaman Absen
                                 </a>
                                 <a href="{{ route('dashboard') }}"
-                                    class="w-full px-4 py-2 rounded-xl text-[11px] font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 transition">
+                                   class="w-full sm:flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 transition">
                                     Kembali ke Dashboard
                                 </a>
                             </div>
-                            <p class="text-[10px] text-amber-600 mt-2">
+                            <p class="text-[10px] text-amber-500 mt-2">
                                 Dialihkan otomatis ke /face dalam 6 detik.
                             </p>
                         </div>
                     </template>
 
-                    <template x-if="done && !degraded">
-                        <div class="w-full rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-center">
-                            <p class="text-sm font-black text-emerald-800">✓ Absen tercatat &amp; wajah terverifikasi</p>
-                            <p class="text-xs text-emerald-700 mt-1" x-text="message"></p>
+                    {{-- SUKSES: absen tercatat & wajah terverifikasi --}}
+                    <template x-if="done && !degraded && !rejected">
+                        <div class="w-full rounded-2xl bg-emerald-50 border border-emerald-200 p-5 text-center shadow-sm">
+                            <p class="text-base font-extrabold text-emerald-800">✓ Absen Tercatat &amp; Wajah Terverifikasi</p>
+                            <p class="text-xs font-medium text-emerald-700 mt-1" x-text="message"></p>
                             <a href="{{ route('dashboard') }}"
-                                class="mt-2 inline-block px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition">
+                               class="mt-3 inline-block px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm">
                                 Kembali ke Dashboard
                             </a>
                         </div>
                     </template>
 
+                    {{-- Manual: Aktifkan Kamera --}}
                     <template x-if="!done && !busy && !ready">
                         <button type="button" @click="openCamera()"
-                            class="w-full px-5 py-3.5 rounded-2xl text-sm font-black bg-emerald-600 text-white hover:bg-emerald-700 transition">
+                                class="w-full px-5 py-3 rounded-xl text-sm font-bold bg-[#1D4ED8] hover:bg-[#1E40AF] text-white transition shadow-md">
                             Aktifkan Kamera
                         </button>
                     </template>
 
+                    {{-- Manual: Scan Ulang --}}
                     <template x-if="!done && !busy && ready && !autoScan">
                         <button type="button" @click="retryNow()"
-                            class="w-full px-5 py-3.5 rounded-2xl text-sm font-black bg-emerald-600 text-white hover:bg-emerald-700 transition">
-                            Scan Lagi
+                                class="w-full px-5 py-3 rounded-xl text-sm font-bold bg-[#1D4ED8] hover:bg-[#1E40AF] text-white transition shadow-md">
+                            Pindai Ulang Wajah
                         </button>
                     </template>
 
-                    <p class="text-[11px] text-gray-500 text-center">
-                        Kamera langsung aktif dan wajah dipindai otomatis. Jika belum dikenali,
-                        sistem mencoba lagi sampai batas {{ $maxAttempts }} kali, lalu absen tetap
-                        dicatat untuk diverifikasi HRD.
+                    {{-- Fail-open policy note --}}
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/80 p-3.5 flex items-start gap-2.5 text-[11px] text-slate-600 leading-relaxed">
+                        <span class="text-[#1E40AF] mt-0.5 shrink-0 text-base">🛡</span>
+                        <div>
+                            <p class="font-semibold text-slate-700 mb-0.5">Kebijakan Fail-Open Transparan</p>
+                            Jika verifikasi wajah terganggu setelah {{ $maxAttempts }} percobaan, kehadiran tetap tercatat sah dan masuk antrean review HRD — tanpa sanksi keterlambatan.
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+                        Kamera aktif otomatis &bull; Wajah dipindai tanpa tombol &bull; Data biometrik dienkripsi end-to-end sesuai standar RS Mata PBEC
                     </p>
                 </div>
+
             </div>
         </div>
     </div>

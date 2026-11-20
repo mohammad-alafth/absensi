@@ -284,6 +284,7 @@ class ApprovalFlowConfig
         return array_values(array_filter(
             self::orderedSteps($flow),
             static fn (string $key) => $key !== self::PJ_STAGE
+                && (self::stage($key)?->is_active ?? false)
         ));
     }
 
@@ -306,6 +307,7 @@ class ApprovalFlowConfig
 
         $steps = self::orderedSteps($flow);
 
-        return ($steps[0] ?? null) === self::PJ_STAGE;
+        return ($steps[0] ?? null) === self::PJ_STAGE
+            && (self::stage(self::PJ_STAGE)?->is_active ?? true);
     }
 }

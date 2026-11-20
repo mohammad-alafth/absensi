@@ -147,12 +147,15 @@ class HistoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | RENTANG PERIODE BULAN & RENTANG DATA YANG DITAMPILKAN
+        | RENTANG PERIODE BULAN & RENTANG FILTER
         |--------------------------------------------------------------------------
         */
         $periodStart = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
         $periodEnd   = $periodStart->copy()->endOfMonth();
 
+        // Rentang filter existing: satu hari saat mode=tanggal, satu bulan saat
+        // mode bulanan. $rows tetap dipotong ke rentang ini setelah baris
+        // kalender dibangun.
         if ($selectedDay) {
             $rangeStart = $selectedDay->copy();
             $rangeEnd   = $selectedDay->copy();
@@ -161,8 +164,10 @@ class HistoryController extends Controller
             $rangeEnd   = $periodEnd->copy();
         }
 
-        $dateStart = $rangeStart->format('Y-m-d');
-        $dateEnd   = $rangeEnd->format('Y-m-d');
+        // Query data selalu satu bulan penuh agar Calendar Matrix lengkap,
+        // termasuk saat filter tanggal aktif.
+        $dateStart = $periodStart->format('Y-m-d');
+        $dateEnd   = $periodEnd->format('Y-m-d');
 
         /*
         |--------------------------------------------------------------------------
@@ -212,23 +217,15 @@ class HistoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | BANGUN REKAP HARIAN
+        | BANGUN BARIS KALENDER (SELALU SATU BULAN PENUH)
         |--------------------------------------------------------------------------
+        | $calendarRows dipakai Calendar Matrix. Aturan status, jam, dan catatan
+        | tetap sama persis dengan rekap existing.
         */
-        $counts = [
-            'hadir'     => 0,
-            'terlambat' => 0,
-            'cuti'      => 0,
-            'izin'      => 0,
-            'alpa'      => 0,
-            'off'       => 0,
-            'terjadwal' => 0,
-        ];
+        $calendarRows = [];
+        $cursor = $periodStart->copy();
 
-        $rows   = [];
-        $cursor = $rangeStart->copy();
-
-        while ($cursor->lte($rangeEnd)) {
+        while ($cursor->lte($periodEnd)) {
             $dateStr  = $cursor->format('Y-m-d');
             $isFuture = $cursor->gt($today);
             $isToday  = $cursor->isSameDay($today);
@@ -318,14 +315,7 @@ class HistoryController extends Controller
                 && !$attendance->jam_keluar
                 && !$isFuture;
 
-            // Hitung summary hanya untuk tanggal <= hari ini
-            if (!$isFuture && $kind !== 'belum_absen') {
-                if (isset($counts[$kind])) {
-                    $counts[$kind]++;
-                }
-            }
-
-            $rows[] = [
+            $calendarRows[] = [
                 'date_str'         => $dateStr,
                 'date_label'       => $cursor->format('j') . ' ' . $this->indoMonthName($cursor->month),
                 'day_name'         => $this->indoDayName($cursor),
@@ -345,6 +335,47 @@ class HistoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | PERTAHANKAN $ROWS SESUAI FILTER EXISTING
+        |--------------------------------------------------------------------------
+        | Mode bulanan: seluruh bulan. Mode tanggal: satu tanggal. Dengan cara
+        | ini test/perilaku $rows tidak berubah, sementara $calendarRows selalu
+        | lengkap untuk Calendar Matrix.
+        */
+        $rangeStartDate = $rangeStart->format('Y-m-d');
+        $rangeEndDate   = $rangeEnd->format('Y-m-d');
+
+        $rows = array_values(array_filter(
+            $calendarRows,
+            fn (array $row) => $row['date_str'] >= $rangeStartDate
+                && $row['date_str'] <= $rangeEndDate
+        ));
+
+        /*
+        |--------------------------------------------------------------------------
+        | HITUNG RINGKASAN (RUMUS TETAP SAMA)
+        |--------------------------------------------------------------------------
+        */
+        $counts = [
+            'hadir'     => 0,
+            'terlambat' => 0,
+            'cuti'      => 0,
+            'izin'      => 0,
+            'alpa'      => 0,
+            'off'       => 0,
+            'terjadwal' => 0,
+        ];
+
+        // Hitung summary hanya untuk tanggal <= hari ini
+        foreach ($rows as $row) {
+            if (!$row['is_future'] && $row['status'] !== 'belum_absen') {
+                if (isset($counts[$row['status']])) {
+                    $counts[$row['status']]++;
+                }
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | PERSENTASE KEHADIRAN (dari hari kerja tanpa cuti/izin)
         |--------------------------------------------------------------------------
         */
@@ -356,11 +387,16 @@ class HistoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | NAVIGASI BULAN
+        | NAVIGASI BULAN & POSISI GRID KALENDER
         |--------------------------------------------------------------------------
         */
         $prevMonth = $periodStart->copy()->subMonthNoOverflow()->format('Y-m');
         $nextMonth = $periodStart->copy()->addMonthNoOverflow()->format('Y-m');
+
+        // Senin = 1 ... Minggu = 7; grid Calendar Matrix dimulai Senin.
+        $leadingBlankCount = $periodStart->dayOfWeekIso - 1;
+        $cellCount = $leadingBlankCount + count($calendarRows);
+        $trailingBlankCount = (7 - ($cellCount % 7)) % 7;
 
         $periodLabel = $this->indoMonthName($periodStart->month)
             . ' ' . $periodStart->format('Y');
@@ -383,6 +419,9 @@ class HistoryController extends Controller
             'nextMonth',
             'periodLabel',
             'rows',
+            'calendarRows',
+            'leadingBlankCount',
+            'trailingBlankCount',
             'counts',
             'presentPercent'
         ));

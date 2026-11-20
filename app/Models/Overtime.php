@@ -49,6 +49,9 @@ class Overtime extends Model
         'department',
         'day_type',
         'status',
+        'approval_workflow_version_id',
+        'approval_workflow_snapshot',
+        'approval_workflow_snapshot_hash',
 
         'pj_status',
         'pj_approved_by',
@@ -292,4 +295,3 @@ class Overtime extends Model
         };
     }
 }
-

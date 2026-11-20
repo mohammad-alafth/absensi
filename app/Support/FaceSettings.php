@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\DB;
  *   office.radius_meters      : radius GPS kantor (default 200)
  *   office.latitude           : latitude kantor
  *   office.longitude          : longitude kantor
+ *   device.enabled            : pencatatan perangkat (device binding) aktif/tidak
+ *   device.max_per_user       : maksimal perangkat aktif per akun (default 3)
+ *   device.require_trust      : perangkat baru harus disetujui admin dulu
  */
 class FaceSettings
 {
@@ -53,6 +56,15 @@ class FaceSettings
         'office.radius_meters' => 200,
         'office.latitude' => 0.4761258,
         'office.longitude' => 101.4190600,
+        /*
+         * Device binding: HANYA mencatat perangkat (keputusan D1), tidak
+         * pernah menolak absen. Karena itu aman dinyalakan secara bawaan;
+         * setel `device.enabled=false` untuk mematikan seluruh perilakunya
+         * tanpa mengubah kode.
+         */
+        'device.enabled' => true,
+        'device.max_per_user' => 3,
+        'device.require_trust' => false,
     ];
 
     /**

@@ -1,196 +1,40 @@
 <x-app-layout>
+    @php
+        $alreadyCheckin = $todayAttendance && $todayAttendance->jam_masuk;
+        $alreadyCheckout = $todayAttendance && $todayAttendance->jam_keluar;
+        $isPjUnit = str_starts_with((string) $user->role, 'pj_');
+        $approverStage = app(\App\Services\ApprovalFlowService::class)->stageForApproverRole($user->role);
+        $isApprover = $approverStage !== null;
+        $portalApprovalUrl = $isApprover
+            ? route('hrd.dashboard')
+            : ($isPjUnit ? route('pj.dashboard') : null);
+        $portalApprovalQueue = $isApprover
+            ? match ($approverStage) {
+                'medical_service' => 'Yanmed',
+                'manager_umum', 'manager_finance' => 'Manager',
+                default => \App\Services\ApprovalFlowService::labelForStage($approverStage),
+            }
+            : ($isPjUnit ? 'PJ Unit' : null);
+        $roleMenu = app(\App\Services\RoleMenuService::class);
+        // PJ approval access is governed by the dedicated PJ route/controller
+        // scope. Keep its portal visible even when a particular queue
+        // permission is absent from the menu projection.
+        $canApprovalPortal = $isPjUnit || $roleMenu->allowsAny($user, [
+            'leave.view',
+            'permission.view',
+            'overtime.view',
+            'shift_request.view',
+        ]);
+        $portalMenus = $roleMenu->leaves(\App\Services\RoleMenuService::DASHBOARD_PORTALS, $user);
+        $canCheckout = false;
+        $checkoutAlertText = 'Checkout hanya bisa dilakukan mendekati jam pulang shift.';
 
-    <div class="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-cyan-50 pb-28">
-
-        <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-
-            <div class="-mt-5 bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl shadow-xl p-5 text-center">
-
-                <h1
-                    id="clock"
-                    class="text-3xl font-extrabold bg-gradient-to-r from-indigo-500 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
-                </h1>
-
-                <p class="text-gray-500 text-sm mt-2">
-                    {{ now()->translatedFormat('l, d F Y') }}
-                </p>
-
-                <hr class="my-4">
-
-                <p class="text-gray-500 text-sm">
-                    Jadwal Anda Hari Ini
-                </p>
-
-                <p class="text-xl font-bold mt-1">
-                    {{ $schedule }}
-                </p>
-
-            </div>
-
-            {{-- Sesi lembur berjalan: pengingat absen selesai --}}
-            <x-overtime-punch-banner :state="$overtimePunchState ?? null" />
-
-            @if($scheduleData && isset($scheduleData['start_time']) && $scheduleData['start_time'] !== null)
-
-            <div class="mt-5 bg-white rounded-3xl p-5 shadow-xl border border-blue-100">
-
-                <div class="flex justify-between items-center">
-
-                    <div>
-
-                        <p class="text-sm text-gray-500">
-                            Jadwal Hari Ini
-                        </p>
-
-                        <h2 class="text-2xl font-bold text-[#1E40AF] mt-1">
-                            {{ isset($scheduleData['shift_name']) ? $scheduleData['shift_name'] : 'Hari Libur / Off' }}
-                        </h2>
-
-                    </div>
-
-                    <div class="text-right">
-
-                        <p class="text-sm text-gray-500">
-                            Jam Kerja
-                        </p>
-
-                        <p class="font-bold text-lg text-gray-800">
-                            {{ \Carbon\Carbon::parse($scheduleData['start_time'])->format('H:i') }} -
-                            {{ \Carbon\Carbon::parse($scheduleData['end_time'])->format('H:i') }}
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-            @endif
-
-            <div class="mt-5 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-500 rounded-3xl p-5 text-white shadow-2xl">
-
-                <div class="flex justify-between items-center">
-
-                    <div>
-
-                        <p class="text-lg font-bold">
-                            Jangan lupa Absen masuk
-                        </p>
-
-                        <p class="text-lg font-bold">
-                            dan Absen pulang ya!
-                        </p>
-
-                    </div>
-
-                    <div class="text-4xl">
-                        👩‍⚕️
-                    </div>
-
-                </div>
-
-            </div>
-
-            @if(auth()->user()->role === 'hrd' && isset($pendingUsers) && $pendingUsers->count() > 0)
-            <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
-                <p class="text-sm text-amber-800">
-                    Ada <strong>{{ $pendingUsers->count() }}</strong> akun baru menunggu approval.
-                </p>
-                <a href="{{ route('hrd.users.approval') }}" class="text-xs font-bold bg-amber-600 text-white px-4 py-2 rounded-xl">Cek Sekarang</a>
-            </div>
-            @endif
-
-            @if($latestPermission)
-
-            <div class="mt-5 bg-white/80 backdrop-blur-md border border-white/50 rounded-3xl p-5 shadow-xl">
-
-                <h3 class="font-bold text-gray-700 mb-2">
-                    Status Izin Terakhir
-                </h3>
-
-                <div class="flex justify-between items-center">
-
-                    <div>
-
-                        <p class="text-sm text-gray-500">
-                            {{ $latestPermission->jenis }}
-                        </p>
-
-                        <p class="font-semibold">
-                            {{ $latestPermission->tanggal }}
-                        </p>
-
-                    </div>
-
-                    <div>
-
-                        @if($latestPermission->status == 'pending')
-
-                        <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
-                            Pending
-                        </span>
-
-                        @elseif($latestPermission->status == 'approved')
-
-                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-                            Approved
-                        </span>
-
-                        @elseif($latestPermission->status == 'rejected')
-
-                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                            Rejected
-                        </span>
-
-                        @endif
-
-                    </div>
-
-                </div>
-
-            </div>
-
-            @endif
-
-            @php
-
-            // $todayAttendance sudah dihitung DashboardController berdasarkan
-            // shift_date (akurat untuk shift lintas hari / overnight),
-            // jadi di sini dipakai apa adanya, tidak di-query ulang pakai
-            // tanggal hari ini agar tombol check-in/check-out tetap benar
-            // untuk shift yang dimulai sehari sebelumnya.
-            $alreadyCheckin = $todayAttendance && $todayAttendance->jam_masuk;
-            $alreadyCheckout = $todayAttendance && $todayAttendance->jam_keluar;
-
-            $canCheckout = false;
-            $checkoutAlertText = 'Checkout hanya bisa dilakukan mendekati jam pulang shift.';
-            if ($scheduleData && !empty($scheduleData['shift_end'])) {
-
-            // shift_end sudah dihitung ScheduleService (termasuk addDay untuk
-            // shift lintas hari / overnight), jadi langsung dipakai apa adanya.
-            $shiftEnd = $scheduleData['shift_end'];
-
-            /*
-            |--------------------------------------------------------------------------
-            | TOMBOL CHECKOUT MUNCUL 5 MENIT SEBELUM JAM PULANG
-            |--------------------------------------------------------------------------
-            */
-            $checkoutTime = $shiftEnd->copy()->subMinutes(5);
-
-            /*
-            |------------------------------------------------------------------------
-            | IZIN PULANG CEPAT: TOMBOL JUGA DIBUKA SEJAK JAM MULAI IZIN
-            |
-            | Izin "pulang lebih awal" (pulang cepat) yang sudah disetujui membuka
-            | tombol pulang sejak jam mulai izin — konsisten dengan aturan
-            | AttendancePunchService::checkOut yang dipakai saat absen.
-            |--------------------------------------------------------------------------
-            */
-            $earlyOpenAt = app(\App\Services\AttendancePunchService::class)
-                ->earlyCheckoutOpenAt(
-                    auth()->user(),
-                    $scheduleData['shift_date'] ?? today()->format('Y-m-d')
-                );
+        if ($scheduleData && !empty($scheduleData['shift_end'])) {
+            $checkoutTime = $scheduleData['shift_end']->copy()->subMinutes(5);
+            $earlyOpenAt = app(\App\Services\AttendancePunchService::class)->earlyCheckoutOpenAt(
+                auth()->user(),
+                $scheduleData['shift_date'] ?? today()->format('Y-m-d')
+            );
 
             if ($earlyOpenAt && $earlyOpenAt->lt($checkoutTime)) {
                 $checkoutTime = $earlyOpenAt;
@@ -199,493 +43,216 @@
             }
 
             $canCheckout = now()->gte($checkoutTime);
-            }
+        }
+    @endphp
 
-            @endphp
-
-            <div class="max-w-full mx-auto px-2 sm:px-6 lg:px-8">
-
-                @if(session('success'))
-
-                <div
-                    id="success-alert"
-                    class="mt-4 bg-emerald-100/80 backdrop-blur border border-emerald-300 text-emerald-700 px-4 py-3 rounded-2xl shadow">
-                    {{ session('success') }}
+    <div class="font-app-body -mt-6 -mb-24 min-h-screen bg-[#f8f9ff] pb-[calc(5.25rem+env(safe-area-inset-bottom))] text-[#0b1c30] md:mb-0 md:pb-0">
+        <main class="mx-auto w-full max-w-5xl space-y-5 px-3 py-4 sm:px-6 lg:px-8">
+            <section class="relative overflow-hidden rounded-2xl border border-[#c4c5d7]/60 bg-white p-5 shadow-sm sm:p-6">
+                <div class="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[#dce9ff] opacity-70 blur-3xl"></div>
+                <div class="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0 text-left">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-[#565e74]">Beranda presensi</p>
+                        <h1 class="font-app-heading mt-1 truncate text-2xl font-bold tracking-tight text-[#0b1c30] sm:text-3xl">Halo, {{ $user->name }}</h1>
+                        <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-[#565e74]">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-[#eff4ff] px-2.5 py-1 text-xs font-semibold text-[#0037b0]"><span class="material-symbols-outlined text-[15px]">badge</span>{{ strtoupper((string) $user->role) }}</span>
+                            <span>RS MATA PBEC</span>
+                        </p>
+                    </div>
+                    <div class="relative shrink-0 rounded-2xl bg-[#0037b0] px-4 py-3 text-left text-white sm:min-w-44 sm:text-right">
+                        <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-blue-100">Jam saat ini</p>
+                        <p id="clock" class="font-app-heading app-tabular mt-1 text-3xl font-bold tracking-tight"></p>
+                        <p class="mt-1 text-xs text-blue-100">{{ now()->locale('id')->translatedFormat('l, d F Y') }}</p>
+                    </div>
                 </div>
 
-                @endif
+                <div class="relative mx-auto mt-5 max-w-2xl rounded-xl border border-[#c4c5d7]/60 bg-[#eff4ff] p-3 text-left">
+                    <div class="flex items-start gap-3">
+                        <span class="material-symbols-outlined mt-0.5 text-[22px] text-[#2151da]">event_available</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-[#565e74]">Jadwal Shift Hari Ini</p>
+                            <p class="mt-1 break-words text-sm font-bold leading-5 text-[#0b1c30]">{{ $schedule }}</p>
+                            @if($scheduleData && !empty($scheduleData['start_time']))
+                                <p class="mt-1 text-xs text-[#565e74]">
+                                    {{ $scheduleData['shift_name'] ?? 'Shift' }} ·
+                                    {{ \Carbon\Carbon::parse($scheduleData['start_time'])->format('H:i') }}–{{ \Carbon\Carbon::parse($scheduleData['end_time'])->format('H:i') }}
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <x-overtime-punch-banner :state="$overtimePunchState ?? null" />
 
+            @if(session('success'))
+                <div id="success-alert" class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span>{{ session('success') }}
+                </div>
+            @endif
+
+            <section class="rounded-2xl border border-[#c4c5d7]/60 bg-white p-4 shadow-sm sm:p-5">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="font-app-heading text-lg font-semibold leading-6 text-[#0b1c30]">Presensi Hari Ini</h2>
+                        <p class="mt-0.5 text-xs text-[#565e74]">Gunakan alur biometrik dan lokasi resmi aplikasi.</p>
+                    </div>
+                    <span class="material-symbols-outlined text-[#2151da]">location_on</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
                     @if($alreadyCheckin && !$alreadyCheckout)
-
-                    <button
-                        onclick="alreadyCheckinAlert()"
-                        class="relative bg-gray-200 cursor-not-allowed rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg w-full opacity-80">
-
-                        <div class="text-4xl">
-                            ✅
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-600">
-                            Sudah Absen
-                        </p>
-
-                    </button>
-
+                        <button type="button" onclick="alreadyCheckinAlert()" class="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
+                            <span class="material-symbols-outlined text-[20px]">task_alt</span> Sudah Absen Masuk
+                        </button>
                     @else
-
-                    <a href="/face"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        <div class="text-4xl drop-shadow-md">
-                            📥
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Datang
-                        </p>
-
-                    </a>
-
+                        <a href="{{ route('face.scan') }}" class="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#1d4ed8] px-3 text-xs font-bold text-white shadow-[0_8px_20px_-4px_rgba(29,78,216,0.35)] transition hover:bg-[#0037b0]">
+                            <span class="material-symbols-outlined text-[20px]">login</span> Absen Masuk
+                        </a>
                     @endif
 
                     @if(!$alreadyCheckin)
-
-                    <button
-                        onclick="notCheckinAlert()"
-                        class="relative bg-gray-200 cursor-not-allowed rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg w-full opacity-80">
-
-                        <div class="text-4xl">
-                            ⛔
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-600">
-                            Belum Absen
-                        </p>
-
-                    </button>
-
+                        <button type="button" onclick="notCheckinAlert()" class="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-500">
+                            <span class="material-symbols-outlined text-[20px]">block</span> Belum Absen Masuk
+                        </button>
                     @elseif($alreadyCheckout)
-
-                    <button
-                        class="relative bg-gray-200 cursor-not-allowed rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg w-full opacity-80">
-
-                        <div class="text-4xl">
-                            ✅
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-600">
-                            Sudah Pulang
-                        </p>
-
-                    </button>
-
+                        <button type="button" class="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
+                            <span class="material-symbols-outlined text-[20px]">task_alt</span> Sudah Absen Pulang
+                        </button>
                     @elseif(!$canCheckout)
-
-                    <button
-                        onclick="checkoutNotAllowedAlert()"
-                        class="relative bg-gray-200 cursor-not-allowed rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg w-full opacity-80">
-
-                        <div class="text-4xl">
-                            ⏳
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-600">
-                            Belum Jam Pulang
-                        </p>
-
-                    </button>
-
+                        <button type="button" onclick="checkoutNotAllowedAlert()" class="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-bold text-slate-500">
+                            <span class="material-symbols-outlined text-[20px]">schedule</span> Belum Jam Pulang
+                        </button>
                     @else
-
-                    <a href="/face"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        <div class="text-4xl drop-shadow-md">
-                            📤
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Pulang
-                        </p>
-
-                    </a>
-
+                        <a href="{{ route('face.scan') }}" class="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-[#c4c5d7] bg-white px-3 text-xs font-bold text-[#0037b0] transition hover:bg-[#eff4ff]">
+                            <span class="material-symbols-outlined text-[20px]">logout</span> Absen Pulang
+                        </a>
                     @endif
-
-                    <a href="/izin"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        @if($pendingPermissionCount > 0)
-
-                        <span
-                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
-                            flex items-center justify-center
-                            bg-gradient-to-r from-pink-500 to-red-500
-                            text-white text-xs font-bold rounded-full shadow-lg">
-                            {{ $pendingPermissionCount }}
-                        </span>
-
-                        @endif
-
-                        <div class="text-4xl drop-shadow-md">
-                            📝
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Izin
-                        </p>
-
-                    </a>
-
-                    <a href="/cuti"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        @if($pendingLeaveCount > 0)
-
-                        <span
-                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
-                            flex items-center justify-center
-                            bg-gradient-to-r from-pink-500 to-red-500
-                            text-white text-xs font-bold rounded-full shadow-lg">
-                            {{ $pendingLeaveCount }}
-                        </span>
-
-                        @endif
-
-                        <div class="text-4xl drop-shadow-md">
-                            📅
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Cuti
-                        </p>
-
-                    </a>
-
-                    <a href="/lembur"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        @if($pendingOvertimeCount > 0)
-
-                        <span
-                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
-                            flex items-center justify-center
-                            bg-gradient-to-r from-pink-500 to-red-500
-                            text-white text-xs font-bold rounded-full shadow-lg">
-                            {{ $pendingOvertimeCount }}
-                        </span>
-
-                        @endif
-
-                        <div class="text-4xl drop-shadow-md">
-                            ⏰
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Lembur
-                        </p>
-
-                    </a>
-
-                    @if(auth()->user()->work_type === 'shift')
-
-                    <a href="{{ route('shift-change.create') }}"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        @if(isset($pendingShiftChangeCount) && $pendingShiftChangeCount > 0)
-
-                        <span
-                            class="absolute top-3 right-3 min-w-[24px] h-[24px]
-                            flex items-center justify-center
-                            bg-gradient-to-r from-pink-500 to-red-500
-                            text-white text-xs font-bold rounded-full shadow-lg">
-                            {{ $pendingShiftChangeCount }}
-                        </span>
-
-                        @endif
-
-                        <div class="text-4xl drop-shadow-md">
-                            🔄
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700 text-center">
-                            Ubah Shift
-                        </p>
-
-                    </a>
-
-                    @endif
-
-                    @if(auth()->user()->role === 'admin')
-
-                    <a href="/register-face"
-                        class="relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        <div class="text-4xl drop-shadow-md">
-                            👤
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            Register
-                        </p>
-
-                    </a>
-
-                    @endif
-
-                    <a href="/history"
-                        class="hidden sm:flex relative bg-white/80 backdrop-blur-md border border-white/40 rounded-3xl
-                        min-h-[110px]
-                        flex-col items-center justify-center
-                        shadow-lg hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95">
-
-                        <div class="text-4xl drop-shadow-md">
-                            📊
-                        </div>
-
-                        <p class="text-sm sm:text-base mt-2 font-semibold text-gray-700">
-                            History
-                        </p>
-
-                    </a>
-
-                    @if(str_starts_with(auth()->user()->role, 'pj_'))
-
-                    <a href="{{ route('pj.dashboard') }}"
-                        class="relative 
-                        bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400
-                        rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-xl hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95 text-white overflow-hidden">
-
-                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
-
-                        <div class="relative text-4xl drop-shadow-lg">
-                            🧑‍💼
-                        </div>
-
-                        <p class="relative text-sm sm:text-base mt-2 font-bold">
-                            Approval PJ
-                        </p>
-
-                    </a>
-
-                    <a href="{{ route('shift.index') }}"
-                        class="relative bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600
-                        rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-xl hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95 text-white overflow-hidden">
-
-                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
-
-                        <div class="relative text-4xl drop-shadow-lg">
-                            📅
-                        </div>
-
-                        <p class="relative text-sm sm:text-base mt-2 font-bold">
-                            Jadwal Shift
-                        </p>
-
-                    </a>
-
-                    @endif
-
-                    @if(in_array(auth()->user()->role, ['medical_service', 'medical_service', 'kabag_umum', 'manager_umum', 'kabag_marketing', 'kabag_nurse', 'manager_finance', 'director']))
-
-                    <a href="{{ route('hrd.dashboard') }}"
-                        class="relative 
-                        bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500
-                        rounded-3xl
-                        min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-xl hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95 text-white overflow-hidden">
-
-                        <div class="absolute inset-0 opacity-20 bg-white blur-2xl"></div>
-
-                        <div class="relative text-4xl drop-shadow-lg">
-                            🏢
-                        </div>
-
-                        <p class="relative text-sm sm:text-base mt-2 font-bold">
-                            Approval
-                        </p>
-
-                    </a>
-                    @endif
-                    @if(in_array(auth()->user()->role, ['hrd', 'director']))
-                    <a href="{{ route('hrd.rekap') }}"
-                        class="relative bg-gradient-to-r from-slate-500 via-blue-500 to-indigo-600
-                        rounded-3xl min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-xl hover:shadow-2xl hover:-translate-y-1
-                        transition duration-300 active:scale-95 text-white overflow-hidden">
-
-                        <div class="absolute inset-0 opacity-15 bg-white blur-2xl"></div>
-
-                        <div class="relative text-4xl drop-shadow-lg">
-                            📊
-                        </div>
-
-                        <p class="relative text-sm sm:text-base mt-2 font-bold">
-                            Rekap HRD
-                        </p>
-
-                    </a>
-
-                    <a href="{{ route('hrd.shifts.index') }}"
-                        class="relative bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600
-                        rounded-3xl min-h-[110px]
-                        flex flex-col items-center justify-center
-                        shadow-xl text-white hover:shadow-2xl hover:-translate-y-1 transition duration-300 active:scale-95">
-
-                        <div class="text-4xl">
-                            ⏰
-                        </div>
-
-                        <p class="mt-2 font-bold">
-                            Management Shift
-                        </p>
-
-                    </a>
-
-                    @endif
-
                 </div>
+            </section>
 
-            </div>
+            @php
+                $serviceCounts = [
+                    'cuti' => $pendingLeaveCount,
+                    'izin' => $pendingPermissionCount,
+                    'lembur' => $pendingOvertimeCount,
+                    'shift-change.create' => $pendingShiftChangeCount ?? 0,
+                ];
+                $services = collect($roleMenu->leaves(\App\Services\RoleMenuService::DASHBOARD_SERVICES, $user))
+                    ->map(function (array $service) use ($serviceCounts): array {
+                        $service['count'] = (int) ($serviceCounts[$service['route']] ?? 0);
 
-        </div>
+                        return $service;
+                    })
+                    ->all();
+            @endphp
 
+            @if($services !== [])
+            <section class="space-y-3">
+                <div class="flex items-end justify-between px-1">
+                    <div>
+                        <h2 class="font-app-heading text-lg font-semibold leading-6 text-[#0b1c30]">Layanan Kehadiran Mandiri</h2>
+                        <p class="text-xs text-[#565e74]">Pengajuan tetap diproses melalui handler resmi.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-4">
+                    @foreach($services as $service)
+                        <a href="{{ route($service['route']) }}" class="relative flex min-h-[108px] flex-col justify-between rounded-2xl border border-[#c4c5d7]/60 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#2151da]">
+                            @if($service['count'] > 0)<span class="absolute right-2.5 top-2.5 min-w-5 rounded-full bg-[#ba1a1a] px-1.5 py-0.5 text-center text-[10px] font-bold text-white">{{ $service['count'] }}</span>@endif
+                            <span class="material-symbols-outlined text-[25px] text-[#2151da]">{{ $service['icon'] }}</span>
+                            <p class="mt-3 text-xs font-bold text-[#0b1c30]">{{ $service['label'] }}</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+            @endif
+
+            @if($canApprovalPortal && $portalApprovalQueue !== null && $portalApprovalUrl !== null)
+                <x-portal-approval-card :queue="$portalApprovalQueue" :href="$portalApprovalUrl" />
+            @endif
+
+            @if($portalMenus !== [])
+                <section class="space-y-3">
+                    <div class="px-1">
+                        <h2 class="font-app-heading text-lg font-semibold leading-6 text-[#0b1c30]">Portal Sesuai Akses</h2>
+                        <p class="text-sm text-[#565e74]">Buka ruang kerja sesuai role dan otorisasi yang terdaftar.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        @foreach($portalMenus as $portal)
+                            <a href="{{ route($portal['route']) }}" @class([
+                                'flex min-h-[104px] items-center gap-4 rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#2151da]',
+                                'border-blue-200 bg-blue-50/70' => $portal['route'] === 'admin.control-center',
+                                'border-[#c4c5d7]/60 bg-white' => $portal['route'] !== 'admin.control-center',
+                            ])>
+                                <span @class([
+                                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#0037b0]',
+                                    'bg-white' => $portal['route'] === 'admin.control-center',
+                                    'bg-[#eff4ff]' => $portal['route'] !== 'admin.control-center',
+                                ])><span class="material-symbols-outlined text-[24px]" aria-hidden="true">{{ $portal['icon'] }}</span></span>
+                                <span class="min-w-0"><span class="font-app-heading block text-base font-semibold text-[#0b1c30]">{{ $portal['label'] }}</span><span class="mt-1 block text-sm leading-5 text-[#565e74]">{{ $portal['description'] ?? '' }}</span></span>
+                                <span class="material-symbols-outlined ml-auto shrink-0 text-[#0037b0]" aria-hidden="true">arrow_forward</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
+            @if($latestPermission)
+                <section class="rounded-2xl border border-[#c4c5d7]/60 bg-white p-4 shadow-sm sm:p-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-app-heading text-lg font-semibold leading-6 text-[#0b1c30]">Pelacakan Berkas Terkini</h2>
+                            <p class="mt-1 text-xs text-[#565e74]">{{ $latestPermission->jenis }} · {{ $latestPermission->tanggal }}</p>
+                        </div>
+                        @if($latestPermission->status === 'pending')
+                            <span class="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">Pending</span>
+                        @elseif($latestPermission->status === 'approved')
+                            <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Approved</span>
+                        @elseif($latestPermission->status === 'rejected')
+                            <span class="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-700">Rejected</span>
+                        @endif
+                    </div>
+                </section>
+            @endif
+
+            <section class="rounded-2xl border border-[#c4c5d7]/60 bg-white p-4 shadow-sm sm:p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#565e74]">Aktivitas terbaru</p>
+                        <h2 class="font-app-heading text-lg font-semibold leading-6 text-[#0b1c30]">Riwayat presensi</h2>
+                    </div>
+                    <a href="{{ route('history') }}" class="inline-flex items-center gap-1 text-xs font-bold text-[#0037b0]">Lihat semua <span class="material-symbols-outlined text-[16px]">arrow_forward</span></a>
+                </div>
+                <div class="mt-4 divide-y divide-[#c4c5d7]/50 rounded-xl border border-[#c4c5d7]/50">
+                    @forelse($histories as $history)
+                        <div class="flex items-center justify-between gap-3 px-3 py-3 text-xs sm:px-4">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eff4ff] text-[#0037b0]"><span class="material-symbols-outlined text-[18px]">event_available</span></span>
+                                <div class="min-w-0">
+                                    <p class="truncate font-bold text-[#0b1c30]">{{ $history->tanggal ?? '-' }}</p>
+                                    <p class="mt-0.5 text-[#565e74]">{{ $history->jam_masuk ?? '--:--' }} masuk · {{ $history->jam_keluar ?? '--:--' }} pulang</p>
+                                </div>
+                            </div>
+                            <span class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">Tercatat</span>
+                        </div>
+                    @empty
+                        <div class="p-7 text-center text-xs text-[#565e74]"><span class="material-symbols-outlined text-[28px] text-[#747686]">event_busy</span><p class="mt-2">Belum ada riwayat presensi.</p></div>
+                    @endforelse
+                </div>
+            </section>
+        </main>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <script>
-        function checkoutNotAllowedAlert() {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Belum Jam Pulang',
-                text: @json($checkoutAlertText ?? 'Checkout hanya bisa dilakukan mendekati jam pulang shift.'),
-                confirmButtonColor: '#4F46E5',
-                confirmButtonText: 'OK',
-                borderRadius: '20px'
-            });
-        }
-
-        function notCheckinAlert() {
-            Swal.fire({
-                icon: 'info',
-                title: 'Belum Absen Masuk',
-                text: 'Silakan lakukan absen masuk terlebih dahulu.',
-                confirmButtonColor: '#4F46E5',
-                confirmButtonText: 'OK',
-                borderRadius: '20px'
-            });
-        }
-
-        // AUTO HIDE ALERT
-        setTimeout(() => {
-            const alertBox = document.getElementById('success-alert');
-            if (alertBox) {
-                alertBox.style.display = 'none';
-            }
-        }, 3000);
-
-        // CLOCK
+        function checkoutNotAllowedAlert() { Swal.fire({ icon: 'warning', title: 'Belum Jam Pulang', text: @json($checkoutAlertText), confirmButtonColor: '#1D4ED8' }); }
+        function notCheckinAlert() { Swal.fire({ icon: 'info', title: 'Belum Absen Masuk', text: 'Silakan lakukan absen masuk terlebih dahulu.', confirmButtonColor: '#1D4ED8' }); }
+        function alreadyCheckinAlert() { Swal.fire({ icon: 'info', title: 'Sudah Absen Masuk', text: 'Anda sudah melakukan absen masuk hari ini, tunggu jam pulang untuk checkout.', confirmButtonColor: '#1D4ED8' }); }
         function updateClock() {
-            const now = new Date();
-            const clock = document.getElementById("clock");
-
-            if (clock) {
-                clock.innerHTML = now.toLocaleTimeString('id-ID', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                }) + " WIB";
-            }
+            const clock = document.getElementById('clock');
+            if (clock) clock.textContent = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) + ' WIB';
         }
-
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // ALERT ABSEN
-        function alreadyCheckinAlert() {
-            Swal.fire({
-                icon: 'info',
-                title: 'Sudah Absen Masuk',
-                text: 'Anda sudah melakukan absen hari ini, tunggu jam pulang untuk checkout.',
-                confirmButtonColor: '#4F46E5',
-                confirmButtonText: 'OK',
-                background: '#fff',
-                borderRadius: '20px'
-            });
-        }
-
-        
-
-    // <script>
-    //     const isHoliday = @json($isHoliday);
-
-    //     if (isHoliday) {
-    //         window.addEventListener('load', function() {
-    //             Swal.fire({
-    //                 icon: 'info',
-    //                 title: 'Hari Libur Nasional',
-    //                 text: 'Hari ini adalah tanggal merah/hari libur. Anda tidak dapat melakukan absensi.',
-    //                 confirmButtonColor: '#1E40AF',
-    //                 allowOutsideClick: false,
-    //                 allowEscapeKey: false
-    //             }).then(() => {
-    //                 // Opsional: Redirect ke halaman lain jika memaksa masuk dashboard
-    //                 // window.location.href = "/home"; 
-    //             });
-    //         });
-    //     }
-    // </script>
+        setInterval(updateClock, 1000); updateClock();
+        setTimeout(() => { const alert = document.getElementById('success-alert'); if (alert) alert.remove(); }, 3000);
+    </script>
 </x-app-layout>

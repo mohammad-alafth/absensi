@@ -1,45 +1,33 @@
-<x-app-layout>
+@extends('layouts.submission')
 
-    <div class="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-cyan-50 p-4 pb-28">
+@section('content')
 
-        <div class="max-w-2xl mx-auto">
+    <style>
+        .c3-page {
+            font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        }
+    </style>
 
-            <!-- HEADER BAR -->
-            <div class="flex items-center justify-between mb-5">
+    <div class="c3-page min-h-screen bg-[#f8f9ff] px-3 py-4 pb-24 sm:px-5">
 
-                <a href="{{ route('dashboard') }}"
-                    class="inline-flex items-center gap-2
-                    bg-white/80 backdrop-blur-md border border-white/50
-                    hover:border-indigo-300 hover:bg-indigo-50
-                    text-gray-700 hover:text-indigo-700
-                    px-4 py-2 rounded-2xl
-                    shadow-sm transition text-sm font-semibold">
+        <div class="w-full max-w-lg mx-auto space-y-4">
 
-                    <span class="text-base">←</span>
-                    Kembali
-                </a>
-
-                <a href="{{ route('shift-change.history') }}"
-                    class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500
-                    hover:from-indigo-700 hover:via-purple-700 hover:to-pink-600
-                    text-white px-5 py-2 rounded-2xl
-                    shadow-lg text-sm font-semibold transition active:scale-95 flex items-center gap-2">
-                    <span>📋</span> Riwayat Pengajuan
-                </a>
-
+            <div class="flex items-center justify-between gap-2 px-1">
+                <a href="{{ route('dashboard') }}" class="text-[#1D4ED8] font-semibold text-xs hover:underline">← Kembali ke Dashboard</a>
+                <a href="{{ route('shift-change.history') }}" class="text-[#1D4ED8] font-semibold text-xs hover:underline">Riwayat Pengajuan</a>
             </div>
 
             <!-- TITLE CARD -->
-            <div class="bg-white/80 backdrop-blur-md rounded-3xl shadow-xl border border-white/50 p-6 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
                 <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-3xl shadow-lg text-white">
+                    <div class="w-12 h-12 rounded-2xl bg-[#1D4ED8] flex items-center justify-center text-2xl shadow-sm text-white">
                         🔄
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-800">
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-800">
                             Pengajuan Perubahan Shift
                         </h1>
-                        <p class="text-sm text-gray-500 mt-0.5">
+                        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
                             Isi formulir berikut untuk mengujikan perubahan jadwal shift Anda
                         </p>
                     </div>
@@ -60,13 +48,13 @@
             @endif
 
             <!-- FORM CARD -->
-            <div class="bg-white/90 backdrop-blur-md rounded-3xl shadow-xl border border-white/60 p-6 sm:p-8">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
 
-                <form action="{{ route('shift-change.store') }}" method="POST" class="space-y-6">
+                <form action="{{ route('shift-change.store') }}" method="POST" class="space-y-4">
                     @csrf
 
                     <!-- TANGGAL SHIFT -->
-                    <div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3.5">
                         <label for="shift_date" class="block text-sm font-bold text-gray-700 mb-2">
                             📅 Tanggal Shift Yang Ingin Diubah <span class="text-red-500">*</span>
                         </label>
@@ -76,29 +64,29 @@
                             value="{{ old('shift_date', now()->format('Y-m-d')) }}"
                             min="{{ now()->format('Y-m-d') }}"
                             required
-                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition text-sm bg-gray-50/50">
+                            class="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-300 focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-200 transition text-sm bg-white">
                         @error('shift_date')
                         <p class="text-xs text-red-500 mt-1 font-medium">{{ $message }}</p>
                         @enderror
                     </div>
 
                     <!-- DISPLAY CURRENT SHIFT -->
-                    <div id="current_shift_box" class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 transition-all">
-                        <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Jadwal Shift Saat Ini</p>
-                        <p id="current_shift_name" class="text-lg font-bold text-indigo-900 mt-1">
+                    <div id="current_shift_box" class="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 transition-all">
+                        <p class="text-[11px] font-semibold text-[#1D4ED8] uppercase tracking-wider">Jadwal Shift Saat Ini</p>
+                        <p id="current_shift_name" class="text-base font-bold text-slate-900 mt-1">
                             Pilih tanggal di atas untuk melihat shift
                         </p>
                     </div>
 
                     <!-- REQUESTED SHIFT -->
-                    <div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3.5">
                         <label for="requested_shift_id" class="block text-sm font-bold text-gray-700 mb-2">
                             🔄 Pilih Shift Baru Yang Diinginkan <span class="text-red-500">*</span>
                         </label>
                         <select id="requested_shift_id"
                             name="requested_shift_id"
                             required
-                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition text-sm bg-gray-50/50">
+                            class="w-full min-h-12 px-4 py-3 rounded-xl border border-slate-300 focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-200 transition text-sm bg-white">
                             <option value="" disabled selected>-- Pilih Shift Baru --</option>
                             <option value="off" {{ old('requested_shift_id') == 'off' ? 'selected' : '' }} class="font-semibold text-amber-700">
                                 Hari Libur / Tidak Ada Shift (Jadwal Kosong)
@@ -115,7 +103,7 @@
                     </div>
 
                     <!-- ALASAN PERUBAHAN SHIFT -->
-                    <div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3.5">
                         <label for="reason" class="block text-sm font-bold text-gray-700 mb-2">
                             📝 Alasan Perubahan Shift <span class="text-red-500">*</span>
                         </label>
@@ -124,7 +112,7 @@
                             rows="4"
                             required
                             placeholder="Tuliskan alasan lengkap pengajuan perubahan shift Anda..."
-                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition text-sm bg-gray-50/50 resize-none">{{ old('reason') }}</textarea>
+                            class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-200 transition text-sm bg-white resize-none">{{ old('reason') }}</textarea>
                         @error('reason')
                         <p class="text-xs text-red-500 mt-1 font-medium">{{ $message }}</p>
                         @enderror
@@ -133,7 +121,7 @@
                     <!-- SUBMIT BUTTON -->
                     <div class="pt-2">
                         <button type="submit"
-                            class="w-full py-4 bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 hover:from-indigo-700 hover:via-blue-700 hover:to-cyan-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-200 hover:shadow-2xl transition duration-300 active:scale-[0.98] text-base flex items-center justify-center gap-2">
+                            class="w-full min-h-14 py-4 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white font-bold rounded-xl shadow-md transition duration-300 active:scale-[0.98] text-sm flex items-center justify-center gap-2">
                             <span>🚀</span> Kirim Pengajuan Perubahan Shift
                         </button>
                     </div>
@@ -166,7 +154,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.has_shift) {
-                        currentShiftName.innerHTML = `<span class="text-indigo-900">${data.shift_name}</span> <span class="text-xs font-normal text-indigo-600">(${data.start_time} - ${data.end_time} WIB)</span>`;
+                         currentShiftName.innerHTML = `<span class="text-slate-900">${data.shift_name}</span> <span class="text-xs font-normal text-[#1D4ED8]">(${data.start_time} - ${data.end_time} WIB)</span>`;
                     } else {
                         currentShiftName.innerHTML = `<span class="text-amber-700">${data.shift_name}</span>`;
                     }
@@ -181,4 +169,4 @@
         });
     </script>
 
-</x-app-layout>
+@endsection

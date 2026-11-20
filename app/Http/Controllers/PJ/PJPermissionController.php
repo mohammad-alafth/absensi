@@ -31,9 +31,13 @@ class PJPermissionController extends Controller
             'signature' => 'required|string'
         ]);
 
-        $permission = Permission::with('user')->findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $permission = Permission::with('user')
+            ->whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($permission->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($permission, $permission->user->role, 'permission') || $permission->pj_status !== 'pending') {
             return back()->with('error', 'Izin sudah diproses PJ');
         }
 
@@ -43,7 +47,7 @@ class PJPermissionController extends Controller
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
             // Tahap PJ selesai -> masuk stage approver pertama sesuai grup role
-            'status' => ApprovalFlowService::statusAfterPj($permission->user->role),
+            'status' => ApprovalFlowService::statusAfterPjSubmission($permission, $permission->user->role, 'permission'),
         ]);
 
         $this->regeneratePdf($permission);
@@ -57,9 +61,12 @@ class PJPermissionController extends Controller
             'note' => 'required|min:2'
         ]);
 
-        $permission = Permission::findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $permission = Permission::whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($permission->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($permission, $permission->user->role, 'permission') || $permission->pj_status !== 'pending') {
             return back()->with('error', 'Izin sudah diproses PJ');
         }
 

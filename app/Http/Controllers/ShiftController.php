@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\EmployeeShift;
 use App\Http\Controllers\PJ\PJDashboardController;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class ShiftController extends Controller
@@ -39,6 +40,15 @@ class ShiftController extends Controller
 
     public function assign(Request $request)
     {
+        $actor = $this->authorizePjActor();
+
+        $request->validate([
+            'user_id'    => 'required|exists:users,id',
+            'shift_date' => 'required|date',
+        ]);
+
+        $targets = $this->authorizeTargets([$request->integer('user_id')], $actor);
+
         if ($request->boolean('is_delete')) {
             EmployeeShift::where('user_id', $request->user_id)
                 ->where('shift_date', $request->shift_date)
@@ -47,13 +57,13 @@ class ShiftController extends Controller
         }
 
         $request->validate([
-            'user_id'    => 'required|exists:users,id',
-            'shift_date' => 'required|date',
             'shift_id'   => 'required|exists:shifts,id',
         ]);
 
+        $shift = Shift::findOrFail($request->shift_id);
+        $this->assertShiftAllowedForTargets($shift, $targets);
+
         try {
-            $shift = Shift::findOrFail($request->shift_id);
             $shiftDate = Carbon::parse($request->shift_date)->format('Y-m-d');
             $year = Carbon::parse($shiftDate)->year;
             $month = Carbon::parse($shiftDate)->month;
@@ -93,8 +103,13 @@ class ShiftController extends Controller
             'shift_id'   => 'required|exists:shifts,id',
         ]);
 
+        $actor = $this->authorizePjActor();
+        $targets = $this->authorizeTargets($request->input('user_ids', []), $actor);
+
+        $shift = Shift::findOrFail($request->shift_id);
+        $this->assertShiftAllowedForTargets($shift, $targets);
+
         try {
-            $shift = Shift::findOrFail($request->shift_id);
             $startDate = Carbon::parse($request->start_date);
             $endDate = Carbon::parse($request->end_date);
 
@@ -135,13 +150,31 @@ class ShiftController extends Controller
             'schedule' => 'required|array', // ['YYYY-MM-DD' => shift_id]
         ]);
 
+        $actor = $this->authorizePjActor();
+        $targets = $this->authorizeTargets($request->input('user_ids', []), $actor);
+
+        $shifts = Shift::query()
+            ->whereIn('id', array_values(array_filter($request->input('schedule', []))))
+            ->get()
+            ->keyBy('id');
+
+        foreach (array_values(array_filter($request->input('schedule', []))) as $shiftId) {
+            $shift = $shifts->get((int) $shiftId);
+            if (!$shift) {
+                throw ValidationException::withMessages([
+                    'schedule' => 'Salah satu shift yang dipilih tidak ditemukan.',
+                ]);
+            }
+
+            $this->assertShiftAllowedForTargets($shift, $targets);
+        }
+
         try {
             foreach ($request->user_ids as $userId) {
                 foreach ($request->schedule as $dateStr => $shiftId) {
                     if (!$shiftId) continue;
 
-                    $shift = Shift::find($shiftId);
-                    if (!$shift) continue;
+                    $shift = $shifts->get((int) $shiftId);
 
                     $currDate = Carbon::parse($dateStr);
 
@@ -171,33 +204,73 @@ class ShiftController extends Controller
 
     public function calendarEvents(Request $request)
     {
-        $pjRole = auth()->user()->role;
+        $actor = auth()->user();
+        if (!$actor || !str_starts_with((string) $actor->role, 'pj_')) {
+            abort(403);
+        }
+
+        $pjRole = $actor->role;
         $divisionRoles = PJDashboardController::getDivisionRolesForUser($pjRole);
 
-        $start = $request->start ? Carbon::parse($request->start)->format('Y-m-d') : now()->startOfMonth()->format('Y-m-d');
-        $end = $request->end ? Carbon::parse($request->end)->format('Y-m-d') : now()->endOfMonth()->format('Y-m-d');
+        $rangeStart = $request->start
+            ? Carbon::parse($request->start)->startOfDay()
+            : now()->startOfMonth()->startOfDay();
+        // FullCalendar sends an exclusive end boundary.
+        $rangeEnd = $request->end
+            ? Carbon::parse($request->end)->startOfDay()->subDay()->endOfDay()
+            : now()->endOfMonth()->endOfDay();
 
         $userIds = User::whereIn('role', $divisionRoles)->pluck('id');
 
         $employeeShifts = EmployeeShift::with(['user', 'shift'])
             ->whereIn('user_id', $userIds)
-            ->whereBetween('shift_date', [$start, $end])
+            ->whereBetween('shift_date', [
+                $rangeStart->copy()->subDay()->toDateString(),
+                $rangeEnd->toDateString(),
+            ])
+            ->orderBy('shift_date')
+            ->orderBy('id')
             ->get();
 
         $events = [];
 
         foreach ($employeeShifts as $es) {
+            $rosterDate = Carbon::parse($es->shift_date)->startOfDay();
+            $isOvernight = (bool) $es->is_overnight
+                || ($es->start_time && $es->end_time
+                    && Carbon::parse($es->end_time)->lessThan(Carbon::parse($es->start_time)));
+            $shiftEnd = $es->end_time
+                ? Carbon::parse($rosterDate->toDateString() . ' ' . $es->end_time)
+                : null;
+            if ($shiftEnd && $isOvernight) {
+                $shiftEnd->addDay();
+            }
+
+            $isCarryOver = $rosterDate->lt($rangeStart);
+            if ($isCarryOver && (!$isOvernight || !$shiftEnd || $shiftEnd->lt($rangeStart))) {
+                continue;
+            }
+
+            $eventStart = $isCarryOver ? $rangeStart->toDateString() : $rosterDate->toDateString();
+            $shiftName = $es->shift->name ?? 'Shift';
             $events[] = [
-                'id' => $es->id,
+                'id' => $isCarryOver ? $es->id . '-carry-over' : $es->id,
                 'user_id' => $es->user_id,
-                'title' => ($es->user->name ?? 'N/A') . ' (' . ($es->shift->name ?? 'Shift') . ')',
-                'start' => $es->shift_date,
-                'backgroundColor' => $this->getShiftColor($es->shift->name ?? ''),
+                'title' => ($es->user->name ?? 'N/A') . ' (' . $shiftName . ')',
+                'start' => $eventStart,
+                'backgroundColor' => $this->getShiftColor($shiftName),
                 'borderColor' => 'transparent',
                 'extendedProps' => [
-                    'shift_name' => $es->shift->name ?? '-',
+                    'employee_name' => $es->user->name ?? 'N/A',
+                    'user_id' => $es->user_id,
+                    'roster_id' => $es->id,
+                    'roster_date' => $rosterDate->toDateString(),
+                    'shift_id' => $es->shift_id,
+                    'shift_name' => $shiftName,
                     'start_time' => $es->start_time,
                     'end_time' => $es->end_time,
+                    'is_overnight' => $isOvernight,
+                    'carry_over' => $isCarryOver,
                 ]
             ];
         }
@@ -217,8 +290,15 @@ class ShiftController extends Controller
 
     public function weeklySchedules(Request $request)
     {
+        $actor = $this->authorizePjActor();
         $userIds = $request->input('user_ids', []);
         $startDate = $request->input('start_date');
+
+        if (!is_array($userIds)) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Daftar user tidak valid.',
+            ]);
+        }
 
         if (empty($userIds) || empty($startDate)) {
             return response()->json([
@@ -226,6 +306,9 @@ class ShiftController extends Controller
                 'schedules' => [],
             ]);
         }
+
+        $targets = $this->authorizeTargets($userIds, $actor);
+        $userIds = $targets->pluck('id')->all();
 
         $start = Carbon::parse($startDate)->startOfDay();
         $end = $start->copy()->addDays(6)->endOfDay();
@@ -276,5 +359,59 @@ class ShiftController extends Controller
             'success' => true,
             'schedules' => $schedules,
         ]);
+    }
+
+    /**
+     * Assignment legacy endpoints use the same PJ contract as the P14 roster
+     * service: exact pj_* actor and division scope from ApprovalFlowService.
+     */
+    private function authorizePjActor(): User
+    {
+        $actor = auth()->user();
+
+        if (!$actor || !str_starts_with((string) $actor->role, 'pj_')) {
+            abort(403, 'Anda tidak memiliki otoritas untuk mengatur shift.');
+        }
+
+        return $actor;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, User> */
+    private function authorizeTargets(array $userIds, User $actor)
+    {
+        $uniqueIds = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $targets = User::query()->whereIn('id', $uniqueIds->all())->get();
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser($actor->role);
+
+        if (
+            $targets->count() !== $uniqueIds->count()
+            || $targets->contains(fn (User $target) => !in_array($target->role, $divisionRoles, true))
+        ) {
+            abort(404, 'Target shift tidak ditemukan.');
+        }
+
+        return $targets;
+    }
+
+    private function assertShiftAllowedForTargets(Shift $shift, $targets): void
+    {
+        $allowedRoles = is_array($shift->allowed_roles) ? $shift->allowed_roles : [];
+
+        // Empty/null allowed_roles retains the existing unrestricted behavior.
+        if ($allowedRoles === []) {
+            return;
+        }
+
+        foreach ($targets as $target) {
+            if (!in_array($target->role, $allowedRoles, true)) {
+                throw ValidationException::withMessages([
+                    'shift_id' => "Shift tidak diizinkan untuk role target {$target->role}.",
+                ]);
+            }
+        }
     }
 }

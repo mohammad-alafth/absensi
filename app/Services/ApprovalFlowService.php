@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalWorkflowAudit;
+use App\Models\ApprovalWorkflowVersion;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
 /**
  * Pusat konfigurasi alur approval (single source of truth).
  *
@@ -573,6 +578,216 @@ class ApprovalFlowService
             'pj_status' => $needsPj ? 'pending' : 'approved',
             'hrd_status' => 'pending',
         ], $stageStatuses);
+    }
+
+    /**
+     * Capture the active workflow once, at submission time. The snapshot is
+     * deliberately plain data so later edits/deletions cannot alter it.
+     */
+    public static function workflowFields(?string $role, string $type): array
+    {
+        $snapshot = self::buildWorkflowSnapshot($role, $type);
+        $encoded = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $configSnapshot = $snapshot;
+        unset($configSnapshot['selection']);
+        $configEncoded = json_encode($configSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $hash = hash('sha256', (string) $configEncoded);
+
+        if (!Schema::hasTable('approval_workflow_versions')) {
+            return [
+                'approval_workflow_version_id' => null,
+                'approval_workflow_snapshot' => $encoded,
+                'approval_workflow_snapshot_hash' => $hash,
+            ];
+        }
+
+        $version = ApprovalWorkflowVersion::where('snapshot_hash', $hash)->first();
+        if (!$version) {
+            try {
+                $version = ApprovalWorkflowVersion::create([
+                    'version' => ((int) ApprovalWorkflowVersion::max('version')) + 1,
+                    'snapshot' => $configEncoded,
+                    'snapshot_hash' => $hash,
+                    'changed_by' => auth()->id(),
+                    'reason' => 'Snapshot otomatis saat pengajuan dibuat',
+                ]);
+            } catch (Throwable $e) {
+                $version = ApprovalWorkflowVersion::where('snapshot_hash', $hash)->first();
+            }
+        }
+
+        return [
+            'approval_workflow_version_id' => $version?->id,
+            'approval_workflow_snapshot' => $encoded,
+            'approval_workflow_snapshot_hash' => $hash,
+        ];
+    }
+
+    /** Snapshot for an in-flight record; null means legacy data. */
+    public static function submissionSnapshot(object $submission): ?array
+    {
+        $raw = $submission->approval_workflow_snapshot ?? null;
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        return null;
+    }
+
+    /** Legacy-safe fallback: live configuration is used only when no snapshot exists. */
+    public static function chainForSubmission(object $submission, ?string $role, string $type): array
+    {
+        $snapshot = self::submissionSnapshot($submission);
+        if (is_array($snapshot)) {
+            return array_values($snapshot['selection']['chain'] ?? []);
+        }
+
+        return self::chainFor($role, $type);
+    }
+
+    public static function statusAfterPjSubmission(object $submission, ?string $role, string $type): string
+    {
+        $chain = self::chainForSubmission($submission, $role, $type);
+        return isset($chain[0]) ? (self::statusForStage($chain[0]) ?? 'approved') : 'approved';
+    }
+
+    public static function needsPjForSubmission(object $submission, ?string $role, string $type): bool
+    {
+        $snapshot = self::submissionSnapshot($submission);
+
+        return is_array($snapshot)
+            ? (bool) ($snapshot['selection']['needs_pj'] ?? false)
+            : self::needsPjApprovalFor($role, $type);
+    }
+
+    /** Resolve approver stage against the submission's immutable catalog. */
+    public static function stageForSubmission(object $submission, ?string $role, string $type): ?string
+    {
+        $snapshot = self::submissionSnapshot($submission);
+        if (!is_array($snapshot)) {
+            return self::stageForApproverRole($role);
+        }
+
+        $role = self::normalize($role);
+        foreach (($snapshot['stages'] ?? []) as $key => $stage) {
+            if (($stage['active'] ?? false) && self::normalize($stage['role'] ?? '') === $role) {
+                return (string) $key;
+            }
+        }
+
+        return null;
+    }
+
+    /** Record a configuration change and publish the resulting version. */
+    public static function recordWorkflowChange(
+        string $action,
+        string $entityType,
+        string|int|null $entityId,
+        mixed $before,
+        mixed $after,
+        ?string $reason = null
+    ): ?ApprovalWorkflowVersion {
+        if (!Schema::hasTable('approval_workflow_versions')) {
+            return null;
+        }
+
+        $snapshot = self::buildWorkflowSnapshot(null, null);
+        $encoded = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $hash = hash('sha256', (string) $encoded);
+        $version = ApprovalWorkflowVersion::where('snapshot_hash', $hash)->first();
+
+        if (!$version) {
+            $version = ApprovalWorkflowVersion::create([
+                'version' => ((int) ApprovalWorkflowVersion::max('version')) + 1,
+                'snapshot' => $encoded,
+                'snapshot_hash' => $hash,
+                'changed_by' => auth()->id(),
+                'reason' => $reason,
+            ]);
+        }
+
+        ApprovalWorkflowAudit::create([
+            'workflow_version_id' => $version->id,
+            'actor_id' => auth()->id(),
+            'action' => $action,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId === null ? null : (string) $entityId,
+            'before_json' => is_string($before) ? $before : json_encode($before, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'after_json' => is_string($after) ? $after : json_encode($after, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'reason' => $reason,
+        ]);
+
+        return $version;
+    }
+
+    private static function buildWorkflowSnapshot(?string $role, ?string $type): array
+    {
+        $stages = [];
+        if (ApprovalFlowConfig::isEnabled()) {
+            foreach (ApprovalFlowConfig::stages() as $key => $stage) {
+                $stages[$key] = [
+                    'label' => $stage->label,
+                    'role' => $stage->role,
+                    'active' => (bool) $stage->is_active,
+                    'is_pj' => (bool) $stage->is_pj,
+                    'sort_order' => (int) $stage->sort_order,
+                ];
+            }
+        } else {
+            $stages['pj'] = ['label' => 'PJ', 'role' => 'pj', 'active' => true, 'is_pj' => true, 'sort_order' => 0];
+            foreach (self::APPROVER_STAGES as $key => $stage) {
+                $stages[$key] = [
+                    'label' => $stage['label'],
+                    'role' => $stage['role'],
+                    'active' => true,
+                    'is_pj' => false,
+                    'sort_order' => 0,
+                ];
+            }
+        }
+
+        $flows = [];
+        $mappings = [];
+        if (ApprovalFlowConfig::isEnabled()) {
+            foreach (ApprovalFlowConfig::flows() as $flow) {
+                $flows[(string) $flow->id] = [
+                    'name' => $flow->name,
+                    'submission_type' => $flow->submission_type,
+                    'active' => (bool) $flow->is_active,
+                    'default' => (bool) $flow->is_default,
+                    'steps' => ApprovalFlowConfig::orderedSteps($flow),
+                ];
+            }
+            foreach (ApprovalFlowConfig::snapshot()['role_flows'] ?? [] as $mapping) {
+                $mappings[] = [
+                    'role' => $mapping->role,
+                    'submission_type' => $mapping->submission_type,
+                    'approval_flow_id' => $mapping->approval_flow_id,
+                ];
+            }
+        }
+
+        $chain = $role !== null ? self::chainFor($role, $type) : [];
+        $needsPj = $role !== null ? self::needsPjApprovalFor($role, $type) : false;
+
+        return [
+            'schema' => 1,
+            'source' => ApprovalFlowConfig::isEnabled() ? 'database' : 'code',
+            'stages' => $stages,
+            'flows' => $flows,
+            'mappings' => $mappings,
+            'selection' => [
+                'role' => $role,
+                'type' => $type,
+                'chain' => array_values($chain),
+                'needs_pj' => $needsPj,
+            ],
+        ];
     }
 
     /*

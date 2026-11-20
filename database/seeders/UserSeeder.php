@@ -52,6 +52,8 @@ class UserSeeder extends Seeder
             'PJ MARKETING' => 'pj_marketing',
 
             'YANMED' => 'medical_service',
+            'SEKRETARIAT' => 'sekre',
+            'SUPERVISOR' => 'supervisor',
         ];
 
         /*

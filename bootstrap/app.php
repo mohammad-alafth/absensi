@@ -4,6 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\PermissionPilotMiddleware;
+use App\Http\Middleware\PermissionEnforcementMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,8 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
 
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'telegram/webhook',
+            'api/telegram/webhook',
+        ]);
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'permission.pilot' => PermissionPilotMiddleware::class,
+            'permission' => PermissionEnforcementMiddleware::class,
         ]);
     })
 

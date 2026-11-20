@@ -100,6 +100,7 @@ class ApprovalFlowController extends Controller
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
             'description' => 'nullable|string|max:500',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         $stage = ApprovalStage::create($this->stageAttributes($data));
@@ -108,6 +109,7 @@ class ApprovalFlowController extends Controller
         ApprovalStageSchema::ensureStageColumns($stage->key);
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('stage.created', 'stage', $stage->id, null, $stage->fresh()->getAttributes(), $data['reason'] ?? null);
 
         return back()->with('success', "Tahap {$stage->label} ditambahkan dan kolom pengajuannya dibuat otomatis.");
     }
@@ -124,8 +126,10 @@ class ApprovalFlowController extends Controller
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
             'description' => 'nullable|string|max:500',
+            'reason' => 'nullable|string|max:500',
         ]);
 
+        $before = $model->getAttributes();
         $keyChanged = $data['key'] !== $model->key;
 
         $model->update($this->stageAttributes($data));
@@ -138,6 +142,7 @@ class ApprovalFlowController extends Controller
         }
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('stage.updated', 'stage', $model->id, $before, $model->fresh()->getAttributes(), $data['reason'] ?? null);
 
         return back()->with('success', 'Tahap ' . $model->label . ' diperbarui.');
     }
@@ -145,10 +150,12 @@ class ApprovalFlowController extends Controller
     public function toggleStage(string $stage)
     {
         $model = ApprovalStage::where('key', $stage)->firstOrFail();
+        $before = $model->getAttributes();
 
         $model->update(['is_active' => !$model->is_active]);
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('stage.toggled', 'stage', $model->id, $before, $model->fresh()->getAttributes(), request('reason'));
 
         return back()->with(
             'success',
@@ -159,6 +166,7 @@ class ApprovalFlowController extends Controller
     public function destroyStage(string $stage)
     {
         $model = ApprovalStage::where('key', $stage)->firstOrFail();
+        $before = $model->getAttributes();
 
         if ($stage === ApprovalFlowConfig::PJ_STAGE) {
             return back()->with('error', 'Tahap PJ tidak dapat dihapus karena dipakai semua pengajuan.');
@@ -167,12 +175,14 @@ class ApprovalFlowController extends Controller
         if (ApprovalFlowStep::where('stage_key', $stage)->exists()) {
             $model->update(['is_active' => false]);
             ApprovalFlowConfig::flush();
+            ApprovalFlowService::recordWorkflowChange('stage.disabled', 'stage', $model->id, $before, $model->fresh()->getAttributes(), request('reason'));
 
             return back()->with('error', 'Tahap masih dipakai pada alur, jadi dinonaktifkan. Hapus dulu dari tree alur.');
         }
 
         $model->delete();
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('stage.deleted', 'stage', $model->id, $before, null, request('reason'));
 
         return back()->with('success', 'Tahap dihapus.');
     }
@@ -201,6 +211,7 @@ class ApprovalFlowController extends Controller
             'submission_type' => 'required|string|in:' . implode(',', array_merge(array_keys(ApprovalFlowConfig::TYPES), [ApprovalFlowConfig::ALL_TYPES])),
             'is_default' => 'nullable|boolean',
             'description' => 'nullable|string|max:500',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         $flow = ApprovalFlow::create([
@@ -214,6 +225,7 @@ class ApprovalFlowController extends Controller
         $this->syncSteps($flow, $request->input('steps', []));
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('flow.created', 'flow', $flow->id, null, $this->flowState($flow), $data['reason'] ?? null);
 
         return back()->with('success', "Alur \"{$flow->name}\" disimpan.");
     }
@@ -226,8 +238,10 @@ class ApprovalFlowController extends Controller
             'is_active' => 'nullable|boolean',
             'is_default' => 'nullable|boolean',
             'description' => 'nullable|string|max:500',
+            'reason' => 'nullable|string|max:500',
         ]);
 
+        $before = $this->flowState($flow);
         $makeDefault = (bool) ($data['is_default'] ?? false);
 
         DB::transaction(function () use ($flow, $data, $makeDefault, $request) {
@@ -249,21 +263,25 @@ class ApprovalFlowController extends Controller
         });
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('flow.updated', 'flow', $flow->id, $before, $this->flowState($flow->fresh()), $data['reason'] ?? null);
 
         return back()->with('success', "Alur \"{$flow->name}\" diperbarui.");
     }
 
     public function destroyFlow(ApprovalFlow $flow)
     {
+        $before = $this->flowState($flow);
         if (ApprovalRoleFlow::where('approval_flow_id', $flow->id)->exists()) {
             $flow->update(['is_active' => false]);
             ApprovalFlowConfig::flush();
+            ApprovalFlowService::recordWorkflowChange('flow.disabled', 'flow', $flow->id, $before, $this->flowState($flow->fresh()), request('reason'));
 
             return back()->with('error', 'Alur masih dipakai role pengaju, jadi dinonaktifkan alih-alih dihapus.');
         }
 
         $flow->delete();
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('flow.deleted', 'flow', $flow->id, $before, null, request('reason'));
 
         return back()->with('success', 'Alur dihapus.');
     }
@@ -311,8 +329,12 @@ class ApprovalFlowController extends Controller
             'submission_type' => 'required|string|in:' . implode(',', array_merge(array_keys(ApprovalFlowConfig::TYPES), [ApprovalFlowConfig::ALL_TYPES])),
             'approval_flow_id' => 'nullable|integer|exists:approval_flows,id',
             'note' => 'nullable|string|max:255',
+            'reason' => 'nullable|string|max:500',
         ]);
 
+        $existing = ApprovalRoleFlow::where('role', strtolower($data['role']))
+            ->where('submission_type', $data['submission_type'])->first();
+        $before = $existing?->getAttributes();
         ApprovalRoleFlow::updateOrCreate(
             [
                 'role' => strtolower($data['role']),
@@ -325,15 +347,20 @@ class ApprovalFlowController extends Controller
         );
 
         ApprovalFlowConfig::flush();
+        $mapping = ApprovalRoleFlow::where('role', strtolower($data['role']))
+            ->where('submission_type', $data['submission_type'])->first();
+        ApprovalFlowService::recordWorkflowChange('mapping.saved', 'role_flow', $mapping?->id, $before, $mapping?->getAttributes(), $data['reason'] ?? null);
 
         return back()->with('success', 'Pemetaan role ' . strtoupper($data['role']) . ' disimpan.');
     }
 
     public function destroyRoleFlow(ApprovalRoleFlow $roleFlow)
     {
+        $before = $roleFlow->getAttributes();
         $roleFlow->delete();
 
         ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('mapping.deleted', 'role_flow', $roleFlow->id, $before, null, request('reason'));
 
         return back()->with('success', 'Pemetaan role dihapus (kembali memakai alur default).');
     }
@@ -345,10 +372,22 @@ class ApprovalFlowController extends Controller
     public function syncDefaults()
     {
         $result = ApprovalFlowDefaults::sync();
+        ApprovalFlowConfig::flush();
+        ApprovalFlowService::recordWorkflowChange('defaults.synced', 'configuration', null, null, $result, request('reason'));
 
         return back()->with(
             'success',
             "Konfigurasi dipulihkan: {$result['stages']} tahap, {$result['flows']} alur, {$result['mappings']} pemetaan role."
         );
+    }
+
+    private function flowState(ApprovalFlow $flow): array
+    {
+        $flow = $flow->fresh('steps');
+
+        return [
+            'flow' => $flow?->getAttributes(),
+            'steps' => $flow?->steps->map(fn ($step) => $step->getAttributes())->values()->all(),
+        ];
     }
 }

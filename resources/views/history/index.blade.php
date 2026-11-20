@@ -1,10 +1,9 @@
-<x-app-layout>
+@extends('layouts.submission')
+
+@section('content')
 
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8f9ff;
-        }
+        .history-page { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 
         @keyframes fadeIn {
             from {
@@ -23,40 +22,56 @@
         }
     </style>
 
-    <div class="min-h-screen bg-[#f8f9ff] px-3 sm:px-5 py-6 pb-28">
+    <div class="history-page min-h-screen bg-[#f8f9ff] px-3 py-3 pb-24 sm:px-5">
 
-        <div class="w-full max-w-6xl mx-auto">
+        <div class="w-full max-w-5xl mx-auto space-y-4">
 
-            <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
-                <a href="{{ route('dashboard') }}" class="text-[#1E40AF] font-semibold text-sm flex items-center gap-1 hover:underline">
-                    ← Kembali
-                </a>
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('history.rekap') }}" class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl shadow-md transition text-sm font-bold whitespace-nowrap">
-                        📊 Rekap Absen
-                    </a>
-                    <div class="bg-gradient-to-r from-[#1E40AF] to-blue-500 text-white px-5 py-2 rounded-2xl shadow-lg text-sm font-semibold tracking-wide whitespace-nowrap">
-                        Riwayat Pengajuan Personel
+            <header class="bg-white border border-[#c4c5d7]/50 rounded-2xl shadow-sm p-4 sm:p-5">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-11 h-11 rounded-full border border-[#2151da]/20 bg-[#eff4ff] text-[#0037b0] flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-[23px]">person</span>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[10px] uppercase tracking-[0.08em] font-bold text-[#565e74]">RS Mata PEK · PBEC</p>
+                            <p class="text-sm font-bold text-[#0b1c30] truncate">{{ auth()->user()->name }}</p>
+                            <p class="text-[11px] text-[#565e74] truncate">{{ auth()->user()->role_label }}</p>
+                        </div>
                     </div>
+                    <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 text-[#1E40AF] font-semibold text-xs hover:underline shrink-0">
+                        <span class="material-symbols-outlined text-[16px]">arrow_back</span> Dashboard
+                    </a>
                 </div>
-            </div>
+                <div class="mt-4 pt-3 border-t border-[#c4c5d7]/40 flex items-end justify-between gap-3">
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight text-[#0b1c30]">Riwayat &amp; Aktivitas</h1>
+                        <p class="text-[11px] uppercase tracking-[0.08em] text-[#565e74] mt-1">Log pengajuan kepegawaian Anda</p>
+                    </div>
+                    <a href="{{ route('history.rekap') }}" class="inline-flex items-center gap-1.5 bg-[#1D4ED8] hover:bg-[#0037b0] text-white px-3 py-2 rounded-xl shadow-sm transition text-[11px] font-bold whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[17px]">insights</span> Rekap Absen
+                    </a>
+                </div>
+            </header>
 
             <x-flash-message />
 
             @forelse($years as $year)
 
-            <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-[#c4c5d7]/50 p-4 sm:p-5">
 
-                <div class="border-b pb-4 mb-5">
-                    <h2 class="text-2xl font-bold text-gray-800">Tahun {{ $year }}</h2>
-                    <p class="text-sm text-gray-500 mt-1">Daftar rekaman riwayat logistik cuti, izin formal, dan jam lembur kerja</p>
+                <div class="border-b border-[#c4c5d7]/40 pb-3 mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-[#0b1c30]">Aktivitas Tahun {{ $year }}</h2>
+                        <p class="text-[11px] text-[#565e74] mt-1">Pengajuan terbaru dari seluruh modul kepegawaian.</p>
+                    </div>
+                    <span class="material-symbols-outlined text-[#2151da] text-[22px]" aria-hidden="true">calendar_month</span>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div class="space-y-4">
 
-                    <div class="bg-white rounded-2xl border border-blue-50 overflow-hidden flex flex-col shadow-xs">
-                        <div class="bg-[#1E40AF] text-white px-4 py-3 flex items-center justify-between">
-                            <h3 class="font-bold text-sm">📅 Riwayat Cuti</h3>
+                    <div class="bg-[#f8f9ff] rounded-2xl border border-[#c4c5d7]/60 overflow-hidden flex flex-col shadow-sm">
+                        <div class="bg-[#0037b0] text-white px-4 py-3 flex items-center justify-between">
+                            <h3 class="font-bold text-sm flex items-center gap-1.5"><span class="material-symbols-outlined text-[19px]">event_note</span> Riwayat Cuti</h3>
                             <span class="bg-white/20 text-[11px] px-2 py-0.5 rounded-full font-bold">{{ count($leaves[$year] ?? []) }} Data</span>
                         </div>
 
@@ -104,10 +119,10 @@
 
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('leave-{{ $leave->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        📋 Detail
+                                         <span class="material-symbols-outlined text-[16px]">description</span> Detail
                                     </button>
                                     <a href="{{ route('leaves.download-pdf', $leave->id) }}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        🖨️ Cetak PDF
+                                         <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Cetak PDF
                                     </a>
                                 </div>
 
@@ -116,8 +131,8 @@
 
                             <div id="leave-{{ $leave->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
                                 <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
-                                    <button onclick="closeModal('leave-{{ $leave->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
-                                    <h2 class="text-xl font-black text-[#1E40AF] border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Dokumen Cuti</h2>
+                                     <button onclick="closeModal('leave-{{ $leave->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold" aria-label="Tutup detail"><span class="material-symbols-outlined">close</span></button>
+                                     <h2 class="text-xl font-black text-[#1E40AF] border-b pb-3 mb-4 flex items-center gap-1.5"><span class="material-symbols-outlined">description</span> Rincian Form Dokumen Cuti</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
                                         <div class="bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Kategori Klasifikasi</p>
@@ -152,7 +167,7 @@
                                     <x-approval-notes :submission="$leave" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('leaves.download-pdf', $leave->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
-                                            ⬇ Download Dokumen PDF Resmi
+                                             <span class="material-symbols-outlined text-[17px] align-middle">download</span> Download Dokumen PDF Resmi
                                         </a>
                                         <button onclick="closeModal('leave-{{ $leave->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-xl text-xs font-bold transition">
                                             Tutup
@@ -162,16 +177,16 @@
                             </div>
                             @empty
                             <div class="text-center py-8">
-                                <div class="text-2xl mb-1 text-slate-300">📅</div>
+                                 <span class="material-symbols-outlined text-3xl mb-1 text-slate-300">event_note</span>
                                 <p class="text-[11px] text-gray-400">Belum ada rekaman data cuti</p>
                             </div>
                             @endforelse
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-blue-50 overflow-hidden flex flex-col shadow-xs">
-                        <div class="bg-indigo-600 text-white px-4 py-3 flex items-center justify-between">
-                            <h3 class="font-bold text-sm">📝 Riwayat Izin</h3>
+                    <div class="bg-[#f8f9ff] rounded-2xl border border-[#c4c5d7]/60 overflow-hidden flex flex-col shadow-sm">
+                        <div class="bg-[#1D4ED8] text-white px-4 py-3 flex items-center justify-between">
+                            <h3 class="font-bold text-sm flex items-center gap-1.5"><span class="material-symbols-outlined text-[19px]">assignment</span> Riwayat Izin</h3>
                             <span class="bg-white/20 text-[11px] px-2 py-0.5 rounded-full font-bold">{{ count($permissions[$year] ?? []) }} Data</span>
                         </div>
 
@@ -183,7 +198,7 @@
                                         <div>
                                             <p class="font-bold text-gray-800 text-xs capitalize">{{ $permission->jenis }}</p>
                                             <p class="text-[10px] text-gray-400 font-medium mt-1 bg-white border px-2 py-0.5 rounded-lg inline-block">
-                                                📅 {{ \Carbon\Carbon::parse($permission->tanggal)->translatedFormat('d M Y') }}
+                                                 <span class="material-symbols-outlined text-[13px] align-middle">event</span> {{ \Carbon\Carbon::parse($permission->tanggal)->translatedFormat('d M Y') }}
                                             </p>
                                         </div>
 
@@ -205,10 +220,10 @@
 
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('permission-{{ $permission->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        📋 Detail
+                                         <span class="material-symbols-outlined text-[16px]">description</span> Detail
                                     </button>
                                     <a href="{{ route('permissions.download-pdf', $permission->id) }}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        🖨️ Cetak PDF
+                                         <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Cetak PDF
                                     </a>
                                 </div>
 
@@ -217,8 +232,8 @@
 
                             <div id="permission-{{ $permission->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
                                 <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
-                                    <button onclick="closeModal('permission-{{ $permission->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
-                                    <h2 class="text-xl font-black text-indigo-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Surat Keperluan Izin</h2>
+                                     <button onclick="closeModal('permission-{{ $permission->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold" aria-label="Tutup detail"><span class="material-symbols-outlined">close</span></button>
+                                     <h2 class="text-xl font-black text-indigo-600 border-b pb-3 mb-4 flex items-center gap-1.5"><span class="material-symbols-outlined">description</span> Rincian Form Surat Keperluan Izin</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
                                         <div class="bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Hari / Tanggal Izin</p>
@@ -253,7 +268,7 @@
                                     <x-approval-notes :submission="$permission" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('permissions.download-pdf', $permission->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
-                                            ⬇ Download Dokumen PDF Resmi
+                                             <span class="material-symbols-outlined text-[17px] align-middle">download</span> Download Dokumen PDF Resmi
                                         </a>
                                         <button onclick="closeModal('permission-{{ $permission->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-xl text-xs font-bold transition">
                                             Tutup
@@ -263,16 +278,16 @@
                             </div>
                             @empty
                             <div class="text-center py-10">
-                                <div class="text-2xl mb-1 text-slate-300">📝</div>
+                                 <span class="material-symbols-outlined text-3xl mb-1 text-slate-300">assignment</span>
                                 <p class="text-[11px] text-gray-400">Belum ada rekaman data izin</p>
                             </div>
                             @endforelse
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-blue-50 overflow-hidden flex flex-col shadow-xs">
-                        <div class="bg-cyan-600 text-white px-4 py-3 flex items-center justify-between">
-                            <h3 class="font-bold text-sm">⏰ Riwayat Lembur</h3>
+                    <div class="bg-[#f8f9ff] rounded-2xl border border-[#c4c5d7]/60 overflow-hidden flex flex-col shadow-sm">
+                        <div class="bg-[#006948] text-white px-4 py-3 flex items-center justify-between">
+                            <h3 class="font-bold text-sm flex items-center gap-1.5"><span class="material-symbols-outlined text-[19px]">more_time</span> Riwayat Lembur</h3>
                             <span class="bg-white/20 text-[11px] px-2 py-0.5 rounded-full font-bold">{{ count($overtimes[$year] ?? []) }} Data</span>
                         </div>
 
@@ -308,10 +323,10 @@
 
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="openModal('overtime-{{ $overtime->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        📋 Detail
+                                         <span class="material-symbols-outlined text-[16px]">description</span> Detail
                                     </button>
                                     <a href="{{ route('overtimes.download-pdf', $overtime->id) }}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1">
-                                        🖨️ Cetak PDF
+                                         <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Cetak PDF
                                     </a>
                                 </div>
 
@@ -320,8 +335,8 @@
 
                             <div id="overtime-{{ $overtime->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
                                 <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl modal-animate border mx-auto my-8">
-                                    <button onclick="closeModal('overtime-{{ $overtime->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold">✕</button>
-                                    <h2 class="text-xl font-black text-cyan-600 border-b pb-3 mb-4 flex items-center gap-1.5">📂 Rincian Form Perintah Kerja Lembur</h2>
+                                     <button onclick="closeModal('overtime-{{ $overtime->id }}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg transition font-bold" aria-label="Tutup detail"><span class="material-symbols-outlined">close</span></button>
+                                     <h2 class="text-xl font-black text-cyan-600 border-b pb-3 mb-4 flex items-center gap-1.5"><span class="material-symbols-outlined">description</span> Rincian Form Perintah Kerja Lembur</h2>
                                     <div class="grid grid-cols-2 gap-4 text-xs leading-relaxed">
                                         <div class="bg-slate-50 p-3 rounded-xl border">
                                             <p class="text-gray-400 font-medium">Hari / Tanggal Lembur</p>
@@ -344,7 +359,7 @@
                                     <x-approval-notes :submission="$overtime" />
                                     <div class="mt-6 pt-3 border-t flex gap-2">
                                         <a href="{{ route('overtimes.download-pdf', $overtime->id) }}" target="_blank" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-center py-3 rounded-xl text-xs font-bold transition shadow-sm">
-                                            ⬇ Download Dokumen PDF Resmi
+                                             <span class="material-symbols-outlined text-[17px] align-middle">download</span> Download Dokumen PDF Resmi
                                         </a>
                                         <button onclick="closeModal('overtime-{{ $overtime->id }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-xl text-xs font-bold transition">
                                             Tutup
@@ -354,7 +369,7 @@
                             </div>
                             @empty
                             <div class="text-center py-10">
-                                <div class="text-2xl mb-1 text-slate-300">⏰</div>
+                                 <span class="material-symbols-outlined text-3xl mb-1 text-slate-300">more_time</span>
                                 <p class="text-[11px] text-gray-400">Belum ada rekaman data lembur</p>
                             </div>
                             @endforelse
@@ -366,8 +381,8 @@
             </div>
             @empty
 
-            <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-12 text-center max-w-md mx-auto mt-12">
-                <div class="text-5xl mb-4">📂</div>
+            <div class="bg-white rounded-2xl shadow-sm border border-[#c4c5d7]/50 p-10 text-center max-w-md mx-auto mt-8">
+                <span class="material-symbols-outlined text-5xl text-[#1D4ED8] mb-4">history</span>
                 <h3 class="text-base font-bold text-gray-800">Riwayat Pengajuan Kosong</h3>
                 <p class="text-xs text-gray-400 mt-1">Anda belum memiliki berkas log transaksional cuti, izin, atau lembur pada sistem.</p>
             </div>
@@ -404,4 +419,4 @@
         }
     </script>
 
-</x-app-layout>
+@endsection

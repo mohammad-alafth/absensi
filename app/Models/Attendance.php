@@ -11,6 +11,8 @@ class Attendance extends Model
 
         'user_id',
 
+        'device_id',
+
         'shift_id',
 
         'tanggal',

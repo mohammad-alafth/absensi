@@ -121,6 +121,10 @@ class PermissionController extends Controller
             auth()->user()->role,
             'permission'
         );
+        $flow = array_merge(
+            $flow,
+            ApprovalFlowService::workflowFields(auth()->user()->role, 'permission')
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -309,7 +313,10 @@ class PermissionController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($wasRejected) {
-            $permission->update(ApprovalFlowService::handle(auth()->user()->role, 'permission'));
+            $permission->update(array_merge(
+                ApprovalFlowService::handle(auth()->user()->role, 'permission'),
+                ApprovalFlowService::workflowFields(auth()->user()->role, 'permission')
+            ));
         }
 
         $permission = $permission->fresh();

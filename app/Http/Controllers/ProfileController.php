@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Support\FaceSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,8 +17,17 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            // Perangkat terikat (device binding). Hanya untuk ditampilkan;
+            // keputusan D1: perangkat tidak pernah memblokir absen.
+            'devices' => $user->devices()
+                ->orderByDesc('last_seen_at')
+                ->get(),
+            'deviceEnabled' => FaceSettings::bool('device.enabled'),
+            'deviceMax' => max(1, FaceSettings::int('device.max_per_user')),
         ]);
     }
 

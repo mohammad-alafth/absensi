@@ -1,28 +1,27 @@
-<nav x-data="{ open: false }"
-    class="bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500
-    text-white relative rounded-b-[35px] shadow-xl overflow-visible z-50">
+@php
+    $roleMenu = app(\App\Services\RoleMenuService::class);
+    $menuUser = auth()->user();
+    $desktopMenu = $roleMenu->menu(\App\Services\RoleMenuService::DESKTOP, $menuUser);
+    $mobileMenu = $roleMenu->menu(\App\Services\RoleMenuService::MOBILE, $menuUser);
+@endphp
 
-    <!-- Glow Background -->
-    <!-- <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-0 left-0 w-32 h-32 bg-cyan-300/10 rounded-full blur-2xl"></div> -->
+<nav x-data="{ open: false }"
+    class="bg-gradient-to-r from-[#0037b0] via-[#1d4ed8] to-[#0284c7]
+    text-white relative rounded-b-[28px] sm:rounded-b-[35px] shadow-xl overflow-visible z-50 border-b border-blue-900/20">
 
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <!-- HEADER -->
-        <div class="flex justify-between items-center py-4">
+        <div class="flex justify-between items-center py-3 sm:py-4">
 
             <!-- LEFT -->
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 sm:gap-4">
 
-                <!-- Avatar -->
+                <!-- Avatar with Clinical Presence Ring -->
                 <div class="relative">
 
                     <div
-                        class="absolute inset-0 rounded-full bg-white/30 blur-md">
-                    </div>
-
-                    <div
-                        class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center select-none">
+                        class="relative w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white/60 shadow-md bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center select-none">
 
                         @php
                             $avatarInitials = collect(explode(' ', trim(Auth::user()->name)))
@@ -32,25 +31,37 @@
                                 ->implode('');
                         @endphp
 
-                        {{-- Inisial dirender lokal (tanpa request ke ui-avatars.com,
-                             yang bisa menggantung di jaringan internal) --}}
-                        <span class="text-white font-bold text-base tracking-wide">
+                        {{-- Inisial dirender lokal (tanpa request ke eksternal) --}}
+                        <span class="text-white font-bold text-sm sm:text-base tracking-wide">
                             {{ $avatarInitials !== '' ? $avatarInitials : 'U' }}
                         </span>
 
                     </div>
 
+                    <!-- Online Presence Pulse -->
+                    <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full"></span>
+
                 </div>
 
-                <!-- Name -->
+                <!-- Staff Info & Hospital Identity -->
                 <div>
 
-                    <p class="text-xs text-white/80 tracking-wide">
-                        Welcome Back 👋
-                    </p>
+                    <div class="flex items-center gap-1.5 flex-wrap">
 
-                    <p class="text-lg font-bold leading-tight">
-                        {{ Auth::user()->name }}
+                        <p class="text-base sm:text-lg font-bold leading-tight tracking-tight">
+                            {{ Auth::user()->name }}
+                        </p>
+
+                        @if(Auth::user()->role)
+                        <span class="bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/20">
+                            {{ Auth::user()->role_label ?? Auth::user()->role }}
+                        </span>
+                        @endif
+
+                    </div>
+
+                    <p class="text-xs text-white/80 tracking-wide font-medium mt-0.5">
+                        RS Mata PBEC • Eye Center
                     </p>
 
                 </div>
@@ -65,11 +76,11 @@
                     <x-slot name="trigger">
 
                         <button
-                            class="flex items-center gap-2 px-4 py-2 rounded-2xl
-                            bg-white/10 backdrop-blur-md border border-white/20
-                            hover:bg-white/20 transition-all duration-300">
+                            class="flex items-center gap-2 px-4 py-2 rounded-xl
+                            bg-white/15 backdrop-blur-md border border-white/25
+                            hover:bg-white/25 transition-all duration-300 shadow-sm active:scale-95">
 
-                            <span class="text-sm font-semibold">
+                            <span class="text-sm font-semibold tracking-wide">
                                 Menu
                             </span>
 
@@ -88,44 +99,29 @@
 
                     <x-slot name="content">
 
-                        <x-dropdown-link :href="route('dashboard')">
-                            Dashboard
-                        </x-dropdown-link>
+                        @foreach($desktopMenu as $node)
+                            @if(!empty($node['children']))
+                                <div class="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">
+                                    {{ $node['label'] }}
+                                </div>
+                                @foreach($node['children'] as $child)
+                                    <x-dropdown-link :href="route($child['route'])">
+                                        {{ $child['label'] }}
+                                    </x-dropdown-link>
+                                @endforeach
+                            @else
+                                <x-dropdown-link :href="route($node['route'])">
+                                    {{ $node['label'] }}
+                                </x-dropdown-link>
+                            @endif
+                        @endforeach
+
+                        <div class="my-1 border-t border-gray-100"></div>
 
                         <x-dropdown-link :href="route('profile.edit')">
                             Profile
                         </x-dropdown-link>
-                        @if(auth()->user()->role === 'hrd')
-                        <x-dropdown-link :href="route('hrd.users.approval')">
-                            Approval Akun
-                        </x-dropdown-link>
-                        @endif
-                        @if(auth()->user()->role === 'admin')
-                        <x-dropdown-link :href="route('admin.approval-flows')">
-                            Alur Approval
-                        </x-dropdown-link>
-                        <x-dropdown-link :href="route('admin.face-settings.index')">
-                            Pengaturan Wajah
-                        </x-dropdown-link>
-                        <x-dropdown-link :href="route('admin.face-settings.audit')">
-                            Log Akses Wajah
-                        </x-dropdown-link>
-                        @endif
-                        {{-- Registrasi wajah dibuka untuk SEMUA role.
 
-                        Sebelumnya dibatasi admin + hrd saja (@if in_array role),
-                        padahal route /face/register memakai middleware auth biasa,
-                        dan halaman registrasi memang self-service: setiap karyawan
-                        daftar wajahnya sendiri. Akibatnya karyawan biasa tidak
-                        punya cara menemukan halaman ini dari menu, dan harus
-                        menghafal URL-nya.
-                    --}}
-                    <x-dropdown-link :href="route('face.register')">
-                        Register Wajah
-                    </x-dropdown-link>
-                    <x-dropdown-link :href="route('face.scan')">
-                        Scan Wajah
-                    </x-dropdown-link>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
 
@@ -150,9 +146,9 @@
 
                 <button
                     @click="open = !open"
-                    class="p-3 rounded-2xl bg-white/10 backdrop-blur-md
-                    border border-white/20 hover:bg-white/20
-                    transition-all duration-300 active:scale-95">
+                    class="p-2.5 rounded-xl bg-white/15 backdrop-blur-md
+                    border border-white/25 hover:bg-white/25
+                    transition-all duration-300 active:scale-95 shadow-sm">
 
                     <svg
                         class="h-6 w-6"
@@ -196,30 +192,40 @@
         class="sm:hidden px-4 pb-5">
 
         <div
-            class="bg-white/10 backdrop-blur-xl border border-white/20
-            rounded-3xl p-3 space-y-2 shadow-2xl">
+            class="bg-[#0b1c30]/95 backdrop-blur-xl border border-white/15
+            rounded-2xl p-3 space-y-2 shadow-2xl">
 
-            <!-- Dashboard -->
-            <a href="{{ route('dashboard') }}"
-                class="flex items-center gap-3 px-4 py-3 rounded-2xl
-                hover:bg-white/10 transition-all duration-300">
+            @foreach($mobileMenu as $node)
+                @if(!empty($node['children']))
+                    <div class="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
+                        {{ $node['label'] }}
+                    </div>
+                    @foreach($node['children'] as $child)
+                        <a href="{{ route($child['route']) }}"
+                            class="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-white/10 transition-all duration-300">
+                            <span class="material-symbols-outlined text-xl" aria-hidden="true">{{ $child['icon'] ?? 'chevron_right' }}</span>
+                            <span class="font-medium text-white">{{ $child['label'] }}</span>
+                        </a>
+                    @endforeach
+                @else
+                    <a href="{{ route($node['route']) }}"
+                        class="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-white/10 transition-all duration-300">
+                        <span class="material-symbols-outlined text-xl" aria-hidden="true">{{ $node['icon'] ?? 'chevron_right' }}</span>
+                        <span class="font-medium text-white">{{ $node['label'] }}</span>
+                    </a>
+                @endif
+            @endforeach
 
-                <span class="text-xl">🏠</span>
+            <div class="my-1 border-t border-white/10"></div>
 
-                <span class="font-medium">
-                    Dashboard
-                </span>
-
-            </a>
-
-            <!-- Profile -->
+            <!-- Profile (account utility, outside feature-menu permissions) -->
             <a href="{{ route('profile.edit') }}"
-                class="flex items-center gap-3 px-4 py-3 rounded-2xl
+                class="flex items-center gap-3 px-4 py-3 rounded-xl
                 hover:bg-white/10 transition-all duration-300">
 
-                <span class="text-xl">👤</span>
+                <span class="material-symbols-outlined text-xl" aria-hidden="true">person</span>
 
-                <span class="font-medium">
+                <span class="font-medium text-white">
                     Profile
                 </span>
 
@@ -231,8 +237,8 @@
 
                 <button
                     onclick="event.preventDefault(); this.closest('form').submit();"
-                    class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl
-                    hover:bg-red-500/20 transition-all duration-300 text-left">
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl
+                    hover:bg-red-500/20 transition-all duration-300 text-left text-white">
 
                     <span class="text-xl">🚪</span>
 

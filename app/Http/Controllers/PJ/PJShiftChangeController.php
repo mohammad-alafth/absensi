@@ -45,7 +45,11 @@ class PJShiftChangeController extends Controller
      */
     public function approve(Request $request, $id)
     {
-        $shiftChangeRequest = ShiftChangeRequest::with(['user', 'requestedShift'])->findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $shiftChangeRequest = ShiftChangeRequest::with(['user', 'requestedShift'])
+            ->whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
         if ($shiftChangeRequest->status !== 'pending') {
             return back()->with('error', 'Pengajuan perubahan shift sudah diproses.');
@@ -80,6 +84,13 @@ class PJShiftChangeController extends Controller
             $requestedShift = Shift::find((int) $requestedValue);
             if (!$requestedShift) {
                 throw new \Exception('Shift tujuan tidak ditemukan.');
+            }
+
+            $allowedRoles = is_array($requestedShift->allowed_roles)
+                ? $requestedShift->allowed_roles
+                : [];
+            if ($allowedRoles !== [] && !in_array($shiftChangeRequest->user->role, $allowedRoles, true)) {
+                throw new \Exception('Shift tujuan tidak diizinkan untuk role pegawai.');
             }
 
             $year = Carbon::parse($targetDate)->year;
@@ -126,7 +137,10 @@ class PJShiftChangeController extends Controller
             'note' => 'required|string|max:500'
         ]);
 
-        $shiftChangeRequest = ShiftChangeRequest::findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $shiftChangeRequest = ShiftChangeRequest::whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
         if ($shiftChangeRequest->status !== 'pending') {
             return back()->with('error', 'Pengajuan perubahan shift sudah diproses.');

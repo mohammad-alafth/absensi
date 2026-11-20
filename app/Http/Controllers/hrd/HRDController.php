@@ -33,6 +33,7 @@ use App\Exports\CalendarMultiExport;
 use App\Support\PermissionRange;
 use App\Support\PdfSignatureBlocks;
 use App\Support\SubmissionStatus;
+use Illuminate\Support\Facades\Validator;
 
 
 class HRDController extends Controller
@@ -530,103 +531,6 @@ class HRDController extends Controller
             ->values();
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | TIMELINE SHIFT
-        |--------------------------------------------------------------------------
-        */
-        $calendarEvents = [];
-
-        /*
-        |--------------------------------------------------------------------------
-        | QUERY ATTENDANCE SEKALI (OPTIMASI)
-        |--------------------------------------------------------------------------
-        | Sebelumnya query Attendance berada DI DALAM loop foreach ($employeeShifts)
-        | sehingga dijalankan ulang untuk SETIAP baris shift (N+1 query).
-        | Dengan ratusan/ribuan shift per bulan, halaman rekap menjadi sangat lambat.
-        | Sekarang data attendance dimuat SEKALI di luar loop.
-        */
-        $attendanceMap = Attendance::whereBetween('tanggal', [
-                $startDate->format('Y-m-d'),
-                $endDate->format('Y-m-d')
-            ])
-            ->get()
-            ->keyBy(fn($a) => $a->user_id . '_' . $a->tanggal);
-
-        foreach ($employeeShifts as $shift) {
-            if (!$shift->user) {
-                continue;
-            }
-            $key = $shift->user_id . '_' .
-                Carbon::parse($shift->shift_date)->format('Y-m-d');
-            $attendance = $attendanceMap->get($key);
-            $role = strtolower($shift->user->role);
-
-            if (str_starts_with($role, 'pj_')) {
-                $role = substr($role, 3);
-            }
-            if ($role === 'nurse_ok') {
-                $role = 'nurse';
-            }
-            $start = Carbon::parse(
-                $shift->shift_date . ' ' . $shift->start_time
-            );
-
-            $end = Carbon::parse(
-                $shift->shift_date . ' ' . $shift->end_time
-            );
-
-            if ($end->lt($start)) {
-                $end->addDay();
-            }
-            $roleColors = [
-                'superadmin'     => '#dc2626', // red-600
-                'admin'          => '#2563eb', // blue-600
-                'nurse'          => '#10b981', // emerald
-                'doctor'         => '#0ea5e9', // sky
-                'pharmacist'     => '#8b5cf6', // violet
-                'security'       => '#ef4444', // red
-                'cs'             => '#06b6d4', // cyan
-                'administrasi'   => '#6366f1', // indigo
-                'finance'        => '#f59e0b', // amber
-                'kasir'          => '#ec4899', // pink
-                'ipsrs'          => '#64748b', // slate
-
-                'lab'            => '#14b8a6', // teal
-                'radiologi'      => '#f97316', // orange
-                'gizi'           => '#84cc16', // lime
-                'rekam_medis'    => '#3b82f6', // blue
-                'it'             => '#1e293b', // slate dark
-                'marketing'      => '#e11d48', // rose
-                'manager'        => '#7c3aed', // purple
-                'direktur'       => '#991b1b', // dark red
-            ];
-            $calendarEvents[] = [
-                'title' => $shift->user->name,
-                'start' => $start->toDateTimeString(),
-                'end'   => $end->toDateTimeString(),
-
-                'backgroundColor' => $roleColors[$role] ?? '#1E40AF',
-                'borderColor'     => $roleColors[$role] ?? '#1E40AF',
-
-                'extendedProps' => [
-                    'role'      => $role,
-                    'shift'     => $shift->shift->name ?? '-',
-                    'date'      => $shift->shift_date,
-                    'user_id' => $shift->user_id,
-                    'shift_in'  => $shift->start_time,
-                    'shift_out' => $shift->end_time,
-
-                    'check_in'  => $attendance?->jam_masuk
-                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
-                        : '-',
-
-                    'check_out' => $attendance?->jam_keluar
-                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
-                        : '-',
-                ]
-            ];
-        }
         return view(
             'hrd.rekap.index',
             compact(
@@ -635,11 +539,184 @@ class HRDController extends Controller
                 'startDate',
                 'endDate',
                 'rankingCepat',
-                'calendarEvents',
                 'roles',
                 'roleLabels'
             )
         );
+    }
+
+    public function calendarEvents(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'start_date' => ['required', 'date_format:Y-m-d'],
+            'end_date' => ['required', 'date_format:Y-m-d'],
+            'role' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter periode kalender tidak valid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $startDate = Carbon::createFromFormat('Y-m-d', $request->string('start_date'))->startOfDay();
+            $endDate = Carbon::createFromFormat('Y-m-d', $request->string('end_date'))->endOfDay();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter periode kalender tidak valid.',
+            ], 422);
+        }
+
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        if ($startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1 > 62) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Rentang kalender maksimal 62 hari.',
+            ], 422);
+        }
+
+        $normalizeRole = static function ($role) {
+            $role = strtolower((string) $role);
+            $role = str_replace('pj_', '', $role);
+
+            return $role === 'nurse_ok' ? 'nurse' : $role;
+        };
+
+        $role = $normalizeRole($request->input('role', 'all'));
+        // Whitelist mengikuti daftar role yang sama dengan filter halaman rekap
+        // (HRDController@index) supaya opsi pada dropdown kalender selalu sah.
+        $availableRoles = User::select('role')
+            ->distinct()
+            ->pluck('role')
+            ->map($normalizeRole)
+            ->unique()
+            ->values();
+
+        if ($role !== 'all' && !$availableRoles->contains($role)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Role kalender tidak valid.',
+            ], 422);
+        }
+
+        $employeeShifts = EmployeeShift::select([
+            'id',
+            'user_id',
+            'shift_id',
+            'shift_date',
+            'start_time',
+            'end_time',
+        ])
+            ->with([
+                'user:id,name,role,work_type',
+                'shift:id,name',
+            ])
+            ->whereHas('user', function ($query) use ($role) {
+                $query->where('work_type', 'shift');
+
+                if ($role !== 'all') {
+                    $query->whereRaw(
+                        "LOWER(REPLACE(REPLACE(role, 'pj_', ''), 'nurse_ok', 'nurse')) = ?",
+                        [$role]
+                    );
+                }
+            })
+            ->whereBetween('shift_date', [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->get();
+
+        $attendanceMap = Attendance::select([
+            'user_id',
+            'tanggal',
+            'jam_masuk',
+            'jam_keluar',
+        ])
+            ->whereBetween('tanggal', [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->get()
+            ->keyBy(fn ($attendance) => $attendance->user_id . '_' . $attendance->tanggal);
+
+        $roleColors = [
+            'superadmin' => '#dc2626',
+            'admin' => '#2563eb',
+            'nurse' => '#10b981',
+            'doctor' => '#0ea5e9',
+            'pharmacist' => '#8b5cf6',
+            'security' => '#ef4444',
+            'cs' => '#06b6d4',
+            'administrasi' => '#6366f1',
+            'finance' => '#f59e0b',
+            'kasir' => '#ec4899',
+            'ipsrs' => '#64748b',
+            'lab' => '#14b8a6',
+            'radiologi' => '#f97316',
+            'gizi' => '#84cc16',
+            'rekam_medis' => '#3b82f6',
+            'it' => '#1e293b',
+            'marketing' => '#e11d48',
+            'manager' => '#7c3aed',
+            'direktur' => '#991b1b',
+        ];
+
+        $events = [];
+
+        foreach ($employeeShifts as $shift) {
+            if (!$shift->user) {
+                continue;
+            }
+
+            $normalizedRole = $normalizeRole($shift->user->role);
+            $start = Carbon::parse($shift->shift_date . ' ' . $shift->start_time);
+            $end = Carbon::parse($shift->shift_date . ' ' . $shift->end_time);
+
+            if ($end->lt($start)) {
+                $end->addDay();
+            }
+
+            $attendance = $attendanceMap->get(
+                $shift->user_id . '_' . Carbon::parse($shift->shift_date)->format('Y-m-d')
+            );
+            $color = $roleColors[$normalizedRole] ?? '#1E40AF';
+
+            $events[] = [
+                'id' => $shift->id,
+                'title' => $shift->user->name,
+                'start' => $start->toDateTimeString(),
+                'end' => $end->toDateTimeString(),
+                'backgroundColor' => $color,
+                'borderColor' => $color,
+                'extendedProps' => [
+                    'role' => $normalizedRole,
+                    'shift' => $shift->shift->name ?? '-',
+                    'date' => $shift->shift_date,
+                    'user_id' => $shift->user_id,
+                    'shift_in' => $shift->start_time,
+                    'shift_out' => $shift->end_time,
+                    'check_in' => $attendance?->jam_masuk
+                        ? Carbon::parse($attendance->jam_masuk)->format('H:i')
+                        : '-',
+                    'check_out' => $attendance?->jam_keluar
+                        ? Carbon::parse($attendance->jam_keluar)->format('H:i')
+                        : '-',
+                ],
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'events' => $events,
+        ]);
     }
 
     public function calendarEmployee($userId)

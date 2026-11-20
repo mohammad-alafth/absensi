@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\FaceController;
 use App\Http\Controllers\LeaveController;
 
@@ -27,7 +28,7 @@ Route::post('/login', [
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'permission'])->group(function () {
 
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -58,7 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware([
     'auth:sanctum',
-    'role:admin'
+    'role:admin',
+    'permission'
 ])->group(function () {
 
     Route::get('/admin', function () {
@@ -86,7 +88,7 @@ Route::middleware([
 */
 
 Route::prefix('device')
-    ->middleware(['web', 'auth', 'throttle:10,1'])
+    ->middleware(['auth:sanctum', 'permission', 'throttle:10,1'])
     ->group(function () {
 
         Route::post('/face/register', [
@@ -99,12 +101,38 @@ Route::prefix('device')
             'matchFace'
         ]);
 
-        // Catatan: endpoint sidik jari BELUM diimplementasikan (perangkat
-        // fingerprint tidak dipakai). Akses ditolak dengan jelas, bukan error 500.
-        Route::any('/fingerprint/{action?}', function () {
-            return response()->json([
-                'success' => false,
-                'message' => 'Endpoint fingerprint belum diimplementasikan pada sistem ini.'
-            ], 501);
-        });
+        // Perangkat pengguna (device binding).
+        // Keputusan D1: hanya MENCATAT perangkat, tidak pernah menolak absen.
+        // Dipanggil halaman Profil dan (fase berikutnya) alur absen.
+        Route::post('/bind', [
+            DeviceController::class,
+            'bind'
+        ]);
+
     });
+
+
+/*
+|--------------------------------------------------------------------------
+| Telegram Bot Webhook API
+|--------------------------------------------------------------------------
+*/
+Route::post('/telegram/webhook', [
+    \App\Http\Controllers\TelegramWebhookController::class,
+    'handle'
+]);
+
+Route::get('/announcement/active', function () {
+    $announcement = \App\Models\SystemAnnouncement::current();
+    if (!$announcement) {
+        return response()->json(['active' => false]);
+    }
+    return response()->json([
+        'active' => true,
+        'id' => $announcement->id,
+        'title' => $announcement->title ?? 'Pemberitahuan Sistem',
+        'message' => $announcement->message,
+        'level' => $announcement->level,
+        'time' => $announcement->created_at->diffForHumans(),
+    ]);
+});

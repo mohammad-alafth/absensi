@@ -9,7 +9,10 @@ use App\Models\User;
 use App\Support\FaceSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /*
 |--------------------------------------------------------------------------
@@ -1106,7 +1109,9 @@ class OvertimePunchService
         array $evidence,
         array $data
     ): OvertimePunch {
-        return OvertimePunch::create([
+        $device = $this->deviceMetadata($user, $data['device_uuid'] ?? null);
+
+        $attributes = [
             'overtime_id' => $overtime->id,
             'user_id' => $user->id,
             'type' => $type,
@@ -1122,7 +1127,61 @@ class OvertimePunchService
             'user_agent' => isset($data['user_agent'])
                 ? substr((string) $data['user_agent'], 0, 255)
                 : null,
-        ]);
+        ];
+
+        if ($device['column_available']) {
+            $attributes['device_id'] = $device['device_id'];
+        }
+
+        $punch = OvertimePunch::create($attributes);
+        $punch->setAttribute('device_unverified', $device['unverified']);
+
+        if ($device['unverified'] && $device['uuid_present']) {
+            $punch->setAttribute(
+                'device_warning',
+                'Perangkat belum terverifikasi; absen lembur tetap tercatat untuk peninjauan.'
+            );
+        }
+
+        return $punch;
+    }
+
+    /**
+     * Device hanya metadata audit. Semua kegagalan evaluasi fail-open agar
+     * punch lembur tetap tercatat sesuai keputusan D1.
+     *
+     * @return array{device_id: ?int, unverified: bool, column_available: bool, uuid_present: bool}
+     */
+    private function deviceMetadata(User $user, ?string $uuid): array
+    {
+        $result = [
+            'device_id' => null,
+            'unverified' => false,
+            'column_available' => false,
+            'uuid_present' => filled($uuid),
+        ];
+
+        try {
+            $result['column_available'] = Schema::hasColumn('overtime_punches', 'device_id');
+            $service = app(DeviceBindingService::class);
+
+            if (!$service->isEnabled()) {
+                return $result;
+            }
+
+            $evaluation = $service->evaluate($user, $uuid);
+            $result['device_id'] = $evaluation['device_id'] ?? null;
+            $result['unverified'] = !($evaluation['known'] ?? false)
+                || !($evaluation['verified'] ?? false);
+        } catch (Throwable $exception) {
+            Log::warning('Device evaluation failed during overtime punch', [
+                'user_id' => $user->id,
+                'exception' => $exception::class,
+            ]);
+            $result['unverified'] = true;
+        }
+
+        return $result;
     }
 
     /*
@@ -1230,8 +1289,5 @@ class OvertimePunchService
         ];
     }
 }
-
-
-
 
 

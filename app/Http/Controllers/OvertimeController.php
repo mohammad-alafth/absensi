@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use App\Services\ApprovalFlowService;
 use App\Services\OvertimePunchService;
+use App\Http\Controllers\PJ\PJDashboardController;
 
 use App\Support\SubmissionStatus;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -34,6 +35,8 @@ class OvertimeController extends Controller
     }
 
     /** Role yang boleh mengoreksi absen lembur saat karyawan lupa absen. */
+    // `pj` is retained for the legacy correction contract. New unit-scoped
+    // PJ roles use the `pj_*` branch below and are constrained by division.
     private const CORRECTOR_ROLES = ['pj', 'hrd', 'director', 'admin'];
 
 
@@ -158,7 +161,10 @@ class OvertimeController extends Controller
         |--------------------------------------------------------------------------
         */
         $userRole = $user->role;
-        $flow = ApprovalFlowService::handle($userRole);
+        $flow = array_merge(
+            ApprovalFlowService::handle($userRole, 'overtime'),
+            ApprovalFlowService::workflowFields($userRole, 'overtime')
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -403,7 +409,10 @@ class OvertimeController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($wasRejected) {
-            $overtime->update(ApprovalFlowService::handle(auth()->user()->role));
+            $overtime->update(array_merge(
+                ApprovalFlowService::handle(auth()->user()->role, 'overtime'),
+                ApprovalFlowService::workflowFields(auth()->user()->role, 'overtime')
+            ));
         }
 
         $overtime = $overtime->fresh();
@@ -467,6 +476,7 @@ class OvertimeController extends Controller
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
+                'device_uuid' => $request->header('X-Device-Id'),
             ]
         );
 
@@ -474,6 +484,8 @@ class OvertimeController extends Controller
             'success' => true,
             'message' => 'Absen mulai lembur tercatat pukul '
                 . $punch->punched_at->format('H:i:s') . '.',
+            'device_unverified' => (bool) $punch->getAttribute('device_unverified'),
+            'warning' => $punch->getAttribute('device_warning'),
             'state' => $this->punches->state($user),
         ]);
     }
@@ -488,13 +500,14 @@ class OvertimeController extends Controller
 
         $overtime = $this->punches->findOwned($user, (int) $id);
 
-        $this->punches->finish(
+        $punch = $this->punches->finish(
             $user,
             $overtime,
             $this->validatePunchEvidence($request) + [
                 'user_id' => $user->id,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
+                'device_uuid' => $request->header('X-Device-Id'),
             ]
         );
 
@@ -509,6 +522,8 @@ class OvertimeController extends Controller
                 . '. Volume lembur ' . $overtime->total_hours . ' jam ('
                 . $overtime->actual_duration_label . ').',
             'total_hours' => (int) $overtime->total_hours,
+            'device_unverified' => (bool) $punch->getAttribute('device_unverified'),
+            'warning' => $punch->getAttribute('device_warning'),
             'state' => $this->punches->state($user),
         ]);
     }
@@ -521,13 +536,19 @@ class OvertimeController extends Controller
     {
         $user = auth()->user();
 
+        $isPj = str_starts_with((string) $user->role, 'pj_');
         abort_unless(
-            in_array($user->role, self::CORRECTOR_ROLES),
+            $isPj || in_array($user->role, self::CORRECTOR_ROLES, true),
             403,
             'Hanya PJ/HRD yang dapat mengoreksi absen lembur.'
         );
 
-        $overtime = Overtime::findOrFail($id);
+        $query = Overtime::query();
+        if ($isPj) {
+            $divisionRoles = PJDashboardController::getDivisionRolesForUser($user->role);
+            $query->whereHas('user', fn ($q) => $q->whereIn('role', $divisionRoles));
+        }
+        $overtime = $query->findOrFail($id);
 
         $data = $request->validate([
             'actual_start_at' => 'required|date',
@@ -585,6 +606,7 @@ class OvertimeController extends Controller
             'user_id' => $request->user()->id,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
+            'device_uuid' => $request->header('X-Device-Id'),
         ];
     }
 

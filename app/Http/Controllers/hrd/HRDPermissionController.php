@@ -22,9 +22,17 @@ class HRDPermissionController extends Controller
         }
 
         $permissions = Permission::with('user')
-            ->whereIn('status', ApprovalFlowService::statusesForStage($stage))
+            ->where(function ($query) {
+                $query->where('status', 'like', 'waiting_%')
+                    ->orWhere('status', 'pending');
+            })
             ->latest()
-            ->get();
+            ->get()
+            ->filter(function (Permission $permission) {
+                $resolved = ApprovalFlowService::stageForSubmission($permission, auth()->user()->role, 'permission');
+                return $resolved !== null
+                    && in_array($permission->status, ApprovalFlowService::statusesForStage($resolved), true);
+            });
 
         $stageLabel = ApprovalFlowService::labelForStage($stage);
 
@@ -45,7 +53,7 @@ class HRDPermissionController extends Controller
 
         $permission = Permission::with('user')->findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($permission, auth()->user()->role, 'permission');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menyetujui pengajuan ini.');
@@ -61,7 +69,7 @@ class HRDPermissionController extends Controller
     | FLOW BERJENJANG (rantai mengikuti grup role pengaju)
     |--------------------------------------------------------------------------
     */
-        $chain = ApprovalFlowService::chainFor($permission->user->role ?? null);
+        $chain = ApprovalFlowService::chainForSubmission($permission, $permission->user->role ?? null, 'permission');
 
         $permission->update(array_merge(
             ['status' => ApprovalFlowService::nextStatus($chain, $stage)],
@@ -88,7 +96,7 @@ class HRDPermissionController extends Controller
 
         $permission = Permission::findOrFail($id);
 
-        $stage = ApprovalFlowService::stageForApproverRole(auth()->user()->role);
+        $stage = ApprovalFlowService::stageForSubmission($permission, auth()->user()->role, 'permission');
 
         if (!$stage) {
             return back()->with('error', 'Role Anda tidak berwenang menolak pengajuan ini.');

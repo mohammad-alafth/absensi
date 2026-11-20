@@ -31,9 +31,13 @@ class PJLeaveController extends Controller
             'signature' => 'required|string'
         ]);
 
-        $leave = Leave::with('user')->findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $leave = Leave::with('user')
+            ->whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($leave->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($leave, $leave->user->role, 'leave') || $leave->pj_status !== 'pending') {
             return back()->with('error', 'Cuti sudah diproses PJ');
         }
 
@@ -43,7 +47,7 @@ class PJLeaveController extends Controller
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
             // Tahap PJ selesai -> masuk stage approver pertama sesuai grup role
-            'status' => ApprovalFlowService::statusAfterPj($leave->user->role),
+            'status' => ApprovalFlowService::statusAfterPjSubmission($leave, $leave->user->role, 'leave'),
         ]);
 
         $this->regenerateLeavePdf($leave);
@@ -57,9 +61,12 @@ class PJLeaveController extends Controller
             'note' => 'required|string|min:2|max:500'
         ]);
 
-        $leave = Leave::findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $leave = Leave::whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($leave->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($leave, $leave->user->role, 'leave') || $leave->pj_status !== 'pending') {
             return back()->with('error', 'Cuti sudah diproses PJ');
         }
 

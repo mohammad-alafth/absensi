@@ -44,6 +44,54 @@
             href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap">
     </noscript>
 
+    {{-- One global source for the Stitch typography system. --}}
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+        media="print"
+        onload="this.media='all'">
+    <noscript>
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+    </noscript>
+
+    {{-- Material Symbols is used by the dashboard and shared mobile navigation. --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap"
+        media="print"
+        onload="this.media='all'">
+    <noscript>
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap">
+    </noscript>
+    <style>
+        .font-app-body {
+            font-family: "Inter", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        .font-app-heading {
+            font-family: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        .app-tabular {
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum" 1, "cv05" 1;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+            line-height: 1;
+            white-space: nowrap;
+        }
+    </style>
+
     <!--
     |--------------------------------------------------------------------------
     | HELPER: TUNGGU LIBRARY EKSTERNAL TANPA MEMBLOKIR HALAMAN
@@ -160,7 +208,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="font-sans antialiased bg-white overflow-x-hidden">
+<body class="font-app-body antialiased bg-white overflow-x-hidden">
 
     <!-- LOADING SCREEN -->
     <div
@@ -221,7 +269,7 @@
         @endisset
 
         <!-- Content -->
-        <main class="mt-6 z-10 pb-0 bg-white min-h-screen">
+        <main class="mt-6 z-10 pb-24 md:pb-0 bg-white min-h-screen">
             {{ $slot }}
         </main>
 
@@ -277,42 +325,66 @@
             const IDLE_MS = IDLE_MINUTES * 60 * 1000;
             const WARNING_MS = WARNING_SECONDS * 1000;
 
-            let logoutTimer = null;
-            let warningTimer = null;
+            let lastActivityAt = performance.now();
+            let warningDeadline = lastActivityAt + IDLE_MS - WARNING_MS;
+            let logoutDeadline = lastActivityAt + IDLE_MS;
+            let phaseTimer = null;
             let countdownInterval = null;
             let isLoggingOut = false;
             let warningOpen = false;
-            let suppressResult = false;
+            let dialogGeneration = 0;
+            let activeDialog = null;
 
-            function clearTimers() {
-                if (logoutTimer) clearTimeout(logoutTimer);
-                if (warningTimer) clearTimeout(warningTimer);
-                logoutTimer = null;
-                warningTimer = null;
+            function clearPhaseTimer() {
+                if (phaseTimer !== null) clearTimeout(phaseTimer);
+                phaseTimer = null;
             }
 
-            // Jadwalkan peringatan + waktu logout otomatis
-            function armTimers() {
-                clearTimers();
-                clearInterval(countdownInterval);
-
-                // Peringatan muncul 30 detik sebelum waktu logout
-                warningTimer = setTimeout(showWarning, IDLE_MS - WARNING_MS);
-                logoutTimer = setTimeout(forceLogout, IDLE_MS);
+            function clearCountdown() {
+                if (countdownInterval !== null) clearInterval(countdownInterval);
+                countdownInterval = null;
+                if (activeDialog) activeDialog.countdownTimer = null;
             }
 
-            // Dipanggil setiap kali ada aktivitas user -> reset hitung mundur
-            function resetActivity() {
+            function clearDialogCountdown(dialog) {
+                if (!dialog || dialog.countdownTimer === null) return;
+                clearInterval(dialog.countdownTimer);
+                if (countdownInterval === dialog.countdownTimer) countdownInterval = null;
+                dialog.countdownTimer = null;
+            }
+
+            function isPopupEvent(event) {
+                if (!event || typeof Swal === 'undefined' || typeof Swal.getPopup !== 'function') return false;
+                const popup = Swal.getPopup();
+                return Boolean(popup && event.target && popup.contains(event.target));
+            }
+
+            function schedulePhaseTimer() {
+                if (isLoggingOut || phaseTimer !== null) return;
+
+                const now = performance.now();
+                const deadline = warningOpen ? logoutDeadline : warningDeadline;
+                phaseTimer = setTimeout(checkDeadline, Math.max(0, deadline - now));
+            }
+
+            function resetActivity(event) {
                 if (isLoggingOut) return;
+                if (isPopupEvent(event)) return;
+
+                lastActivityAt = performance.now();
+                warningDeadline = lastActivityAt + IDLE_MS - WARNING_MS;
+                logoutDeadline = lastActivityAt + IDLE_MS;
 
                 // Jika peringatan sedang terbuka lalu user kembali aktif, tutup
                 if (warningOpen && typeof Swal !== 'undefined') {
-                    suppressResult = true;
+                    if (activeDialog) activeDialog.suppressed = true;
                     warningOpen = false;
                     Swal.close();
                 }
 
-                armTimers();
+                // Timer lama boleh tetap menunggu; callback-nya akan memeriksa
+                // deadline terbaru sebelum melakukan tindakan apa pun.
+                schedulePhaseTimer();
             }
 
             function showWarning() {
@@ -323,15 +395,22 @@
                     return;
                 }
 
+                const dialog = {
+                    id: ++dialogGeneration,
+                    suppressed: false,
+                    countdownTimer: null,
+                };
                 let remaining = WARNING_SECONDS;
                 warningOpen = true;
-                clearInterval(countdownInterval);
+                clearCountdown();
+                activeDialog = dialog;
 
-                countdownInterval = setInterval(function () {
+                dialog.countdownTimer = setInterval(function () {
                     remaining--;
                     const el = document.getElementById('session-countdown');
                     if (el) el.textContent = Math.max(remaining, 0);
                 }, 1000);
+                countdownInterval = dialog.countdownTimer;
 
                 Swal.fire({
                     icon: 'warning',
@@ -348,13 +427,16 @@
                     timer: WARNING_MS,
                     timerProgressBar: true,
                     willClose: function () {
-                        clearInterval(countdownInterval);
+                        clearDialogCountdown(dialog);
                     }
                 }).then(function (result) {
-                    if (suppressResult) {
-                        suppressResult = false;
+                    clearDialogCountdown(dialog);
+                    if (!activeDialog || activeDialog.id !== dialog.id) {
                         return;
                     }
+
+                    activeDialog = null;
+                    if (dialog.suppressed) return;
 
                     warningOpen = false;
 
@@ -368,13 +450,35 @@
                 });
             }
 
+            function checkDeadline() {
+                phaseTimer = null;
+                if (isLoggingOut) return;
+
+                const now = performance.now();
+
+                if (now < warningDeadline) {
+                    schedulePhaseTimer();
+                    return;
+                }
+
+                if (now < logoutDeadline) {
+                    if (!warningOpen) showWarning();
+                    // Fallback logout tetap memakai deadline absolut, bukan
+                    // timer internal SweetAlert.
+                    schedulePhaseTimer();
+                    return;
+                }
+
+                forceLogout();
+            }
+
             // Logout sungguhan: hapus session web + revoke token Sanctum
             function forceLogout() {
                 if (isLoggingOut) return;
                 isLoggingOut = true;
 
-                clearTimers();
-                clearInterval(countdownInterval);
+                clearPhaseTimer();
+                clearCountdown();
 
                 // Hapus token API (Sanctum) dari localStorage browser
                 try {
@@ -422,8 +526,8 @@
                 if (!document.hidden) resetActivity();
             });
 
-            // Mulai hitung mundur begitu halaman selesai dimuat
-            armTimers();
+            // Mulai pemeriksaan fase berdasarkan deadline absolut.
+            schedulePhaseTimer();
         })();
     </script>
 
@@ -530,6 +634,9 @@
             }
         })();
     </script>
+
+    <!-- System Announcement Modal / Banner -->
+    <x-system-announcement />
 
     <!-- Mobile Bottom Navbar -->
     <x-mobile-bottom-nav />

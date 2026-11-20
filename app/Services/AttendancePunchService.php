@@ -10,6 +10,8 @@ use App\Support\FaceSettings;
 use App\Support\PermissionRange;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 /**
  * Satu-satunya tempat logika punch absensi (check-in / check-out).
@@ -57,6 +59,10 @@ class AttendancePunchService
         $shiftDate = $schedule['shift_date'];
         $graceMinutes = $schedule['grace_minutes'] ?? ScheduleService::DEFAULT_GRACE_MINUTES;
         $lateLimit = $shiftStart->copy()->addMinutes($graceMinutes);
+
+        // Device hanya menjadi metadata audit. Kegagalan evaluasi tidak boleh
+        // menghentikan punch, termasuk saat migrasi device belum aktif.
+        $context = $this->withDeviceMetadata($user, $context);
 
         // Absensi memakai tanggal mulai shift (bukan hari kalender) supaya
         // shift lintas tengah malam menemukan baris yang sama.
@@ -138,6 +144,7 @@ class AttendancePunchService
 
         $attendance = Attendance::create([
             'user_id' => $user->id,
+            ...$this->deviceColumnData($context),
             'tanggal' => $shiftDate,
             'jam_masuk' => $now,
             'latitude' => $context['latitude'] ?? null,
@@ -157,6 +164,7 @@ class AttendancePunchService
             'status' => $status,
             'late_minutes' => $lateMinutes,
             'attendance_id' => $attendance->id,
+            ...$this->deviceWarning($context),
         ]);
     }
 
@@ -203,6 +211,7 @@ class AttendancePunchService
         $attendance->update([
             'jam_keluar' => $now,
             'overtime_minutes' => $overtimeMinutes,
+            ...$this->deviceColumnData($context),
         ]);
 
         return $this->ok(
@@ -213,8 +222,67 @@ class AttendancePunchService
                 'type' => 'checkout',
                 'overtime_minutes' => $overtimeMinutes,
                 'attendance_id' => $attendance->id,
+                ...$this->deviceWarning($context),
             ]
         );
+    }
+
+    /**
+     * Evaluasi device bersifat fail-open. UUID dari browser adalah metadata,
+     * bukan faktor autentikasi dan tidak boleh menjadi gerbang absensi.
+     *
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function withDeviceMetadata(User $user, array $context): array
+    {
+        $context['device_id'] = null;
+        $context['device_unverified'] = false;
+        $context['device_uuid_present'] = filled($context['device_uuid'] ?? null);
+
+        try {
+            $service = app(DeviceBindingService::class);
+
+            if (!$service->isEnabled()) {
+                return $context;
+            }
+
+            $evaluation = $service->evaluate($user, $context['device_uuid'] ?? null);
+            $context['device_id'] = $evaluation['device_id'] ?? null;
+            $context['device_unverified'] = !($evaluation['known'] ?? false)
+                || !($evaluation['verified'] ?? false);
+        } catch (Throwable $exception) {
+            // Pencatatan device tidak boleh membuat absensi gagal.
+            Log::warning('Device evaluation failed during attendance punch', [
+                'user_id' => $user->id,
+                'exception' => $exception::class,
+            ]);
+            $context['device_unverified'] = true;
+        }
+
+        return $context;
+    }
+
+    /** @param array<string, mixed> $context */
+    private function deviceColumnData(array $context): array
+    {
+        if (!Schema::hasColumn('attendances', 'device_id')) {
+            return [];
+        }
+
+        return ['device_id' => $context['device_id'] ?? null];
+    }
+
+    /** @param array<string, mixed> $context */
+    private function deviceWarning(array $context): array
+    {
+        return ($context['device_unverified'] ?? false)
+            && ($context['device_uuid_present'] ?? false)
+            ? [
+                'device_unverified' => true,
+                'warning' => 'Perangkat belum terverifikasi; absensi tetap tercatat untuk peninjauan.',
+            ]
+            : [];
     }
 
     /**

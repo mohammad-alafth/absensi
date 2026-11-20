@@ -318,6 +318,23 @@
                     <li>Telegram: <span class="font-bold">{{ $settings['telegram.bot_token'] === '' || $settings['telegram.chat_id'] === '' ? 'belum dikonfigurasi' : 'terkonfigurasi' }}</span></li>
                     <li>Role bebas: {{ $exemptRoles === [] ? '(tidak ada)' : implode(', ', $exemptRoles) }}</li>
                 </ul>
+
+                <div class="mt-6 pt-6 border-t border-slate-100">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Webhook Telegram (/alert Command)</h3>
+                    <p class="text-xs text-slate-600 mb-3 leading-relaxed">
+                        Daftarkan URL publik sistem ini ke Telegram agar perintah <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-sky-700">/alert notif all [pesan]</code> dari bot langsung tayang di dashboard seluruh karyawan.
+                    </p>
+                    <form method="POST" action="{{ route('admin.face-settings.telegram-webhook-set') }}" class="flex flex-col sm:flex-row gap-2">
+                        @csrf
+                        <input type="url" name="webhook_url" value="{{ url('/telegram/webhook') }}" placeholder="https://domain-anda.com/telegram/webhook" class="flex-1 rounded-xl border-slate-200 text-xs px-3 py-2 bg-slate-50 focus:bg-white" required>
+                        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition shrink-0">
+                            Setel Webhook
+                        </button>
+                    </form>
+                    <div class="mt-2 text-[11px] text-slate-400">
+                        *Catatan: Telegram mensyaratkan HTTPS publik (misalnya via domain production atau tunneling seperti Ngrok / Cloudflare Tunnel saat pengujian lokal).
+                    </div>
+                </div>
             </div>
         </div>
     </div>

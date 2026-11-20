@@ -1,8 +1,12 @@
-@php
-$pjRole = 'pj_' . auth()->user()->role;
-$pjUsers = \App\Models\User::where('role', $pjRole)->get();
+@extends('layouts.submission')
 
-/*
+@section('content')
+
+    @php
+    $pjRole = 'pj_' . auth()->user()->role;
+    $pjUsers = \App\Models\User::where('role', $pjRole)->get();
+
+    /*
 |--------------------------------------------------------------------------
 | MODE "SAMPAI SELESAI" (LEMBUR HARI LIBUR)
 |--------------------------------------------------------------------------
@@ -10,164 +14,178 @@ $pjUsers = \App\Models\User::where('role', $pjRole)->get();
 | Mode ini hanya tersedia saat hari ini benar-benar tanpa jadwal kerja reguler,
 | karena pengiriman pengajuan langsung mencatat absen mulai (GPS + selfie).
 */
-$openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null];
-@endphp
-
-<x-app-layout>
+    $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null];
+    @endphp
 
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8f9ff;
-        }
-
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9ff; }
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
+            from { opacity: 0; transform: scale(0.95); }
+            to   { opacity: 1; transform: scale(1); }
         }
-
-        .modal-animate {
-            animation: fadeIn 0.2s ease-out forwards;
-        }
+        .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
+        .c3-page { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     </style>
 
-    <div class="min-h-screen bg-[#f8f9ff] py-4 px-3 pb-24">
-
-        <div class="max-w-4xl mx-auto">
-
-            <div class="flex items-center justify-between mb-4">
-                <a href="{{ route('dashboard') }}" class="text-[#1E40AF] font-semibold text-xs hover:underline">
-                    ← Kembali
+    <div class="c3-page min-h-screen bg-[#f8f9ff] py-3 px-3 sm:px-5 pb-24">
+        <div class="w-full max-w-lg mx-auto space-y-4">
+            <div class="flex items-center justify-between gap-2 px-1">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 text-[#1D4ED8] font-semibold text-xs hover:underline">
+                    <span class="material-symbols-outlined text-[16px]">arrow_back</span> Kembali ke Dashboard
                 </a>
-                <a href="{{ route('lembur.history') }}" class="bg-gradient-to-r from-[#1E40AF] to-blue-500 text-white px-4 py-2 rounded-xl shadow text-xs font-semibold transition">
-                    Riwayat Pengajuan Lembur
-                </a>
+                <a href="{{ route('lembur.history') }}" class="text-[#1D4ED8] font-semibold text-xs hover:underline">Riwayat Pengajuan Lembur</a>
             </div>
 
             <x-flash-message />
 
-            <form id="overtimeForm" action="{{ route('lembur.store') }}" method="POST" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {{-- ── Form SPL ── --}}
+            <form id="overtimeForm" action="{{ route('lembur.store') }}" method="POST"
+                  class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 @csrf
 
-                <div class="border-b bg-gray-50/50 px-5 py-4 flex items-center justify-between">
+                {{-- Form header --}}
+                <div class="border-b border-slate-200 px-4 py-4 bg-white flex items-start gap-3">
+                    <span class="material-symbols-outlined text-[#1D4ED8] text-[24px] mt-0.5" aria-hidden="true">more_time</span>
                     <div>
-                        <h1 class="text-base font-bold text-gray-800 tracking-wide">Surat Perintah Lembur (SPL)</h1>
-                        <p class="text-[11px] text-gray-400">RS Mata Pekanbaru Eye Center</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] text-gray-400 font-medium">Unit Departemen</p>
-                        <p class="text-xs font-bold text-[#1E40AF] capitalize">{{ auth()->user()->role_label }}</p>
+                        <h1 class="text-base font-extrabold text-slate-800 tracking-tight">Pengajuan Lembur</h1>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Surat Perintah Lembur (SPL) dan pencatatan waktu kerja</p>
                     </div>
                 </div>
 
-                <div class="p-5 md:p-6 space-y-5">
+                <div class="p-4 sm:p-5 space-y-4">
 
-                    <div>
-                        <h3 class="text-xs font-bold text-gray-800 mb-2.5">Informasi Acuan Lembur</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    {{-- ── Identitas pemohon dan informasi acuan ── --}}
+                    <section class="rounded-xl border border-[#c4c5d7]/50 bg-white p-3.5 shadow-sm">
+                        <h3 class="text-xs font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[#1D4ED8] text-[19px]">badge</span>
+                            Identitas Pemohon
+                        </h3>
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            <div class="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                                <span class="block text-[10px] text-slate-400">Nama Pegawai</span>
+                                <strong class="block text-xs text-slate-700 truncate">{{ auth()->user()->name }}</strong>
+                            </div>
+                            <div class="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                                <span class="block text-[10px] text-slate-400">Unit / Role</span>
+                                <strong class="block text-xs text-slate-700 truncate">{{ auth()->user()->role_label }}</strong>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-100 pt-3">
+                        <h3 class="text-xs font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[#1D4ED8] text-[19px]">event</span>
+                            Informasi Acuan Lembur
+                        </h3>
+                        <div class="grid grid-cols-1 gap-3 items-start">
 
                             <div>
-                                <label class="block text-[11px] font-medium text-gray-500 mb-1">Tanggal SPL</label>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Tanggal SPL</label>
                                 <input type="date" name="overtime_date"
                                        value="{{ old('overtime_date', $openEnded['available'] ? $openEnded['date'] : '') }}"
-                                       class="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500">
+                                       class="w-full min-h-12 border border-slate-300 rounded-xl px-3 py-2 text-xs outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-[#1D4ED8] bg-white transition">
                                 @if($openEnded['available'])
                                 <p class="text-[10px] text-amber-600 mt-1 leading-tight">Mode "sampai selesai" hanya berlaku untuk lembur hari ini.</p>
                                 @endif
                             </div>
 
                             <div class="md:col-span-2">
-                                <label class="block text-[11px] font-medium text-gray-500 mb-1">Klasifikasi Hari</label>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Klasifikasi Hari</label>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 hover:border-blue-500 cursor-pointer transition bg-white text-xs h-[38px]">
+                                    <label class="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2.5 hover:border-[#1D4ED8] cursor-pointer transition bg-white text-xs h-[40px]">
                                         <input type="radio" name="day_type" value="hari_kerja" @checked(old('day_type') === 'hari_kerja') class="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-                                        <span class="font-medium text-gray-700">Hari Kerja Aktif</span>
+                                        <span class="font-semibold text-slate-700">Hari Kerja</span>
                                     </label>
-                                    <label class="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 hover:border-blue-500 cursor-pointer transition bg-white text-xs h-[38px]">
+                                    <label class="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2.5 hover:border-[#1D4ED8] cursor-pointer transition bg-white text-xs h-[40px]">
                                         <input type="radio" name="day_type" value="hari_libur" @checked(old('day_type') === 'hari_libur') class="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-                                        <span class="font-medium text-gray-700">Hari Libur / Off</span>
+                                        <span class="font-semibold text-slate-700">Hari Libur</span>
                                     </label>
                                 </div>
                             </div>
 
                         </div>
-                    </div>
+                        </div>
+                    </section>
 
                     <input type="hidden" name="department" value="{{ auth()->user()->role_label }}">
 
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 mb-1.5">Uraian Komitmen Tugas Lembur</label>
-                        <textarea name="reason" rows="3" placeholder="Tuliskan rincian uraian pekerjaan lembur..." class="w-full border border-gray-300 rounded-xl p-3 text-xs resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:outline-none">{{ old('reason') }}</textarea>
+                    {{-- ── Uraian Tugas ── --}}
+                    <div class="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">Uraian Komitmen Tugas Lembur</label>
+                        <textarea name="reason" rows="3"
+                                  placeholder="Tuliskan rincian uraian pekerjaan lembur..."
+                                  class="w-full border border-slate-300 rounded-xl p-3 text-xs resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-[#1D4ED8] focus:outline-none transition">{{ old('reason') }}</textarea>
                     </div>
 
-                    <div>
-                        <h3 class="text-xs font-bold text-gray-800 mb-2">Alokasi Waktu Jam Karyawan</h3>
+                    {{-- ── Alokasi Waktu ── --}}
+                    <div class="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                        <h3 class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[#1D4ED8] text-[19px]">schedule</span>
+                            Alokasi Waktu Jam Karyawan
+                        </h3>
 
-                        {{-- Pilihan mode pengisian: rencana jam selesai, atau "sampai selesai"
-                             (khusus hari tanpa jadwal kerja; absen mulai tercatat saat kirim). --}}
                         @if($openEnded['available'])
-                        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 space-y-2">
+                        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 space-y-2">
                             <p class="text-[11px] font-medium text-amber-800 leading-relaxed">🕒 {{ $openEnded['reason'] }}</p>
-
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                <label class="flex items-start gap-2 border border-emerald-200 rounded-xl px-3 py-2 bg-white cursor-pointer text-[11px] transition">
+                                <label class="flex items-start gap-2 border border-emerald-200 rounded-xl px-3 py-2.5 bg-white cursor-pointer text-[11px] transition hover:border-emerald-400">
                                     <input type="radio" name="pengisian_mode" value="sampai_selesai" checked
                                            onchange="setPengisianMode('sampai_selesai')"
                                            class="mt-0.5 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5">
                                     <span>
-                                        <span class="block font-bold text-gray-800">Sampai selesai (absen awal tercatat saat kirim)</span>
-                                        <span class="block text-gray-500 mt-0.5">Tanpa Jam Berakhir. Absen mulai (GPS + selfie) tercatat saat pengajuan dikirim, jam selesai diambil dari absen pulang.</span>
+                                        <span class="block font-bold text-slate-800">Sampai selesai (absen awal tercatat saat kirim)</span>
+                                        <span class="block text-slate-500 mt-0.5">Tanpa Jam Berakhir. Absen mulai (GPS + selfie) tercatat saat pengajuan dikirim, jam selesai diambil dari absen pulang.</span>
                                     </span>
                                 </label>
-
-                                <label class="flex items-start gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white cursor-pointer text-[11px] transition">
+                                <label class="flex items-start gap-2 border border-slate-200 rounded-xl px-3 py-2.5 bg-white cursor-pointer text-[11px] transition hover:border-blue-300">
                                     <input type="radio" name="pengisian_mode" value="rencana"
                                            onchange="setPengisianMode('rencana')"
                                            class="mt-0.5 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
                                     <span>
-                                        <span class="block font-bold text-gray-800">Rencanakan jam selesai</span>
-                                        <span class="block text-gray-500 mt-0.5">Isi Jam Mulai & Jam Berakhir seperti biasa, misalnya lembur yang memang berakhir pada jam tertentu.</span>
+                                        <span class="block font-bold text-slate-800">Rencanakan jam selesai</span>
+                                        <span class="block text-slate-500 mt-0.5">Isi Jam Mulai &amp; Jam Berakhir seperti biasa, misalnya lembur yang memang berakhir pada jam tertentu.</span>
                                     </span>
                                 </label>
                             </div>
                         </div>
                         @else
-                        <p class="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-500 leading-relaxed">
+                        <p class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500 leading-relaxed">
                             ℹ️ {{ $openEnded['reason'] }}
                         </p>
                         @endif
 
-                        <div class="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-2xs">
-                            <table class="w-full text-xs">
-                                <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
+                        <div class="overflow-visible border-0 rounded-xl bg-transparent shadow-none md:overflow-x-auto md:border md:border-slate-200 md:bg-white md:shadow-sm">
+                            <table class="block w-full text-xs md:table">
+                                <thead class="hidden bg-slate-50 text-slate-600 border-b border-slate-200 md:table-header-group">
                                     <tr>
-                                        <th class="px-3 py-2.5 text-center font-bold w-12">No</th>
-                                        <th class="px-3 py-2.5 text-left font-bold">Nama & NIK</th>
+                                        <!-- <th class="px-3 py-2.5 text-center font-bold w-12">No</th> -->
+                                        <th class="px-3 py-2.5 text-left font-bold">Nama &amp; NIK</th>
                                         <th class="px-3 py-2.5 text-left font-bold">Jabatan / Role</th>
                                         <th class="px-3 py-2.5 text-center font-bold w-32">Jam Mulai</th>
                                         <th class="px-3 py-2.5 text-center font-bold w-32">Jam Berakhir</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-100 text-gray-700">
-                                    <tr>
-                                        <td class="px-3 py-3 text-center font-medium">1</td>
-                                        <td class="px-3 py-3 font-semibold text-gray-900">
-                                            {{ auth()->user()->name }}
-                                            <span class="block text-[10px] font-normal text-gray-400 mt-0.5">NIK: {{ auth()->user()->nik ?? '-' }}</span>
+                                <tbody class="block space-y-3 text-slate-700 md:table-row-group md:space-y-0 md:divide-y md:divide-slate-100">
+                                    <tr class="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:table-row md:rounded-none md:border-0 md:p-0 md:shadow-none">
+                                        <td class="col-span-2 block min-w-0 p-0 text-left font-medium md:table-cell md:px-3 md:py-3 md:text-center">
+                                            <!-- <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 md:hidden">No. 1</span>
+                                            <span class="hidden md:inline">1</span> -->
                                         </td>
-                                        <td class="px-3 py-3 text-gray-500 font-medium">{{ auth()->user()->role_label }}</td>
-                                        <td class="px-3 py-3">
-                                            <input type="text" id="start_time" name="start_time" value="{{ old('start_time') }}" placeholder="--:--" class="timepicker w-full text-center border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:outline-none">
+                                        <td class="col-span-2 block min-w-0 p-0 font-semibold text-slate-900 md:table-cell md:px-3 md:py-3">
+                                            <span class="block break-words text-sm font-bold leading-5 md:break-normal md:text-xs md:font-semibold md:leading-4">{{ auth()->user()->name }}</span>
+                                            <span class="mt-0.5 block break-words text-[10px] font-normal text-slate-400 md:break-normal">NIK: {{ auth()->user()->nik ?? '-' }}</span>
                                         </td>
-                                        <td class="px-3 py-3">
-                                            <input type="text" id="end_time" name="end_time" value="{{ $openEnded['available'] ? '' : old('end_time') }}" placeholder="--:--" class="timepicker w-full text-center border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:outline-none">
+                                        <td class="col-span-2 block min-w-0 p-0 text-slate-500 font-medium md:table-cell md:px-3 md:py-3">
+                                            <span class="mb-0.5 block text-[9px] font-bold uppercase tracking-wide text-slate-400 md:hidden">Jabatan / Role</span>
+                                            <span class="block break-words text-[11px] font-medium leading-4 md:break-normal md:text-xs md:leading-4">{{ auth()->user()->role_label }}</span>
+                                        </td>
+                                        <td class="block min-w-0 p-0 md:table-cell md:px-3 md:py-3">
+                                            <label for="start_time" class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 md:hidden">Jam Mulai</label>
+                                            <input type="text" id="start_time" name="start_time" value="{{ old('start_time') }}" placeholder="--:--"
+                                                   class="timepicker w-full min-h-12 text-center border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-[#1D4ED8] focus:outline-none transition">
+                                        </td>
+                                        <td class="block min-w-0 p-0 md:table-cell md:px-3 md:py-3">
+                                            <label for="end_time" class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 md:hidden">Jam Berakhir</label>
+                                            <input type="text" id="end_time" name="end_time" value="{{ $openEnded['available'] ? '' : old('end_time') }}" placeholder="--:--"
+                                                   class="timepicker w-full min-h-12 text-center border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-[#1D4ED8] focus:outline-none transition">
                                             <span id="end_time_locked" class="hidden mt-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-center text-[10px] font-bold text-emerald-700">
                                                 sampai selesai
                                             </span>
@@ -178,16 +196,16 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                         </div>
                     </div>
 
-                    <div class="bg-blue-50/80 border border-blue-100 rounded-xl px-4 py-2 flex items-center justify-between h-[38px]">
+                    {{-- Estimasi durasi --}}
+                    <div class="bg-blue-50/80 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm">
                         <div class="flex items-center gap-2 text-[11px]">
                             <span>⏱️</span>
-                            <span class="text-blue-600 font-bold">Estimasi Durasi Lembur:</span>
+                            <span class="text-[#1D4ED8] font-bold">Estimasi Durasi Lembur:</span>
                         </div>
                         <span id="durasi_output" class="font-black text-slate-800 text-xs">0 Jam 0 Menit</span>
                     </div>
 
-                    {{-- Bukti absen mulai: wajib pada mode "sampai selesai" karena
-                         pengiriman pengajuan sekaligus mencatat absen mulai. --}}
+                    {{-- Bukti absen mulai: wajib pada mode "sampai selesai" --}}
                     <x-overtime-capture />
 
                     <p id="openEndedNote" class="hidden text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 leading-relaxed">
@@ -196,28 +214,30 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                         melakukan koreksi.
                     </p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                    {{-- ── Area Tanda Tangan ── --}}
+                    <div class="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4">
 
-                        <div class="flex flex-col items-center justify-center border-r border-dashed border-gray-100 last:border-0">
-                            <p class="text-[11px] font-medium text-gray-500 mb-1.5">Hormat Saya (Pemohon)</p>
+                        <div class="flex flex-col items-center justify-center border-r border-dashed border-slate-200 last:border-0 py-2">
+                            <p class="text-[11px] font-semibold text-slate-500 mb-2">Hormat Saya (Pemohon)</p>
                             <div onclick="openSignatureModal()" class="cursor-pointer group">
-                                <img id="signature-preview" src="" class="hidden mx-auto border rounded-xl bg-white shadow-2xs" width="160">
-                                <div id="signature-placeholder" class="w-[160px] h-[75px] border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-[11px] text-gray-400 bg-gray-50/50 group-hover:bg-gray-50 group-hover:border-blue-400 transition">
+                                <img id="signature-preview" src="" class="hidden mx-auto border rounded-xl bg-white shadow-sm" width="160">
+                                <div id="signature-placeholder"
+                                     class="w-[160px] h-[75px] border border-dashed border-slate-300 rounded-xl flex items-center justify-center text-[11px] text-slate-400 bg-slate-50/50 group-hover:bg-slate-50 group-hover:border-[#1D4ED8] transition">
                                     Goreskan TTD
                                 </div>
                             </div>
                             <input type="hidden" name="employee_signature" id="employee_signature">
-                            <p class="mt-1.5 font-bold text-gray-800 text-xs">{{ auth()->user()->name }}</p>
+                            <p class="mt-1.5 font-bold text-slate-800 text-xs">{{ auth()->user()->name }}</p>
                         </div>
 
-                        <div class="flex flex-col items-center justify-center">
-                            <p class="text-[11px] font-medium text-gray-500 mb-1.5">Disetujui Oleh (Verifikator)</p>
-                            <div class="w-[160px] h-[75px] border border-gray-200 rounded-xl bg-gray-50/50 flex items-center justify-center text-[10px] font-medium text-gray-400 italic">
-                                Waiting Flow Approval
+                        <div class="flex flex-col items-center justify-center py-2">
+                            <p class="text-[11px] font-semibold text-slate-500 mb-2">Disetujui Oleh (Verifikator)</p>
+                            <div class="w-[160px] h-[75px] border border-slate-200 rounded-xl bg-slate-50/50 flex items-center justify-center text-[10px] font-medium text-slate-400 italic">
+                                Mengikuti alur persetujuan aplikasi
                             </div>
                             <div class="mt-1.5 text-center">
                                 @foreach($pjUsers as $pj)
-                                <p class="font-bold text-gray-700 text-xs inline-block mx-0.5">[{{ $pj->name }}]</p>
+                                <p class="font-bold text-slate-700 text-xs inline-block mx-0.5">[{{ $pj->name }}]</p>
                                 @endforeach
                             </div>
                         </div>
@@ -226,8 +246,10 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
 
                 </div>
 
-                <div class="bg-gray-50/50 border-t px-5 py-3.5">
-                    <button type="button" id="overtimeSubmit" onclick="submitOvertime()" class="w-full bg-[#1E40AF] hover:bg-blue-800 text-white py-3 rounded-xl text-xs font-bold shadow-xs transition tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
+                {{-- Submit footer --}}
+                <div class="bg-slate-50/50 border-t border-slate-200 px-5 py-3.5">
+                    <button type="button" id="overtimeSubmit" onclick="submitOvertime()"
+                            class="w-full bg-[#1D4ED8] hover:bg-[#1E40AF] active:scale-95 text-white py-3 rounded-xl text-xs font-bold shadow-md transition tracking-wide disabled:opacity-60 disabled:cursor-not-allowed">
                         Kirim Formulir Pengajuan Lembur Resmi
                     </button>
                 </div>
@@ -242,6 +264,7 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
         </div>
     </div>
 
+    {{-- Signature Modal --}}
     <div id="signatureModal" class="hidden fixed inset-0 bg-black/50 z-50 overflow-y-auto p-4 backdrop-blur-xs">
         <div class="bg-white rounded-3xl w-full max-w-sm max-h-[90vh] overflow-y-auto p-5 shadow-2xl modal-animate border border-gray-100 mx-auto my-8">
             <div class="flex justify-between items-center mb-3">
@@ -252,7 +275,7 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
                     <h3 class="font-bold text-sm text-gray-800">Tanda Tangan Pemohon</h3>
                 </div>
                 <button type="button" onclick="closeSignatureModal()" class="text-xl text-gray-400 hover:text-gray-700">
-                    ×
+                    &times;
                 </button>
             </div>
             <div class="border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-white shadow-inner">
@@ -276,7 +299,6 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
-
 
     <script>
         /*
@@ -550,4 +572,4 @@ $openEnded = $openEnded ?? ['available' => false, 'reason' => '', 'date' => null
         }
     </script>
 
-</x-app-layout>
+@endsection

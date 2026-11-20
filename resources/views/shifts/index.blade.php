@@ -85,40 +85,133 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <div x-data="shiftPage()" class="min-h-screen p-3 sm:p-5 pb-24">
-        <div class="w-full max-w-[98%] mx-auto space-y-4">
+    <div x-data="shiftPage()" class="min-h-screen bg-[#f8f9ff] px-3 py-4 sm:px-6 sm:py-6 pb-24 text-slate-900">
+        <div class="mx-auto w-full max-w-7xl space-y-4 sm:space-y-5">
 
-            <!-- Header Navigasi & Tombol Aksi Utama -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200">
-                <div class="flex items-center gap-3">
-                    <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 text-[#1E40AF] font-bold text-xs hover:underline transition">← Kembali</a>
-                    <h1 class="text-lg font-extrabold text-slate-800 tracking-tight">📅 Kelola Jadwal Shift Divisi</h1>
+            <!-- App bar: visual redesign only; existing route and action remain unchanged. -->
+            <header class="flex flex-col gap-4 rounded-2xl border border-[#c4c5d7]/70 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div class="flex min-w-0 items-center gap-3">
+                    <a href="{{ route('dashboard') }}" aria-label="Kembali ke dashboard" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eff4ff] text-[#0037b0] transition hover:bg-[#dce9ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0037b0]">←</a>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0037b0]">Manajemen roster PJ unit</p>
+                        <h1 class="truncate font-['Plus_Jakarta_Sans'] text-xl font-bold tracking-tight text-[#0b1c30] sm:text-2xl">Plotting Jadwal Shift</h1>
+                        <p class="mt-0.5 flex items-center gap-1.5 text-xs text-[#565e74]"><span class="h-2 w-2 rounded-full bg-emerald-500"></span> Data unit dan shift mengikuti akses akun aktif</p>
+                    </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    <button @click="openWeeklyModal()" class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md hover:opacity-95 transition flex items-center gap-2">
-                        <span class="text-sm">🗓️</span> Penjadwalan Mingguan (Beda-Beda Shift / Hari)
-                    </button>
+                <button @click="openWeeklyModal()" type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1d4ed8] px-4 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#0037b0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0037b0]">
+                    <span aria-hidden="true">🗓️</span>
+                    Penjadwalan Mingguan
+                </button>
+            </header>
 
-                    <!-- <button @click="showBulkModal = true" class="bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
-                        <span>⚡</span> Same-Shift Multi-Days
-                    </button> -->
+            <!-- Context card uses only values supplied by ShiftController@index. -->
+            <section class="rounded-2xl border border-[#c4c5d7]/70 bg-white p-4 shadow-sm sm:p-5">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#0037b0]">
+                            <span aria-hidden="true">▦</span>
+                            <span>Unit kerja dalam kewenangan Anda</span>
+                        </div>
+                        <h2 class="mt-1 font-['Plus_Jakarta_Sans'] text-lg font-bold text-[#0b1c30]">Roster Shift Unit</h2>
+                        <p class="mt-1 text-sm text-[#565e74]">Periode kalender aktif: {{ \Carbon\Carbon::parse($date)->format('d M Y') }}</p>
+                    </div>
+                    <span class="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-700">Kelola jadwal</span>
                 </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-2 border-t border-[#c4c5d7]/60 pt-4 sm:grid-cols-4">
+                    <div class="rounded-xl bg-[#eff4ff] p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">Pegawai</p>
+                        <p class="mt-1 text-2xl font-bold text-[#0037b0]">{{ $employees->count() }}</p>
+                        <p class="text-[11px] text-[#565e74]">dalam cakupan PJ</p>
+                    </div>
+                    <div class="rounded-xl bg-[#eff4ff] p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">Shift tersedia</p>
+                        <p class="mt-1 text-2xl font-bold text-[#0037b0]">{{ $shifts->count() }}</p>
+                        <p class="text-[11px] text-[#565e74]">dari katalog aplikasi</p>
+                    </div>
+                    <div class="rounded-xl bg-[#f0fdf4] p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">Mode</p>
+                        <p class="mt-1 text-lg font-bold text-emerald-700">Aktif</p>
+                        <p class="text-[11px] text-[#565e74]">kalender aplikasi</p>
+                    </div>
+                    <div class="rounded-xl bg-[#fff7ed] p-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">Aksi aktif</p>
+                        <p class="mt-1 text-lg font-bold text-orange-700">7 hari</p>
+                        <p class="text-[11px] text-[#565e74]">melalui modal mingguan</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Existing scheduling instruction, restyled without changing its action. -->
+            <div class="flex items-start gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 shadow-sm">
+                <span class="mt-0.5 text-xl" aria-hidden="true">💡</span>
+                <p class="text-xs font-semibold leading-relaxed text-blue-900">
+                    <span class="font-bold text-indigo-800">Petunjuk Penjadwalan:</span>
+                    Klik tanggal pada kalender untuk membuka penjadwalan mingguan, atau gunakan tombol di atas untuk mengisi shift berbeda selama 7 hari.
+                    <button type="button" @click="openWeeklyModal()" class="font-bold text-indigo-700 underline underline-offset-2">Buka penjadwalan mingguan</button>
+                </p>
             </div>
 
-            <!-- Petunjuk Pengisian -->
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 rounded-3xl flex items-center justify-between gap-3 shadow-2xs">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">💡</span>
-                    <p class="text-xs text-blue-900 font-semibold leading-relaxed">
-                        <span class="font-bold text-indigo-800">Petunjuk Penjadwalan:</span> Klik tanggal mana saja di kalender atau tombol <span class="font-bold text-indigo-700 underline cursor-pointer" @click="openWeeklyModal()">"🗓️ Penjadwalan Mingguan"</span> untuk langsung mengisi shift 7 hari berturut-turut untuk pegawai!
-                    </p>
-                </div>
-            </div>
+            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.36fr)] lg:items-start">
+                <!-- Kalender existing: FullCalendar and its selectors are unchanged. -->
+                <section class="rounded-2xl border border-[#c4c5d7]/70 bg-white p-3 shadow-sm sm:p-5">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-['Plus_Jakarta_Sans'] text-base font-bold text-[#0b1c30] sm:text-lg">Kalender plotting</h2>
+                            <p class="mt-0.5 text-xs text-[#565e74]">Pilih tanggal untuk mengatur jadwal mingguan.</p>
+                        </div>
+                        <span class="hidden rounded-full bg-[#eff4ff] px-3 py-1 text-[10px] font-bold text-[#0037b0] sm:inline-flex">FullCalendar</span>
+                    </div>
+                    <div id="calendar"></div>
+                </section>
 
-            <!-- Kalender Utama -->
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-4">
-                <div id="calendar"></div>
+                <aside class="space-y-4">
+                    <!-- Legend is generated from the actual shift catalog. -->
+                    <section class="rounded-2xl border border-[#c4c5d7]/70 bg-white p-4 shadow-sm">
+                        <div class="mb-3 flex items-center justify-between gap-2">
+                            <h2 class="font-['Plus_Jakarta_Sans'] text-base font-bold text-[#0b1c30]">Shift tersedia</h2>
+                            <span class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">{{ $shifts->count() }} opsi</span>
+                        </div>
+                        <div class="space-y-2">
+                            @forelse($shifts as $shift)
+                                <div class="flex items-center justify-between gap-3 rounded-xl bg-[#eff4ff] px-3 py-2.5">
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <span class="h-3 w-3 shrink-0 rounded-full bg-[#2151da]" aria-hidden="true"></span>
+                                        <span class="truncate text-xs font-bold text-[#0b1c30]">{{ $shift->name }}</span>
+                                    </div>
+                                    <span class="shrink-0 text-[10px] font-semibold text-[#565e74]">
+                                        {{ \Carbon\Carbon::parse($shift->start_time)->format('H:i') }}–{{ \Carbon\Carbon::parse($shift->end_time)->format('H:i') }}
+                                    </span>
+                                </div>
+                            @empty
+                                <p class="rounded-xl bg-slate-50 p-3 text-xs text-[#565e74]">Belum ada shift yang tersedia.</p>
+                            @endforelse
+                        </div>
+                    </section>
+
+                    <!-- Employee list now links only to the approved read-only individual route. -->
+                    <section class="rounded-2xl border border-[#c4c5d7]/70 bg-white p-4 shadow-sm">
+                        <div class="mb-3 flex items-center justify-between gap-2">
+                            <h2 class="font-['Plus_Jakarta_Sans'] text-base font-bold text-[#0b1c30]">Pegawai unit</h2>
+                            <span class="text-[10px] font-bold uppercase tracking-wide text-[#565e74]">{{ $employees->count() }} orang</span>
+                        </div>
+                        <div class="max-h-80 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+                            @forelse($employees as $employee)
+                                <div class="flex items-center gap-3 rounded-xl border border-[#c4c5d7]/60 px-3 py-2.5">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dce1ff] text-xs font-bold text-[#0037b0]">{{ \Illuminate\Support\Str::of($employee->name)->trim()->explode(' ')->take(2)->map(fn ($part) => \Illuminate\Support\Str::substr($part, 0, 1))->implode('') }}</span>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-xs font-bold text-[#0b1c30]">{{ $employee->name }}</p>
+                                        <p class="truncate text-[10px] text-[#565e74]">{{ $employee->role_label }}</p>
+                                    </div>
+                                    <a href="{{ route('shift.employee', ['user' => $employee->id, 'year' => \Carbon\Carbon::parse($date)->year, 'month' => \Carbon\Carbon::parse($date)->month]) }}" class="ml-auto shrink-0 rounded-lg bg-[#eff4ff] px-2.5 py-2 text-[10px] font-bold text-[#0037b0] transition hover:bg-[#dce9ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0037b0]">Buka</a>
+                                </div>
+                            @empty
+                                <p class="rounded-xl bg-slate-50 p-3 text-xs text-[#565e74]">Belum ada pegawai dalam cakupan unit.</p>
+                            @endforelse
+                        </div>
+                    </section>
+                </aside>
             </div>
         </div>
 

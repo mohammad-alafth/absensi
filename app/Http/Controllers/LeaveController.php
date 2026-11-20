@@ -151,7 +151,10 @@ class LeaveController extends Controller
 */
         $userRole = auth()->user()->role;
 
-        $flow = ApprovalFlowService::handle($userRole);
+        $flow = array_merge(
+            ApprovalFlowService::handle($userRole, 'leave'),
+            ApprovalFlowService::workflowFields($userRole, 'leave')
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -424,7 +427,10 @@ class LeaveController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($wasRejected) {
-            $leave->update(ApprovalFlowService::handle($user->role));
+            $leave->update(array_merge(
+                ApprovalFlowService::handle($user->role, 'leave'),
+                ApprovalFlowService::workflowFields($user->role, 'leave')
+            ));
         }
 
         $leave = $leave->fresh();

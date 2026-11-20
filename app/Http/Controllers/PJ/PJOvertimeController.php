@@ -31,9 +31,13 @@ class PJOvertimeController extends Controller
             'signature' => 'required|string'
         ]);
 
-        $overtime = Overtime::with('user')->findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $overtime = Overtime::with('user')
+            ->whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($overtime->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($overtime, $overtime->user->role, 'overtime') || $overtime->pj_status !== 'pending') {
             return back()->with('error', 'Lembur sudah diproses PJ');
         }
 
@@ -43,7 +47,7 @@ class PJOvertimeController extends Controller
             'pj_approved_by' => auth()->id(),
             'pj_approved_at' => now(),
             // Tahap PJ selesai -> masuk stage approver pertama sesuai grup role
-            'status' => ApprovalFlowService::statusAfterPj($overtime->user->role),
+            'status' => ApprovalFlowService::statusAfterPjSubmission($overtime, $overtime->user->role, 'overtime'),
         ]);
 
         $this->regeneratePdf($overtime);
@@ -57,9 +61,12 @@ class PJOvertimeController extends Controller
             'note' => 'required|min:2'
         ]);
 
-        $overtime = Overtime::findOrFail($id);
+        $divisionRoles = PJDashboardController::getDivisionRolesForUser(auth()->user()->role);
+        $overtime = Overtime::whereKey($id)
+            ->whereHas('user', fn ($query) => $query->whereIn('role', $divisionRoles))
+            ->firstOrFail();
 
-        if ($overtime->pj_status !== 'pending') {
+        if (!ApprovalFlowService::needsPjForSubmission($overtime, $overtime->user->role, 'overtime') || $overtime->pj_status !== 'pending') {
             return back()->with('error', 'Lembur sudah diproses PJ');
         }
 

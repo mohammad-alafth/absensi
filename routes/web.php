@@ -27,6 +27,7 @@ use App\Http\Controllers\PJ\PJLeaveController;
 use App\Http\Controllers\PJ\PJPermissionController;
 use App\Http\Controllers\PJ\PJOvertimeController;
 use App\Http\Controllers\PJ\PJShiftChangeController;
+use App\Http\Controllers\PJ\PJShiftController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,6 +43,8 @@ use App\Http\Controllers\HRD\ShiftManagementController;
 use App\Http\Controllers\Admin\ApprovalFlowController;
 use App\Http\Controllers\Admin\FaceAuditController;
 use App\Http\Controllers\Admin\FaceSettingsController;
+use App\Http\Controllers\Admin\AdminControlCenterController;
+use App\Http\Controllers\Admin\PermissionMatrixController;
 use App\Support\FaceSettings;
 use App\Http\Controllers\FaceController;
 use App\Http\Controllers\HRD\FaceReviewController;
@@ -64,7 +67,8 @@ Route::get('/', function () {
 
 Route::middleware([
     'auth',
-    'verified'
+    'verified',
+    'permission'
 ])->group(function () {
 
     /*
@@ -76,7 +80,7 @@ Route::middleware([
     Route::get('/dashboard', [
         DashboardController::class,
         'index'
-    ])->name('dashboard');
+    ])->middleware('permission.pilot:group-a')->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
@@ -101,9 +105,6 @@ Route::get('/face', function () {
 })
         ->middleware('auth')
         ->name('face');
-
-    Route::view('/fingerprint', 'fingerprint')
-        ->name('fingerprint');
 
     Route::view('/register-face', 'register-face')
         ->name('register.face');
@@ -400,7 +401,7 @@ Route::get('/face', function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('hrd')->middleware(['auth', 'verified', 'role:hrd,director'])->group(function () {
+    Route::prefix('hrd')->middleware(['auth', 'verified', 'permission'])->group(function () {
         Route::get('/users/approval', [HRDUserController::class, 'index'])->name('hrd.users.approval');
         Route::post('/users/{id}/approve', [HRDUserController::class, 'approve'])->name('hrd.users.approve');
         Route::post('/users/{id}/reset-password', [HRDUserController::class, 'resetPassword'])->name('hrd.users.reset-password');
@@ -538,6 +539,9 @@ Route::get('/face', function () {
 
     Route::middleware(['auth', 'role:hrd,director'])->group(function () {
 
+        Route::get('/hrd/calendar-events', [HRDController::class, 'calendarEvents'])
+            ->name('hrd.calendar.events');
+
         Route::get(
             '/hrd/calendar/export',
             [HRDController::class, 'exportCalendar']
@@ -563,9 +567,30 @@ Route::get('/face', function () {
     Route::middleware(['auth'])->group(function () {
         // Rute Shift Umum (Bisa diakses user)
         Route::get('/shift', [ShiftController::class, 'index'])->name('shift.index');
-        Route::post('/shift/assign', [ShiftController::class, 'assign'])->name('shift.assign');
-        Route::post('/shift/bulk-assign', [ShiftController::class, 'bulkAssign'])->name('shift.bulk-assign');
-        Route::post('/shift/weekly-assign', [ShiftController::class, 'weeklyAssign'])->name('shift.weekly-assign');
+        Route::get('/shift/employee/{user}/{year}/{month}', [PJShiftController::class, 'show'])
+            ->whereNumber('year')
+            ->whereNumber('month')
+            ->middleware('verified')
+            ->name('shift.employee');
+        Route::get('/shift/employee/{user}/{year}/{month}/data', [PJShiftController::class, 'data'])
+            ->whereNumber('year')
+            ->whereNumber('month')
+            ->middleware('verified')
+            ->name('shift.employee.data');
+        Route::post('/shift/employee/{user}/{year}/{month}/save', [PJShiftController::class, 'save'])
+            ->whereNumber('year')
+            ->whereNumber('month')
+            ->middleware('verified')
+            ->name('shift.employee.save');
+        Route::post('/shift/assign', [ShiftController::class, 'assign'])
+            ->middleware('permission')
+            ->name('shift.assign');
+        Route::post('/shift/bulk-assign', [ShiftController::class, 'bulkAssign'])
+            ->middleware('permission')
+            ->name('shift.bulk-assign');
+        Route::post('/shift/weekly-assign', [ShiftController::class, 'weeklyAssign'])
+            ->middleware('permission')
+            ->name('shift.weekly-assign');
         Route::get('/shift/weekly-schedules',[ShiftController::class, 'weeklySchedules'])->name('shift.weekly-schedules');
         Route::get('/shifts/calendar-events', [ShiftController::class, 'calendarEvents'])->name('shift.calendar');
 
@@ -589,7 +614,7 @@ Route::get('/face', function () {
 | FACE RECOGNITION (registrasi & scan wajah)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'permission'])->group(function () {
     Route::get('/face/register', [FaceController::class, 'showRegisterPage'])->name('face.register');
     Route::post('/face/register', [FaceController::class, 'register'])->name('face.register.store');
     Route::delete('/face/register', [FaceController::class, 'resetFace'])->name('face.register.destroy');
@@ -612,7 +637,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 | Antrean absen yang wajahnya tidak dipastikan (zona abu / layanan mati /
 | belum terdaftar) sehingga perlu ditinjau manusia.
 */
-Route::middleware(['auth', 'verified', 'role:hrd,director'])
+Route::middleware(['auth', 'verified', 'permission', 'role:hrd,director'])
     ->prefix('hrd/face')
     ->name('hrd.face.')
     ->group(function () {
@@ -631,7 +656,7 @@ Route::middleware(['auth', 'verified', 'role:hrd,director'])
 |
 */
 
-Route::middleware(['auth', 'verified', 'role:admin'])
+Route::middleware(['auth', 'verified', 'permission', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -675,7 +700,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
 | Threshold, maks percobaan, role bebas, retensi, dan endpoint layanan
 | disimpan di tabel attendance_settings (bukan kode).
 */
-Route::middleware(['auth', 'verified', 'role:admin'])
+Route::middleware(['auth', 'verified', 'permission', 'role:admin'])
     ->prefix('admin/face-settings')
     ->name('admin.face-settings.')
     ->group(function () {
@@ -690,6 +715,34 @@ Route::middleware(['auth', 'verified', 'role:admin'])
             ->name('service-control');
         Route::get('/audit', [FaceAuditController::class, 'index'])->name('audit');
         Route::post('/telegram-test', [FaceSettingsController::class, 'testTelegram'])->name('telegram-test');
+        Route::post('/telegram-webhook-set', [FaceSettingsController::class, 'setTelegramWebhook'])->name('telegram-webhook-set');
     });
+
+// Telegram Bot Webhook endpoint (CSRF excluded in bootstrap/app.php)
+Route::post('/telegram/webhook', [\App\Http\Controllers\TelegramWebhookController::class, 'handle'])->name('telegram.webhook');
+
+// Local/testing-only Admin Control Center. The default-off flag keeps the
+// frozen production route baseline unchanged until explicitly enabled.
+if (config('admin_control_center.enabled', false)) {
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->get('/admin/control-center', [AdminControlCenterController::class, 'index'])
+        ->name('admin.control-center');
+
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->get('/admin/access-management', [PermissionMatrixController::class, 'index'])
+        ->name('admin.access-management.index');
+
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->get('/admin/access-management/roles/{role}', [PermissionMatrixController::class, 'editor'])
+        ->name('admin.access-management.editor');
+
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->post('/admin/access-management', [PermissionMatrixController::class, 'update'])
+        ->name('admin.access-management.update');
+
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->post('/admin/access-management/roles/{role}/batch', [PermissionMatrixController::class, 'saveBatch'])
+        ->name('admin.access-management.batch');
+}
 
 require __DIR__ . '/auth.php';

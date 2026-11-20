@@ -41,6 +41,7 @@ class AttendanceController extends Controller
             'latitude' => $request->input('latitude'),
             'longitude' => $request->input('longitude'),
             'accuracy' => $request->input('accuracy'),
+            'device_uuid' => $request->header('X-Device-Id'),
         ];
 
         $faceResult = null;

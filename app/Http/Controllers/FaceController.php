@@ -58,12 +58,27 @@ class FaceController extends Controller
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
             'accuracy' => $request->accuracy,
+            'device_uuid' => $request->header('X-Device-Id'),
         ];
 
         $faceResult = $this->verifier()->verify($user, $request->input('image'));
         $required = FacePolicy::isRequired($user);
         $attempt = (int) $request->input('attempt', 1);
         $maxAttempts = max(1, FaceSettings::int('face.max_attempts'));
+
+        // A failed face service is never an identity signal. Keep this
+        // separate from the retry policy so max attempts cannot turn an
+        // unavailable service into an accepted attendance.
+        if ($required && $faceResult->status === FaceResult::UNAVAILABLE) {
+            return response()->json([
+                'success' => false,
+                'face' => $faceResult->toArray(),
+                'message' => 'Layanan pengenalan wajah sedang tidak tersedia. Absen ditolak; silakan coba lagi atau hubungi HRD.',
+                'attempt' => $attempt,
+                'attempt_remaining' => max(0, $maxAttempts - $attempt),
+                'retry' => true,
+            ], 503);
+        }
 
         // 1. Gagal diverifikasi dan tidak ada jalan lain -> tolak.
         if ($required && !$faceResult->allowsAttendance()) {

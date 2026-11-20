@@ -383,6 +383,9 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': token,
+                        'X-Device-Id': (() => {
+                            try { return localStorage.getItem('absensi.device_uuid') || ''; } catch (error) { return ''; }
+                        })(),
                     },
                     body: JSON.stringify(body),
                 });
@@ -400,7 +403,7 @@
                 return;
             }
 
-            notify(data.message, false);
+            notify(data.warning || data.message, false);
 
             if (data.state) {
                 applyState(data.state);
@@ -482,6 +485,4 @@
     </div>
 </div>
 @endif
-
-
 

@@ -24,6 +24,7 @@ class OvertimePunch extends Model
     protected $fillable = [
         'overtime_id',
         'user_id',
+        'device_id',
         'type',
         'punched_at',
         'latitude',
