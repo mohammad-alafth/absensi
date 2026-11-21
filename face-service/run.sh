@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 
 if [ ! -d .venv ]; then
     echo "Membuat virtual environment..."
-    python3 -m venv .venv
+    python3.9 -m venv .venv
     ./.venv/bin/python -m pip install -r requirements.txt
 fi
 
