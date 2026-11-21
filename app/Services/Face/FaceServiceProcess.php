@@ -301,7 +301,14 @@ class FaceServiceProcess
 
     private function isInstalled(): bool
     {
-        return is_file($this->interpreter());
+        // Pada Linux/Plesk, `.venv/bin/python` dapat berupa symlink ke
+        // interpreter Plesk di luar open_basedir. Membaca file itu dengan
+        // is_file() memicu warning meskipun service sudah sehat. Launcher
+        // tetap berada di dalam project dan start.sh sendiri memvalidasi
+        // virtual environment sebelum menjalankan uvicorn.
+        return $this->isWindows()
+            ? is_file($this->interpreter())
+            : is_file($this->script());
     }
 
     private function interpreter(): string
