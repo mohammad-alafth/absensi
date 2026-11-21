@@ -15,25 +15,25 @@
 set -e
 cd "$(dirname "$0")"
 
-PY="${PYTHON:-python3.9}"
+PY="${PYTHON:-python3}"
 
 echo "== 1/4 Mengecek Python =="
 if ! command -v "$PY" >/dev/null 2>&1; then
     echo "ERROR: '$PY' tidak ditemukan." >&2
     echo "  Plesk        : Extensions > Python > Add Python, lalu jalankan" >&2
-    echo "                 PYTHON=python3.9 sh setup.sh" >&2
+    echo "                 PYTHON=python3.x sh setup.sh" >&2
     echo "  Ubuntu/Debian: sudo apt install python3 python3-venv python3-dev build-essential" >&2
     echo "  AlmaLinux/RHEL: sudo dnf install python3 python3-devel gcc gcc-c++ make" >&2
     exit 1
 fi
 
-# onnxruntime 1.18.1 dan numpy 1.26.4 belum punya wheel untuk Python 3.13+.
-# Plesk production memakai Python 3.9.5, jadi 3.9-3.12 diterima.
+# onnxruntime 1.18.1 dan numpy 1.26.4 belum punya wheel untuk Python 3.13+,
+# jadi batasi pada 3.10-3.12 (3.11/3.12 paling aman).
 "$PY" - <<'PY'
 import sys
 v = sys.version_info
-if v < (3, 9) or v >= (3, 13):
-    sys.exit("ERROR: Python %d.%d.%d tidak didukung. Pakai 3.9, 3.10, 3.11 atau 3.12."
+if v < (3, 10) or v >= (3, 13):
+    sys.exit("ERROR: Python %d.%d.%d tidak didukung. Pakai 3.10, 3.11 atau 3.12."
              % v[:3])
 print("    Python %d.%d.%d OK" % v[:3])
 PY

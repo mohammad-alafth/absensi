@@ -12,7 +12,6 @@ Model: InsightFace buffalo_l (ArcFace) versi ONNX, jalan di CPU.
 import base64
 import io
 import os
-from typing import Optional
 
 import numpy as np
 from fastapi import FastAPI, Header, HTTPException
@@ -92,7 +91,7 @@ def face_quality(img: np.ndarray, face) -> float:
         return 0.5
 
 
-def authorize(token: Optional[str]) -> None:
+def authorize(token: str | None) -> None:
     if TOKEN and token != TOKEN:
         raise HTTPException(status_code=401, detail="Token tidak valid.")
 
@@ -107,7 +106,7 @@ def health():
 
 
 @app.post("/embed")
-def embed(payload: dict, authorization: Optional[str] = Header(default=None)):
+def embed(payload: dict, authorization: str | None = Header(default=None)):
     authorize(_bearer(authorization))
 
     image_b64 = payload.get("image")
@@ -135,7 +134,7 @@ def embed(payload: dict, authorization: Optional[str] = Header(default=None)):
 
 
 @app.post("/match")
-def match(payload: dict, authorization: Optional[str] = Header(default=None)):
+def match(payload: dict, authorization: str | None = Header(default=None)):
     authorize(_bearer(authorization))
 
     image_b64 = payload.get("image")
@@ -158,7 +157,7 @@ def match(payload: dict, authorization: Optional[str] = Header(default=None)):
     return {"success": True, "score": round(score, 4), "detected": True}
 
 
-def _bearer(authorization: Optional[str]) -> Optional[str]:
+def _bearer(authorization: str | None) -> str | None:
     if authorization and authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
     return authorization
