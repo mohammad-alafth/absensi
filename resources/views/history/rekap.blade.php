@@ -99,22 +99,22 @@
 
             {{-- PROFIL USER --}}
             <section class="bg-white rounded-2xl shadow-sm border border-[#c4c5d7]/50 p-4 sm:p-5">
-                <div class="flex flex-wrap items-center gap-4">
-                    <div class="w-14 h-14 rounded-2xl bg-[#eff4ff] border border-[#c4c5d7] text-[#0037b0] flex items-center justify-center shadow-sm">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+                    <div class="w-14 h-14 shrink-0 rounded-2xl bg-[#eff4ff] border border-[#c4c5d7] text-[#0037b0] flex items-center justify-center shadow-sm">
                         <span class="material-symbols-outlined text-[30px]">person</span>
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-lg font-extrabold text-[#0b1c30] truncate">{{ $user->name }}</h2>
-                            <span class="bg-[#eff4ff] text-[#0037b0] border border-[#c4c5d7] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{{ $user->role_label }}</span>
+                            <h2 class="min-w-0 break-words text-lg font-extrabold leading-6 text-[#0b1c30]">{{ $user->name }}</h2>
+                            <span class="max-w-full break-words bg-[#eff4ff] text-[#0037b0] border border-[#c4c5d7] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{{ $user->role_label }}</span>
                         </div>
-                        <p class="text-xs text-[#565e74] font-medium mt-1">
+                        <p class="break-words text-xs text-[#565e74] font-medium mt-1 leading-5">
                             ID User {{ $user->id }} <span class="text-[#c4c5d7]">•</span> {{ $workLabels[$user->work_type] ?? $user->work_type ?? '-' }}
                         </p>
                     </div>
-                    <div class="text-left sm:text-right">
+                    <div class="w-full border-t border-[#c4c5d7]/40 pt-3 text-left sm:w-auto sm:border-t-0 sm:pt-0 sm:text-right">
                         <p class="text-[10px] uppercase tracking-widest text-[#565e74] font-bold">Periode Rekap</p>
-                        <p class="text-xl font-extrabold text-[#0b1c30]">{{ $periodLabel }}</p>
+                        <p class="break-words text-xl font-extrabold leading-7 text-[#0b1c30]">{{ $periodLabel }}</p>
                     </div>
                 </div>
 

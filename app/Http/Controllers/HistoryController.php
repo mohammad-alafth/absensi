@@ -17,35 +17,22 @@ class HistoryController extends Controller
     public function index()
     {
         $userId = auth()->id();
+        $today = Carbon::today();
+        $monthStart = $today->copy()->startOfMonth()->toDateString();
+        $monthEnd = $today->copy()->endOfMonth()->toDateString();
+        $currentMonthLabel = $today->translatedFormat('F Y');
 
         /*
         |--------------------------------------------------------------------------
-        | Ambil semua tahun
+        | Hanya bulan berjalan
         |--------------------------------------------------------------------------
         */
 
-        $leaveYears = Leave::where('user_id', $userId)
-            ->selectRaw('YEAR(start_date) as year')
-            ->pluck('year');
-
-        $permissionYears = Permission::where('user_id', $userId)
-            ->selectRaw('YEAR(tanggal) as year')
-            ->pluck('year');
-
-        $overtimeYears = Overtime::where('user_id', $userId)
-            ->selectRaw('YEAR(overtime_date) as year')
-            ->pluck('year');
-
-        $years = $leaveYears
-            ->merge($permissionYears)
-            ->merge($overtimeYears)
-            ->unique()
-            ->sortDesc()
-            ->values();
+        $years = collect([$today->year]);
 
         /*
         |--------------------------------------------------------------------------
-        | LEAVES / PERMISSIONS / OVERTIMES PER TAHUN
+        | LEAVES / PERMISSIONS / OVERTIMES BULAN BERJALAN
         |--------------------------------------------------------------------------
         | Hanya 3 query total (sebelumnya 3 query x jumlah tahun karena
         | whereYear + selectRaw YEAR() yang tidak memakai index).
@@ -54,18 +41,26 @@ class HistoryController extends Controller
         */
 
         $leaves = Leave::where('user_id', $userId)
+            ->whereDate('start_date', '<=', $monthEnd)
+            ->whereDate('end_date', '>=', $monthStart)
             ->latest()
             ->get()
             ->groupBy(fn($item) => (int) Carbon::parse($item->start_date)->year)
             ->all();
 
         $permissions = Permission::where('user_id', $userId)
+            ->whereDate('tanggal', '<=', $monthEnd)
+            ->where(function ($query) use ($monthStart): void {
+                $query->whereDate('tanggal_selesai', '>=', $monthStart)
+                    ->orWhereNull('tanggal_selesai');
+            })
             ->latest()
             ->get()
             ->groupBy(fn($item) => (int) Carbon::parse($item->tanggal)->year)
             ->all();
 
         $overtimes = Overtime::where('user_id', $userId)
+            ->whereBetween('overtime_date', [$monthStart, $monthEnd])
             ->latest()
             ->get()
             ->groupBy(fn($item) => (int) Carbon::parse($item->overtime_date)->year)
@@ -93,7 +88,8 @@ class HistoryController extends Controller
             'years',
             'leaves',
             'permissions',
-            'overtimes'
+            'overtimes',
+            'currentMonthLabel'
         ));
     }
 

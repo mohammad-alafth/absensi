@@ -92,6 +92,11 @@
         // kotak yang bergoyang beberapa piksel tiap frame; tanpa pelembatan,
         // uji "diam" selalu gagal karena drift kecil tapi terus-menerus.
         this.smoothAlpha = 0.45;
+        // Pelembutan khusus untuk elemen visual. Jangan gunakan nilai ini
+        // untuk deteksi/liveness karena koordinat validasi tetap berasal dari
+        // `box` di atas.
+        this.displayAlpha = 0.22;
+        this.displayBox = null;
         this.boxStaleMs = 400;
         this.faceCount = 0;
         this.frameCount = 0;
@@ -252,6 +257,41 @@
         // posisi terkini, bukan dari kotak yang masih membawa posisi sampel lama.
         this.smooth = null;
         this.rawBox = null;
+        this.displayBox = null;
+    };
+
+    /**
+     * Haluskan koordinat yang digambar di preview tanpa menunda koordinat
+     * yang dipakai untuk evaluasi atau pengambilan sampel.
+     */
+    FaceCoach.prototype.smoothDisplayRect = function (rect) {
+        if (!rect) {
+            this.displayBox = null;
+
+            return null;
+        }
+
+        if (!this.displayBox) {
+            this.displayBox = {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+            };
+
+            return this.displayBox;
+        }
+
+        var prev = this.displayBox;
+        var a = this.displayAlpha;
+        this.displayBox = {
+            left: prev.left + (rect.left - prev.left) * a,
+            top: prev.top + (rect.top - prev.top) * a,
+            width: prev.width + (rect.width - prev.width) * a,
+            height: prev.height + (rect.height - prev.height) * a,
+        };
+
+        return this.displayBox;
     };
     /** Hitung metrik satu frame: luminans dan ketajaman. */
     FaceCoach.prototype.measureFrame = function () {
@@ -599,7 +639,11 @@
             stage = 'evaluate';
             var state = this.evaluate(metrics, box, guide);
             stage = 'display';
-            var displayBox = box && !box.multiple ? this.toDisplay(box) : null;
+            // Hanya visual yang dihaluskan. `box`, `insideOval`, dan state
+            // evaluasi tetap memakai hasil deteksi yang sama seperti sebelumnya.
+            var displayBox = this.smoothDisplayRect(
+                box && !box.multiple ? this.toDisplay(box) : null
+            );
             var displayGuide = this.toDisplay(guide);
             var inside = box && !box.multiple ? this.insideOval(box, guide) : false;
             stage = 'update';

@@ -61,8 +61,8 @@
 
                 <div class="border-b border-[#c4c5d7]/40 pb-3 mb-4 flex items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-bold text-[#0b1c30]">Aktivitas Tahun {{ $year }}</h2>
-                        <p class="text-[11px] text-[#565e74] mt-1">Pengajuan terbaru dari seluruh modul kepegawaian.</p>
+                        <h2 class="text-lg font-bold text-[#0b1c30]">Aktivitas Bulan {{ $currentMonthLabel }}</h2>
+                        <p class="text-[11px] text-[#565e74] mt-1">Pengajuan cuti, izin, dan lembur pada bulan berjalan.</p>
                     </div>
                     <span class="material-symbols-outlined text-[#2151da] text-[22px]" aria-hidden="true">calendar_month</span>
                 </div>

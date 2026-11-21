@@ -487,7 +487,7 @@
                 {{-- Preview kamera tampil lebih dulu supaya pengguna bisa
                     mengatur posisi wajah sebelum menekan tombol ambil sampel. --}}
                 <div class="rounded-2xl border border-slate-200 overflow-hidden mb-5">
-                    <div class="relative bg-slate-900" style="aspect-ratio: 16 / 9;">
+                    <div class="relative bg-slate-900" style="aspect-ratio: 4 / 5;">
                         {{-- Video TIDAK memakai x-show. Element yang display:none
                              bisa berhenti men-decode frame di beberapa browser,
                              sehingga capture menghasilkan gambar hitam. --}}

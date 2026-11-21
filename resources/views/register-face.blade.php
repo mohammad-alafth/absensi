@@ -13,23 +13,63 @@
 
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             text-align: center;
-            background: #f4f4f4;
+            background: #f8f9ff;
             margin: 0;
-            padding: 10px;
+            padding: 16px;
         }
 
         .container {
-            max-width: 500px;
+            width: 100%;
+            max-width: 520px;
             margin: auto;
         }
 
-        video {
+        .camera-card {
+            position: relative;
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
+            margin: 0 auto;
+            overflow: hidden;
+            aspect-ratio: 4 / 5;
+            background: #020617;
+            border: 2px solid #1d4ed8;
+            border-radius: 16px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+        }
+
+        video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        .camera-card::after {
+            content: '';
+            position: absolute;
+            inset: 12% 19%;
+            border: 2px solid rgba(147, 197, 253, 0.9);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(29, 78, 216, 0.35);
+            pointer-events: none;
+        }
+
+        .camera-status {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            left: 12px;
+            z-index: 1;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 10px;
-            border: 2px solid #333;
+            background: rgba(15, 23, 42, 0.8);
+            color: #fff;
+            font-size: 12px;
         }
 
         button {
@@ -53,15 +93,20 @@
 
 <body>
 
-    <h2>Register Wajah</h2>
+    <div class="container">
+        <h2>Register Wajah</h2>
 
-    <video id="video" autoplay width="400"></video>
+        <div class="camera-card">
+            <video id="video" autoplay playsinline muted></video>
+            <div class="camera-status">Posisikan seluruh wajah di dalam panduan</div>
+        </div>
 
-    <p id="info">Posisi: Depan</p>
-    <p id="count">Data: 0 / 3</p>
+        <p id="info">Posisi: Depan</p>
+        <p id="count">Data: 0 / 3</p>
 
-    <button onclick="capture()">Ambil Wajah</button>
-    <button onclick="submitData()">Simpan</button>
+        <button onclick="capture()">Ambil Wajah</button>
+        <button onclick="submitData()">Simpan</button>
+    </div>
 
     <script>
         const video = document.getElementById('video');
@@ -143,8 +188,11 @@
         async function startCamera() {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: "user" // 🔥 ini penting untuk HP
-                }
+                    facingMode: "user",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
             });
             video.srcObject = stream;
         }

@@ -29,43 +29,45 @@
     </div>
 </div>
 
-<!-- 2. POPUP MODAL DIALOG (Melompat di Tengah Layar dengan Inline Styles Anti-Gagal) -->
+<!-- 2. POPUP NOTIFIKASI (gaya alert/error, tidak menutupi seluruh halaman) -->
 <div id="system-announcement-modal"
-     style="position: fixed; inset: 0; z-index: 999999; display: {{ $announcement ? 'flex' : 'none' }}; align-items: center; justify-content: center; padding: 16px; background-color: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
+     style="position: fixed; top: 16px; right: 16px; z-index: 999999; display: {{ $announcement ? 'block' : 'none' }}; width: min(420px, calc(100vw - 32px));"
      role="dialog"
-     aria-modal="true">
+     aria-modal="false"
+     aria-live="assertive">
 
-    <div style="position: relative; width: 100%; max-width: 440px; background-color: #ffffff; border-radius: 24px; padding: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); border: 1px solid #fde68a; font-family: system-ui, -apple-system, sans-serif;">
+    <div style="position: relative; width: 100%; background-color: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.35); border: 1px solid #fcd34d; font-family: system-ui, -apple-system, sans-serif;">
         <!-- Header Modal -->
-        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
-            <div style="position: relative; width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 16px; background-color: #f59e0b; color: #ffffff; font-size: 26px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="position: relative; width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; background-color: #f59e0b; color: #ffffff; font-size: 21px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
                 📢
             </div>
-            <div>
+            <div style="min-width: 0; flex: 1;">
                 <span style="display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #d97706;">
                     Pemberitahuan Resmi
                 </span>
-                <h3 id="modal-announcement-title" style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2;">
+                <h3 id="modal-announcement-title" style="margin: 2px 0 0 0; font-size: 16px; font-weight: 800; color: #0f172a; line-height: 1.3; word-break: break-word;">
                     {{ $announcement->title ?? 'Pemberitahuan Sistem' }}
                 </h3>
             </div>
+            <button type="button" onclick="closeAnnouncementModal()" aria-label="Tutup pemberitahuan" style="flex-shrink: 0; border: 0; background: transparent; color: #92400e; font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 4px;">&times;</button>
         </div>
 
         <!-- Isi Pesan -->
-        <div style="margin: 16px 0; border-radius: 16px; border: 1px solid #fde68a; background-color: #fffbeb; padding: 16px;">
-            <p id="modal-announcement-message" style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; line-height: 1.5; word-break: break-word;">
+        <div style="margin: 12px 0 0 52px; border-radius: 12px; border: 1px solid #fde68a; background-color: #fffbeb; padding: 12px;">
+            <p id="modal-announcement-message" style="margin: 0; font-size: 13px; font-weight: 700; color: #1e293b; line-height: 1.5; word-break: break-word;">
                 {!! $announcement ? nl2br(e($announcement->message)) : '' !!}
             </p>
-            <p id="modal-announcement-time" style="margin: 8px 0 0 0; text-align: right; font-size: 11px; font-weight: 600; color: #92400e;">
+            <p id="modal-announcement-time" style="margin: 8px 0 0 0; text-align: right; font-size: 10px; font-weight: 600; color: #92400e;">
                 {{ $announcement ? $announcement->created_at->diffForHumans() : '' }}
             </p>
         </div>
 
         <!-- Tombol Tutup -->
-        <div style="margin-top: 18px;">
+        <div style="margin-top: 12px; margin-left: 52px;">
             <button type="button"
                     onclick="closeAnnouncementModal()"
-                    style="width: 100%; border: none; border-radius: 14px; background-color: #1D4ED8; padding: 14px 20px; font-size: 14px; font-weight: 700; color: #ffffff; cursor: pointer; box-shadow: 0 4px 14px rgba(29, 78, 216, 0.35); transition: background-color 0.2s;">
+                    style="width: 100%; border: none; border-radius: 10px; background-color: #1D4ED8; padding: 9px 14px; font-size: 12px; font-weight: 700; color: #ffffff; cursor: pointer; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25); transition: background-color 0.2s;">
                 Saya Mengerti
             </button>
         </div>
@@ -94,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (timeEl) timeEl.textContent = time || '';
 
         if (modal) {
-            modal.style.display = 'flex';
+            modal.style.display = 'block';
         }
     }
 

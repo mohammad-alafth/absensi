@@ -20,12 +20,12 @@ face-service/
 > InsightFace perlu mengunduh ulang model dari internet. Keduanya memang tidak
 > masuk commit karena `.gitignore`.
 
-## 2. Menjalankan (sudah pernah diuji di mesin ini dengan Python 3.12)
+## 2. Menjalankan (production Plesk menggunakan Python 3.9.5)
 
 ```powershell
 cd c:\laragon\www\absensi\face-service
 
-# sekali saja
+# sekali saja (Linux/Plesk: Python 3.9.5 dibuat dengan setup.sh)
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 
@@ -65,7 +65,7 @@ cd /var/www/vhosts/DOMAIN/HTTPDOCS/face-service
 
 # 2. Sekali saja: buat .venv + pasang dependensi
 sh setup.sh
-#    (atau: PYTHON=python3.12 sh setup.sh bila Python bawaan terlalu lama)
+#    (atau: PYTHON=python3.9 sh setup.sh)
 
 # 3. Nyalakan
 sh start.sh
@@ -76,7 +76,7 @@ curl http://127.0.0.1:8100/health
 > di-checkout dari Windows sering tidak punya `+x`). Kalau tetap ingin memakai
 > `./setup.sh`, jalankan dulu: `chmod +x setup.sh start.sh`.
 
-Prasyarat Python **3.10–3.12** (3.11/3.12 paling aman — `onnxruntime==1.18.1`
+Prasyarat Python **3.9–3.12** (Plesk production menggunakan 3.9.5 — `onnxruntime==1.18.1`
 dan `numpy==1.26.4` belum punya wheel untuk 3.13). Bila `setup.sh` gagal di
 `insightface`, install dulu compiler:
 
@@ -84,7 +84,7 @@ dan `numpy==1.26.4` belum punya wheel untuk 3.13). Bila `setup.sh` gagal di
 | --- | --- |
 | Ubuntu / Debian | `sudo apt install python3 python3-venv python3-dev build-essential` |
 | AlmaLinux / RHEL | `sudo dnf install python3 python3-devel gcc gcc-c++ make` |
-| Plesk | Extensions → **Python** → Add Python, lalu `PYTHON=python3.x ./setup.sh` |
+| Plesk | Extensions → **Python** → Add Python 3.9.5, lalu `PYTHON=python3.9 sh setup.sh` |
 
 Agar **hidup otomatis setelah reboot** dan dijalankan ulang saat crash, pasang
 unit systemd dari `face-service.service.example` (petunjuk ada di komentar

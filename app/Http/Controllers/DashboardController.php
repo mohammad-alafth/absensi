@@ -48,7 +48,7 @@ class DashboardController extends Controller
     */
         $histories = Attendance::where('user_id', $user->id)
             ->latest()
-            ->limit(10)
+            ->limit(5)
             ->get();
 
         /*
