@@ -42,7 +42,9 @@ echo "== 2/4 Membuat virtual environment =="
 if [ -x .venv/bin/python ]; then
     echo "    .venv sudah ada - dilewati."
 else
-    "$PY" -m venv .venv
+    # Salin interpreter agar PHP/Plesk open_basedir tidak mengikuti symlink
+    # Python ke lokasi di luar folder subscription.
+    "$PY" -m venv --copies .venv
     echo "    .venv dibuat."
 fi
 
