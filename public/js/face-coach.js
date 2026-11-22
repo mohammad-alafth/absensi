@@ -119,6 +119,11 @@
         this.poseDy = 0;
         this.running = false;
         this.rafId = null;
+        // Preview tetap mengikuti refresh rate layar, tetapi pekerjaan coach
+        // dibatasi sekitar 20 fps agar mobile tidak tersendat saat pixel
+        // metrics, deteksi wajah, dan liveness berjalan bersamaan.
+        this.tickIntervalMs = options.tickIntervalMs || 50;
+        this.lastTickAt = 0;
         this.detectorPromise = null;
     }
 
@@ -233,7 +238,14 @@
             // diagnostik froze pada frame terakhir -- persis gejala "wajah tidak
             // terdeteksi" yang sangat sulit diagnosa.
             try {
-                self.tick();
+                var now = (global.performance && typeof global.performance.now === 'function')
+                    ? global.performance.now()
+                    : Date.now();
+
+                if (!self.lastTickAt || now - self.lastTickAt >= self.tickIntervalMs) {
+                    self.lastTickAt = now;
+                    self.tick();
+                }
             } catch (e) {
                 self.tickError = String(e && e.message ? e.message : e);
             }
@@ -247,6 +259,7 @@
         this.running = false;
         if (this.rafId) global.cancelAnimationFrame(this.rafId);
         this.rafId = null;
+        this.lastTickAt = 0;
     };
 
     FaceCoach.prototype.reset = function () {
@@ -258,6 +271,7 @@
         this.smooth = null;
         this.rawBox = null;
         this.displayBox = null;
+        this.lastTickAt = 0;
     };
 
     /**

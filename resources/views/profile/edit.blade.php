@@ -487,11 +487,17 @@
                                     }),
                                 });
 
-                                const data = await response.json().catch(function () {
-                                    return {};
-                                });
+                                 const data = await response.json().catch(function () {
+                                     return {};
+                                 });
 
-                                applyResult(data, meta);
+                                 if (!response.ok) {
+                                     setText(titleEl, 'Perangkat tidak dapat dicatat');
+                                     showNote(data.message || ('Server menolak permintaan (HTTP ' + response.status + ').'));
+                                     return;
+                                 }
+
+                                 applyResult(data, meta);
                             } catch (error) {
                                 setText(titleEl, 'Gagal memuat data perangkat');
                                 showNote('Periksa koneksi Anda, lalu muat ulang halaman ini.');
