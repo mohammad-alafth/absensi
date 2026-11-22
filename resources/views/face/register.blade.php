@@ -88,7 +88,7 @@
                                       facingMode: 'user',
                                       width: { ideal: isMobile ? 960 : 1280 },
                                       height: { ideal: 720 },
-                                      frameRate: { ideal: isMobile ? 24 : 30, max: 30 },
+                                      frameRate: { ideal: isMobile ? 30 : 30, max: 30 },
                                   },
                                   audio: false,
                               });
@@ -121,7 +121,7 @@
                               // Pekerjaan landmark + liveness cukup berat pada
                               // CPU HP. Preview tetap mengikuti kamera, tetapi
                               // coach memakai interval dan input lebih ringan.
-                              tickIntervalMs: isMobile ? 80 : 50,
+                              tickIntervalMs: isMobile ? 60 : 50,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada
                               // di dalam oval. Beban CPU dikurangi melalui
@@ -527,8 +527,9 @@
                         </div>
 
                         {{-- Guide: digambar memakai pemetaan yang sama dengan kotak wajah --}}
-                        <div x-show="ready && guideBox" x-cloak
-                            class="pointer-events-none absolute"
+                         <div x-show="ready && guideBox" x-cloak
+                             class="pointer-events-none absolute"
+                             style="transition: left 120ms linear, top 120ms linear, width 120ms linear, height 120ms linear;"
                             :style="`left:${guideBox.left}%; top:${guideBox.top}%; width:${guideBox.width}%; height:${guideBox.height}%;`">
                             <div class="w-full h-full border-4 border-dashed border-white/60"
                                  style="border-radius: 50%; box-sizing: border-box;"></div>
@@ -549,8 +550,9 @@
                         </div>
 
                         {{-- Kotak wajah hasil tracking face-api (menempel di wajah) --}}
-                        <div x-show="ready && faceBox" x-cloak
-                            class="pointer-events-none absolute"
+                         <div x-show="ready && faceBox" x-cloak
+                             class="pointer-events-none absolute"
+                             style="transition: left 120ms linear, top 120ms linear, width 120ms linear, height 120ms linear;"
                             :style="`left:${faceBox.left}%; top:${faceBox.top}%; width:${faceBox.width}%; height:${faceBox.height}%;`">
                             <div class="w-full h-full border-4 transition-colors"
                                 style="border-radius: 50%; box-sizing: border-box;"
