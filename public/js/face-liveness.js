@@ -255,7 +255,10 @@
      * lama yang hanya memeriksa i+1 melewatkannya.
      */
     Liveness.prototype.trackBlink = function (m) {
-        var WINDOW_MS = 900;    // cukup memuat satu siklus kedip
+        // Kamera mobile dapat menghasilkan landmark lebih jarang daripada
+        // desktop. Jendela sedikit diperpanjang agar fase menutup dan membuka
+        // tetap tertangkap walau ada satu-dua frame yang terlewat.
+        var WINDOW_MS = 1200;
 
         // PENTING: ambang dihitung dari baseline ORANG YANG SEDANG DIAM.
         //
@@ -267,9 +270,9 @@
         // Karena itu dipakai ambang RELATIF terhadap baseline mata
         // terbuka milik user itu sendiri, ditambah penurunan mutlak
         // minimum supaya noise kecil tidak dianggap kedip.
-        var CLOSE_RATIO = 0.75; // dianggap menutup bila turun ke 75% baseline
-        var OPEN_RATIO = 0.85;  // dianggap kembali terbuka bila naik ke 85%
-        var MIN_DROP = 0.025;   // minimal penurunan absolut (anti noise)
+        var CLOSE_RATIO = 0.82; // toleran untuk kedipan yang tidak terlalu dalam
+        var OPEN_RATIO = 0.90;  // wajib kembali terbuka setelah fase menutup
+        var MIN_DROP = 0.018;   // tetap wajib ada penurunan, bukan noise kecil
         var MAX_EAR = 0.45;     // batas wajar EAR manusia; di atas ini frame rusak
 
         var now = Date.now();

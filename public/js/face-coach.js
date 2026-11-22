@@ -122,7 +122,9 @@
         // Preview tetap mengikuti refresh rate layar, tetapi pekerjaan coach
         // dibatasi sekitar 20 fps agar mobile tidak tersendat saat pixel
         // metrics, deteksi wajah, dan liveness berjalan bersamaan.
-        this.tickIntervalMs = options.tickIntervalMs || 50;
+        // Default 0 mempertahankan perilaku coach lama. Halaman registrasi
+        // dapat mengaktifkan throttling khusus mobile melalui option ini.
+        this.tickIntervalMs = options.tickIntervalMs || 0;
         this.lastTickAt = 0;
         this.detectorPromise = null;
     }
@@ -242,7 +244,9 @@
                     ? global.performance.now()
                     : Date.now();
 
-                if (!self.lastTickAt || now - self.lastTickAt >= self.tickIntervalMs) {
+                if (!self.tickIntervalMs
+                    || !self.lastTickAt
+                    || now - self.lastTickAt >= self.tickIntervalMs) {
                     self.lastTickAt = now;
                     self.tick();
                 }
