@@ -101,13 +101,6 @@ class RoleMenuService
             'icon' => 'swap_horiz',
             'work_types' => ['shift'],
         ],
-        'dashboard_face_register' => [
-            'label' => 'Registrasi Wajah',
-            'route' => 'register.face',
-            'permission' => 'face.registration.view',
-            'icon' => 'person_add',
-            'admin_only' => true,
-        ],
         'admin_control' => [
             'label' => 'Admin Control Center',
             'route' => 'admin.control-center',
@@ -277,7 +270,6 @@ class RoleMenuService
             'permission_create',
             'overtime_create',
             'shift_change_create',
-            'dashboard_face_register',
         ],
         self::DASHBOARD_PORTALS => [
             'admin_control',

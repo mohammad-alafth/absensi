@@ -11,12 +11,14 @@
  * public/models - tanpa model eksternal dan tanpa satu pun panggilan ke
  * server saat pemeriksaan berjalan.
  *
- * Tantangan yang dipakai (urutan diacak tiap sesi):
- *   blink      : kedipkan mata                     -> Eye Aspect Ratio
- *   turn_left  : putar kepala sedikit ke kiri      -> pergeseran hidung
- *   turn_right : putar kepala sedikit ke kanan     -> pergeseran hidung
- *   smile      : senyum / buka mulut               -> jarak bibir dalam
- *   closer     : dekatkan sedikit ke kamera        -> lebar kotak wajah
+     * Tantangan yang dipakai (urutan diacak tiap sesi):
+     *   turn_left  : putar kepala sedikit ke kiri      -> pergeseran hidung
+     *   turn_right : putar kepala sedikit ke kanan     -> pergeseran hidung
+     *   smile      : senyum / buka mulut               -> jarak bibir dalam
+     *   closer     : dekatkan sedikit ke kamera        -> lebar kotak wajah
+     *
+     * Kedipan tidak dipakai sebagai challenge aktif karena sebagian kamera
+     * mobile sulit menangkap perubahan EAR secara konsisten.
  */
 (function (global) {
     'use strict';
@@ -51,7 +53,6 @@
     }
 
     var CHALLENGES = {
-        blink:      { label: 'Kedipkan mata',        hint: 'Kedipkan mata dua kali.' },
         turn_left:  { label: 'Putar ke kiri',         hint: 'Putar kepala sedikit ke kiri, lalu kembali.' },
         turn_right: { label: 'Putar ke kanan',        hint: 'Putar kepala sedikit ke kanan, lalu kembali.' },
         smile:      { label: 'Senyum',                hint: 'Senyum atau buka mulut sedikit.' },

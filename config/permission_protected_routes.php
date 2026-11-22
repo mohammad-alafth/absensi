@@ -59,7 +59,6 @@ return [
         ['method' => 'GET,HEAD', 'uri' => 'shift/weekly-schedules', 'name' => 'shift.weekly-schedules', 'action' => 'App\\Http\\Controllers\\ShiftController@weeklySchedules', 'key' => 'roster.view'],
 
         // Authenticated user pages and actions.
-        ['method' => 'GET,HEAD', 'uri' => 'register-face', 'name' => 'register.face', 'action' => 'Illuminate\\Routing\\ViewController', 'key' => 'face.registration.view'],
         ['method' => 'GET,HEAD', 'uri' => 'izin', 'name' => 'izin', 'action' => 'App\\Http\\Controllers\\PermissionController@create', 'key' => 'permission.view'],
         ['method' => 'POST', 'uri' => 'izin', 'name' => 'izin.store', 'action' => 'App\\Http\\Controllers\\PermissionController@store', 'key' => 'permission.create'],
         ['method' => 'GET,HEAD', 'uri' => 'izin/history', 'name' => 'izin.history', 'action' => 'App\\Http\\Controllers\\PermissionController@history', 'key' => 'permission.view'],

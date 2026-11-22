@@ -106,9 +106,6 @@ Route::get('/face', function () {
         ->middleware('auth')
         ->name('face');
 
-    Route::view('/register-face', 'register-face')
-        ->name('register.face');
-
     /*
     |--------------------------------------------------------------------------
     | IZIN
