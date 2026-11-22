@@ -78,7 +78,7 @@
         this.detectWidth = 0;
         this.detectHeight = 0;
 
-        this.inputSize = 320;
+        this.inputSize = options.inputSize || 320;
         this.scoreThreshold = 0.3;
         this.detectIntervalMs = 70;
         this.landmarkIntervalMs = 180;

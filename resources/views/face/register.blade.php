@@ -78,13 +78,20 @@
                      diag: null,
                      async startCamera() {
                          if (this.ready || this.starting) return;
-                         this.starting = true;
-                         this.cameraError = '';
-                         try {
-                             const stream = await navigator.mediaDevices.getUserMedia({
-                                 video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-                                 audio: false,
-                             });
+                          this.starting = true;
+                          this.cameraError = '';
+                          try {
+                              const isMobile = window.matchMedia
+                                  && window.matchMedia('(max-width: 768px)').matches;
+                              const stream = await navigator.mediaDevices.getUserMedia({
+                                  video: {
+                                      facingMode: 'user',
+                                      width: { ideal: isMobile ? 960 : 1280 },
+                                      height: { ideal: 720 },
+                                      frameRate: { ideal: isMobile ? 24 : 30, max: 30 },
+                                  },
+                                  audio: false,
+                              });
                              this.stream = stream;
                              this.$nextTick(() => {
                                  const video = this.$refs.preview;
@@ -102,14 +109,25 @@
                          }
                      },
                      startCoach() {
-                         if (this.coach || typeof window.FaceCoach === 'undefined') return;
-                         const self = this;
-                         this.coach = new window.FaceCoach({
-                             video: this.$refs.preview,
-                             onUpdate: (update) => self.applyCoach(update),
-                             onReady: () => self.maybeAutoCapture(),
-                             requiredFrames: 6,
-                         });
+                          if (this.coach || typeof window.FaceCoach === 'undefined') return;
+                          const self = this;
+                          const isMobile = window.matchMedia
+                              && window.matchMedia('(max-width: 768px)').matches;
+                          this.coach = new window.FaceCoach({
+                              video: this.$refs.preview,
+                              onUpdate: (update) => self.applyCoach(update),
+                              onReady: () => self.maybeAutoCapture(),
+                              requiredFrames: 6,
+                              // Pekerjaan landmark + liveness cukup berat pada
+                              // CPU HP. Preview tetap mengikuti kamera, tetapi
+                              // coach memakai interval dan input lebih ringan.
+                              tickIntervalMs: isMobile ? 80 : 50,
+                              // Pertahankan input detector 320 agar confidence
+                              // wajah di HP tidak turun saat wajah sudah berada
+                              // di dalam oval. Beban CPU dikurangi melalui
+                              // interval coach dan resolusi kamera di atas.
+                              inputSize: 320,
+                          });
                          this.coach.start();
                          this.coachLabel = 'Menyiapkan coach wajah...';
                          this.startLiveness();
