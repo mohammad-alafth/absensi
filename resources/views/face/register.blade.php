@@ -127,6 +127,8 @@
                               // Target coach sekitar 30 FPS (1000 / 30 ~= 33 ms).
                               tickIntervalMs: 33,
                               detectIntervalMs: 33,
+                              landmarkIntervalMs: 100,
+                              metricsIntervalMs: 100,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada
                               // di dalam oval. Beban CPU dikurangi melalui

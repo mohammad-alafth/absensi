@@ -82,6 +82,9 @@
         this.scoreThreshold = 0.3;
         this.detectIntervalMs = options.detectIntervalMs || 70;
         this.landmarkIntervalMs = options.landmarkIntervalMs || 180;
+        this.metricsIntervalMs = options.metricsIntervalMs || 100;
+        this.metricsAt = 0;
+        this.cachedMetrics = null;
         this.detectAt = 0;
         this.detecting = false;
         this.box = null;
@@ -126,6 +129,8 @@
         // dapat mengaktifkan throttling khusus mobile melalui option ini.
         this.tickIntervalMs = options.tickIntervalMs || 0;
         this.lastTickAt = 0;
+        this.metricsAt = 0;
+        this.cachedMetrics = null;
         this.detectorPromise = null;
     }
 
@@ -276,6 +281,9 @@
         this.rawBox = null;
         this.displayBox = null;
         this.lastTickAt = 0;
+        this.metricsAt = 0;
+        this.cachedMetrics = null;
+        this.landmarksAt = 0;
     };
 
     /**
@@ -476,7 +484,11 @@
             return false;
         }
 
-        var wantLandmarks = !!this.landmarker;
+        // TinyFaceDetector boleh berjalan lebih sering untuk kotak/guide,
+        // tetapi landmark 68 titik jauh lebih mahal dan hanya dibutuhkan
+        // untuk liveness. Batasi pengambilannya agar CPU tidak penuh.
+        var wantLandmarks = !!this.landmarker
+            && (!this.landmarks || now - this.landmarksAt >= this.landmarkIntervalMs);
         var chain = wantLandmarks && typeof task.withFaceLandmarks === 'function'
             ? task.withFaceLandmarks()
             : task;
@@ -490,6 +502,7 @@
                 self.rawBox = null;
                 self.smooth = null;
                 self.box = null;
+                self.landmarks = null;
                 self.boxAt = now;
                 self.faceCount = 0;
 
@@ -502,6 +515,7 @@
                 self.rawBox = null;
                 self.smooth = null;
                 self.box = { multiple: true, count: results.length };
+                self.landmarks = null;
                 self.boxAt = now;
 
                 return;
@@ -514,6 +528,7 @@
                 self.rawBox = null;
                 self.smooth = null;
                 self.box = null;
+                self.landmarks = null;
                 self.boxAt = now;
 
                 return;
@@ -543,7 +558,10 @@
             if (wantLandmarks && r.landmarks) {
                 var lm = self.landmarksFrom(r);
 
-                if (lm) self.landmarks = lm;
+                if (lm) {
+                    self.landmarks = lm;
+                    self.landmarksAt = Date.now();
+                }
             }
         }).catch(function (e) {
             self.detecting = false;
@@ -644,7 +662,16 @@
             }
 
             stage = 'metrics';
-            var metrics = this.measureFrame();
+            // Preview tetap diperbarui setiap tick, tetapi pembacaan pixel dan
+            // variance Laplacian tidak perlu dilakukan 30 kali per detik.
+            // Cache singkat ini mengurangi beban CPU tanpa mengubah keputusan
+            // kualitas wajah secara bermakna.
+            var metricsNow = Date.now();
+            if (!this.cachedMetrics || metricsNow - this.metricsAt >= this.metricsIntervalMs) {
+                this.cachedMetrics = this.measureFrame();
+                this.metricsAt = metricsNow;
+            }
+            var metrics = this.cachedMetrics;
 
             // Luncurkan siklus deteksi (async, tidak memblokir rAF). Hasilnya
             // dibaca ulang pada frame berikutnya lewat `currentBox()`.
