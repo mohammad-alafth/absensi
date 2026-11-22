@@ -80,8 +80,8 @@
 
         this.inputSize = options.inputSize || 320;
         this.scoreThreshold = 0.3;
-        this.detectIntervalMs = 70;
-        this.landmarkIntervalMs = 180;
+        this.detectIntervalMs = options.detectIntervalMs || 70;
+        this.landmarkIntervalMs = options.landmarkIntervalMs || 180;
         this.detectAt = 0;
         this.detecting = false;
         this.box = null;

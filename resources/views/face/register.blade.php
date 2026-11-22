@@ -88,7 +88,10 @@
                                       facingMode: 'user',
                                       width: { ideal: isMobile ? 960 : 1280 },
                                       height: { ideal: 720 },
-                                      frameRate: { ideal: isMobile ? 30 : 30, max: 30 },
+                                      // Minta refresh kamera tinggi di mobile;
+                                      // browser akan fallback ke FPS default
+                                      // perangkat bila kamera tidak mendukung 60.
+                                      frameRate: { ideal: 60, max: 60 },
                                   },
                                   audio: false,
                               });
@@ -121,7 +124,9 @@
                               // Pekerjaan landmark + liveness cukup berat pada
                               // CPU HP. Preview tetap mengikuti kamera, tetapi
                               // coach memakai interval dan input lebih ringan.
-                              tickIntervalMs: isMobile ? 60 : 50,
+                              // Target coach sekitar 30 FPS (1000 / 30 ~= 33 ms).
+                              tickIntervalMs: 33,
+                              detectIntervalMs: 33,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada
                               // di dalam oval. Beban CPU dikurangi melalui
