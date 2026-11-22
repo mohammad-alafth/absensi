@@ -818,5 +818,6 @@
      Keduanya dimuat LAZY: hanya saat halaman ini dibuka, tidak menambah beban
      halaman lain. Coach boleh gagal total; halaman tetap berfungsi. --}}
 <script src="{{ asset('vendor/face-api/face-api.min.js') }}" defer></script>
-<script src="{{ asset('js/face-coach.js') }}" defer></script>
-<script src="{{ asset('js/face-liveness.js') }}" defer></script>
+{{-- Versi file mencegah browser/CDN memakai challenge liveness lama. --}}
+<script src="{{ asset('js/face-coach.js') }}?v={{ filemtime(public_path('js/face-coach.js')) }}" defer></script>
+<script src="{{ asset('js/face-liveness.js') }}?v={{ filemtime(public_path('js/face-liveness.js')) }}" defer></script>
