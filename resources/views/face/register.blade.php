@@ -127,7 +127,8 @@
                               // Target coach sekitar 30 FPS (1000 / 30 ~= 33 ms).
                               tickIntervalMs: 33,
                               detectIntervalMs: 33,
-                              landmarkIntervalMs: 100,
+                              // Target landmark sekitar 30 FPS (1000 / 30 ~= 33 ms).
+                              landmarkIntervalMs: 33,
                               metricsIntervalMs: 100,
                               useTinyLandmarks: true,
                               // Pertahankan input detector 320 agar confidence
