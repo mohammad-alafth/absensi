@@ -79,6 +79,10 @@
         this.detectHeight = 0;
 
         this.inputSize = options.inputSize || 320;
+        // Registrasi dapat memilih model landmark kecil. Default tetap model
+        // penuh agar perilaku coach umum dan test/consumer lama tidak berubah.
+        this.useTinyLandmarks = options.useTinyLandmarks === true;
+        this.landmarkUseTiny = false;
         this.scoreThreshold = 0.3;
         this.detectIntervalMs = options.detectIntervalMs || 70;
         this.landmarkIntervalMs = options.landmarkIntervalMs || 180;
@@ -195,9 +199,15 @@
         var tinyNet = global.faceapi
             ? global.faceapi.nets.tinyFaceDetector
             : null;
-        var landmarkNet = global.faceapi
-            ? global.faceapi.nets.faceLandmark68Net
-            : null;
+         var fullLandmarkNet = global.faceapi
+             ? global.faceapi.nets.faceLandmark68Net
+             : null;
+         var tinyLandmarkNet = global.faceapi
+             ? global.faceapi.nets.faceLandmark68TinyNet
+             : null;
+         var landmarkNet = this.useTinyLandmarks && tinyLandmarkNet
+             ? tinyLandmarkNet
+             : fullLandmarkNet;
 
         this.detectorPromise = (tinyNet
             ? tinyNet.loadFromUri(options_model_path())
@@ -208,15 +218,18 @@
                     // Landmark 68 titik dibutuhkan untuk liveness detection
                     // (kedip / putar kepala / senyum). Modelnya sudah ada di
                     // public/models, jadi tidak ada unduhan tambahan.
-                    if (!landmarkNet) {
-                        self.landmarker = null;
+                     if (!landmarkNet) {
+                         self.landmarker = null;
 
-                        return null;
-                    }
+                         return null;
+                     }
 
-                    return landmarkNet.loadFromUri(options_model_path())
-                        .then(function () { self.landmarker = landmarkNet; })
-                        .catch(function () { self.landmarker = null; });
+                     return landmarkNet.loadFromUri(options_model_path())
+                         .then(function () {
+                             self.landmarker = landmarkNet;
+                             self.landmarkUseTiny = landmarkNet === tinyLandmarkNet;
+                         })
+                         .catch(function () { self.landmarker = null; });
                 })
                 .catch(function () {
                     self.detector = null;
@@ -490,7 +503,7 @@
         var wantLandmarks = !!this.landmarker
             && (!this.landmarks || now - this.landmarksAt >= this.landmarkIntervalMs);
         var chain = wantLandmarks && typeof task.withFaceLandmarks === 'function'
-            ? task.withFaceLandmarks()
+             ? task.withFaceLandmarks(this.landmarkUseTiny)
             : task;
 
         chain.then(function (results) {
@@ -997,9 +1010,28 @@
             ctx.drawImage(self.video, 0, 0, w, h);
             self.reset();
 
-            if (typeof done === 'function') {
+            if (typeof done !== 'function') return;
+
+            // toDataURL() melakukan encoding JPEG secara sinkron di main
+            // thread. Pada webcam desktop 1280px, ini membuat preview
+            // tersendat setiap sampel diambil. toBlob() menjaga payload tetap
+            // data URL yang sama, tetapi memberi browser jalur asynchronous.
+            if (typeof canvas.toBlob !== 'function' || typeof FileReader === 'undefined') {
                 done(canvas.toDataURL('image/jpeg', 0.9));
+                return;
             }
+
+            canvas.toBlob(function (blob) {
+                if (!blob) {
+                    done(null);
+                    return;
+                }
+
+                var reader = new FileReader();
+                reader.onload = function () { done(reader.result); };
+                reader.onerror = function () { done(null); };
+                reader.readAsDataURL(blob);
+            }, 'image/jpeg', 0.9);
         };
 
         // Tunggu frame yang benar-benar ditampilkan. Tanpa ini, selfie bisa

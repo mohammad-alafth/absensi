@@ -129,6 +129,7 @@
                               detectIntervalMs: 33,
                               landmarkIntervalMs: 100,
                               metricsIntervalMs: 100,
+                              useTinyLandmarks: true,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada
                               // di dalam oval. Beban CPU dikurangi melalui
