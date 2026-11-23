@@ -46,8 +46,9 @@
                      liveness: null,
                      step: 'scan',
                      insideOval: false,
-                     scanReady: false,
-                     lastLandmarks: null,
+                      scanReady: false,
+                      lastLandmarks: null,
+                      lastLandmarkUpdateAt: 0,
                      liveState: 'idle',
                      liveIndex: 0,
                      liveTotal: 0,
@@ -129,9 +130,12 @@
                               // kemampuan perangkat; interval 16 ms tidak
                               // memaksa promise deteksi menumpuk.
                               tickIntervalMs: 16,
-                              detectIntervalMs: 16,
-                              landmarkIntervalMs: 16,
-                              metricsIntervalMs: 16,
+                              // Rendering tetap 60 FPS, inferensi dipisah
+                              // dan dijadwalkan sekitar 3 FPS agar hasil tidak
+                              // saling menimpa serta status lebih stabil.
+                              detectIntervalMs: 300,
+                              landmarkIntervalMs: 300,
+                              metricsIntervalMs: 100,
                               useTinyLandmarks: true,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada
@@ -150,7 +154,11 @@
                              count: 3,
                              onUpdate: (u) => self.applyLiveness(u),
                              onPass: () => { self.step = 'capture'; self.liveState = 'passed'; },
-                             onFail: (reason) => { self.liveState = 'failed'; self.liveDetail = reason; },
+                              onFail: (reason) => {
+                                  self.liveState = 'failed';
+                                  self.liveDetail = reason;
+                                  self.scanHoldAt = 0;
+                              },
                          });
                      },
                      beginLiveness() {
@@ -209,9 +217,11 @@
                          this.coachLabel = '';
                          this.coachDetail = '';
                          this.coachOk = false;
-                         this.faceBox = null;
-                         this.guideBox = null;
-                         this.progress = 0;
+                          this.faceBox = null;
+                          this.guideBox = null;
+                          this.progress = 0;
+                          this.lastLandmarks = null;
+                          this.lastLandmarkUpdateAt = 0;
                      },
                      applyCoach(update) {
                          const box = update.display;
@@ -226,12 +236,12 @@
                          this.guideBox = update.displayGuide || null;
                          this.diag = update.diagnostics || null;
 
-                         // Mode pemindaian: hanya boleh lanjut kalau wajah benar-benar
-                         // berada DI DALAM oval, bukan sekadar di dekat.
-                         if (this.step === 'scan') {
-                             this.insideOval = !!update.insideOval;
-                             this.scanReady = this.insideOval && this.coachOk;
-                             this.detectorOk = update.detectorState !== 'unavailable' && !update.detectError;
+                          // Mode pemindaian: hanya boleh lanjut kalau wajah benar-benar
+                          // berada DI DALAM oval, bukan sekadar di dekat.
+                          if (this.step === 'scan') {
+                              this.insideOval = !!update.stableInsideOval;
+                              this.scanReady = !!update.authReady;
+                              this.detectorOk = update.detectorState !== 'unavailable' && !update.detectError;
 
                              // Auto-lanjut setelah syarat Scan terpenuhi terus
                              // selama ~1 detik, supaya pengguna tidak perlu
@@ -247,22 +257,26 @@
                                  if (Date.now() - this.scanHoldAt > 900) {
                                      this.scanDone();
                                  }
-                             } else {
-                                 this.scanHold = 0;
-                                 this.scanHoldAt = 0;
-                             }
+                              } else if (update.detectionState === 'LOST'
+                                  || update.positionState === 'outside'
+                                  || update.detectionState === 'SEARCHING') {
+                                  this.scanHold = 0;
+                                  this.scanHoldAt = 0;
+                              }
 
                              // Selalu jelaskan APA yang sedang ditunggu.
                              this.nextHint = !this.detectorOk
                                  ? 'Deteksi wajah bermasalah: ' + (update.detectError || 'model gagal dimuat') + '. Muat ulang halaman (Ctrl+F5).'
-                                 : (!this.insideOval
-                                     ? 'Posisikan wajah di DALAM oval.'
-                                     : (this.coachLabel || 'Tahan posisi sebentar.'));
+                                  : (!this.insideOval
+                                      ? 'Posisikan wajah di DALAM oval.'
+                                      : (this.coachLabel || 'Tahan posisi sebentar.'));
                          }
 
                          // Landmark untuk liveness (dari frame video, bukan layar).
-                         if (update.landmarks) {
-                             this.lastLandmarks = {
+                          if (update.landmarks && update.landmarkUpdatedAt
+                              && update.landmarkUpdatedAt !== this.lastLandmarkUpdateAt) {
+                              this.lastLandmarkUpdateAt = update.landmarkUpdatedAt;
+                              this.lastLandmarks = {
                                  ok: true,
                                  ear: update.landmarks.ear,
                                  yaw: update.landmarks.yaw,
@@ -274,9 +288,9 @@
                              if (this.liveness && this.liveState === 'running' && this.step === 'liveness') {
                                  this.liveness.update(this.lastLandmarks);
                              }
-                         } else {
-                             this.lastLandmarks = null;
-                         }
+                           } else if (!update.landmarkFresh) {
+                              this.lastLandmarks = null;
+                          }
                      },
                      scanDone() {
                          if (!this.scanReady) return;
@@ -719,6 +733,9 @@
                             <div>face-api loaded : <span x-text="diag ? (diag.detectorState || '-') : '-'"></span></div>
                             <div>wajah ditemukan  : <span x-text="diag ? diag.count : '-'"></span></div>
                             <div>score           : <span x-text="diag && diag.score !== null && diag.score !== undefined ? Number(diag.score).toFixed(3) : '-'"></span></div>
+                            <div>score aktual    : <span x-text="diag && diag.actualScore !== null && diag.actualScore !== undefined ? Number(diag.actualScore).toFixed(3) : '-' "></span></div>
+                            <div>state deteksi   : <span x-text="diag ? (diag.detectionState || '-') : '-' "></span></div>
+                            <div>auth valid       : <span x-text="diag ? (diag.authValid ? 'ya' : 'tidak') : '-' "></span></div>
                             <div>resolusi video  : <span x-text="diag ? diag.video : '-'"></span></div>
                             <div>kanvas kerja    : <span x-text="diag ? diag.work : '-'"></span></div>
                             <div>siklus deteksi  : <span x-text="diag ? diag.frames : '-'"></span></div>

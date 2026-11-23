@@ -89,6 +89,15 @@
         this.detectIntervalMs = options.detectIntervalMs || 70;
         this.landmarkIntervalMs = options.landmarkIntervalMs || 180;
         this.metricsIntervalMs = options.metricsIntervalMs || 100;
+        this.detectionGraceMs = options.detectionGraceMs || 800;
+        this.authFreshMs = options.authFreshMs || Math.max(350, this.detectIntervalMs + 50);
+        this.detectionState = 'SEARCHING';
+        this.detectionFailures = 0;
+        this.lastValidDetectionAt = 0;
+        this.lastValidScore = null;
+        this.positionState = 'unknown';
+        this.positionInsideStreak = 0;
+        this.positionOutsideStreak = 0;
         this.metricsAt = 0;
         this.cachedMetrics = null;
         this.detectAt = 0;
@@ -106,7 +115,7 @@
         // `box` di atas.
         this.displayAlpha = 0.22;
         this.displayBox = null;
-        this.boxStaleMs = 400;
+        this.boxStaleMs = options.boxStaleMs || this.detectionGraceMs;
         this.faceCount = 0;
         this.frameCount = 0;
         // Diagnostik penjaga: kapan terakhir detectBox() keluar DINI dan
@@ -135,10 +144,16 @@
         // dapat mengaktifkan throttling khusus mobile melalui option ini.
         this.tickIntervalMs = options.tickIntervalMs || 0;
         this.lastTickAt = 0;
+        this.detectionTimer = null;
+        this.generation = 0;
+        this.inferenceActive = false;
+        this.inferenceGeneration = 0;
         this.metricsAt = 0;
         this.cachedMetrics = null;
         this.landmarks = null;
         this.landmarkSmooth = null;
+        this.visualLandmarkSnapshot = null;
+        this.visualLandmarkAt = 0;
         this.landmarksAt = 0;
         this.detectorPromise = null;
     }
@@ -249,11 +264,78 @@
 
     function options_model_path() { return '/models'; }
 
+    FaceCoach.prototype.markDetectionFailure = function (error) {
+        var now = Date.now();
+        this.detectionFailures += 1;
+        this.lastDetectError = error || null;
+        this.landmarks = null;
+        this.landmarkSmooth = null;
+
+        if (!this.lastValidDetectionAt) {
+            this.detectionState = 'SEARCHING';
+            return;
+        }
+
+        this.detectionState = now - this.lastValidDetectionAt <= this.detectionGraceMs
+            ? 'DETECTED_GRACE'
+            : 'LOST';
+    };
+
+    FaceCoach.prototype.visualLandmarks = function () {
+        if (!this.visualLandmarkSnapshot) return null;
+
+        return Date.now() - this.visualLandmarkAt <= this.detectionGraceMs
+            ? this.visualLandmarkSnapshot
+            : null;
+    };
+
+    FaceCoach.prototype.currentAuthLandmarks = function () {
+        if (!this.landmarks || !this.lastValidDetectionAt
+            || this.landmarksAt !== this.lastValidDetectionAt) return null;
+
+        return Date.now() - this.landmarksAt <= this.authFreshMs
+            ? this.landmarks
+            : null;
+    };
+
+    FaceCoach.prototype.currentAuthLandmarkAt = function () {
+        return this.currentAuthLandmarks() ? this.landmarksAt : 0;
+    };
+
+    FaceCoach.prototype.updatePositionState = function (box, guide) {
+        if (!box || box.multiple) return false;
+        if (this.positionDetectionAt === this.lastValidDetectionAt) {
+            return this.positionState === 'inside';
+        }
+
+        this.positionDetectionAt = this.lastValidDetectionAt;
+        var rawInside = this.insideOval(box, guide);
+
+        if (rawInside) {
+            this.positionInsideStreak += 1;
+            this.positionOutsideStreak = 0;
+            if (this.positionInsideStreak >= 2) this.positionState = 'inside';
+        } else {
+            this.positionOutsideStreak += 1;
+            this.positionInsideStreak = 0;
+            if (this.positionOutsideStreak >= 2) this.positionState = 'outside';
+        }
+
+        return this.positionState === 'inside';
+    };
+
     FaceCoach.prototype.start = function () {
         if (this.running) return;
         this.running = true;
+        this.generation += 1;
         this.loadDetector();
         var self = this;
+        var detectionLoop = function () {
+            if (!self.running) return;
+            self.detectBox();
+            self.detectionTimer = setTimeout(detectionLoop, self.detectIntervalMs);
+        };
+        detectionLoop();
         var loop = function () {
             if (!self.running) return;
 
@@ -284,9 +366,15 @@
 
     FaceCoach.prototype.stop = function () {
         this.running = false;
+        this.generation += 1;
         if (this.rafId) global.cancelAnimationFrame(this.rafId);
+        if (this.detectionTimer) global.clearTimeout(this.detectionTimer);
         this.rafId = null;
+        this.detectionTimer = null;
         this.lastTickAt = 0;
+        // Promise inferensi yang sedang berjalan tidak dapat dibatalkan.
+        // Biarkan flag aktif sampai callback lama selesai agar sesi baru tidak
+        // menyalakan inferensi kedua secara bersamaan.
     };
 
     FaceCoach.prototype.reset = function () {
@@ -304,6 +392,18 @@
         this.landmarksAt = 0;
         this.landmarks = null;
         this.landmarkSmooth = null;
+        this.visualLandmarkSnapshot = null;
+        this.visualLandmarkAt = 0;
+        this.generation += 1;
+        this.detecting = false;
+        this.detectionFailures = 0;
+        this.detectionState = 'SEARCHING';
+        this.lastValidDetectionAt = 0;
+        this.lastValidScore = null;
+        this.positionState = 'unknown';
+        this.positionInsideStreak = 0;
+        this.positionOutsideStreak = 0;
+        this.positionDetectionAt = 0;
     };
 
     /**
@@ -442,7 +542,7 @@
 
         // Jangan menumpuk deteksi: model ini berat, dan menumpuknya membuat
         // halaman macet serta hasil tertinggal dari frame yang sudah lewat.
-        if (this.detecting) {
+        if (this.detecting || this.inferenceActive) {
             this.skipReason = 'deteksi sebelumnya masih berjalan';
 
             return false;
@@ -463,7 +563,10 @@
         this.detectAttempts += 1;
         this.skipReason = 'none';
         this.detecting = true;
+        this.inferenceActive = true;
+        this.inferenceGeneration = this.generation;
         this.detectAt = now;
+        var generation = this.generation;
 
         var self = this;
         var w = this.detectWidth;
@@ -490,7 +593,10 @@
             task = global.faceapi.detectAllFaces(this.detectCanvas, options);
         } catch (e) {
             this.detecting = false;
-            this.lastDetectError = String(e && e.message ? e.message : e);
+            this.inferenceActive = false;
+            if (generation === this.generation) {
+                this.markDetectionFailure(String(e && e.message ? e.message : e));
+            }
 
             return false;
         }
@@ -514,17 +620,18 @@
             : task;
 
         chain.then(function (results) {
+            if (generation !== self.generation) {
+                if (self.inferenceGeneration === generation) self.inferenceActive = false;
+                return;
+            }
             self.detecting = false;
+            self.inferenceActive = false;
             self.lastDetectError = null;
             self.frameCount += 1;
+            var completedAt = Date.now();
 
             if (!results || results.length === 0) {
-                self.rawBox = null;
-                self.smooth = null;
-                self.box = null;
-                self.landmarks = null;
-                self.landmarkSmooth = null;
-                self.boxAt = now;
+                self.markDetectionFailure(null);
                 self.faceCount = 0;
 
                 return;
@@ -533,12 +640,13 @@
             self.faceCount = results.length;
 
             if (results.length > 1) {
-                self.rawBox = null;
-                self.smooth = null;
+                self.detectionFailures = 0;
+                self.detectionState = 'DETECTED';
+                self.lastValidDetectionAt = completedAt;
                 self.box = { multiple: true, count: results.length };
+                self.boxAt = completedAt;
                 self.landmarks = null;
                 self.landmarkSmooth = null;
-                self.boxAt = now;
 
                 return;
             }
@@ -547,12 +655,7 @@
             var b = r.detection ? r.detection.box : null;
 
             if (!b) {
-                self.rawBox = null;
-                self.smooth = null;
-                self.box = null;
-                self.landmarks = null;
-                self.landmarkSmooth = null;
-                self.boxAt = now;
+                self.markDetectionFailure(null);
 
                 return;
             }
@@ -573,8 +676,13 @@
             // Yang dipakai coach adalah kotak yang sudah dihaluskan, supaya
             // gonjengan 2-5 px tiap frame tidak terbaca sebagai "bergerak".
             self.box = self.smoothBox(self.rawBox);
-            self.box.landmarks = self.landmarks;
-            self.boxAt = now;
+            self.boxAt = completedAt;
+            self.detectionFailures = 0;
+            self.detectionState = 'DETECTED';
+            self.lastValidDetectionAt = completedAt;
+            self.lastValidScore = self.rawBox.score;
+            self.landmarks = null;
+            self.landmarkSmooth = null;
 
             // Landmark diambil dari PASS yang sama, jadi tidak perlu deteksi
             // kedua kali (yang sebelumnya memakai API sinkron dan gagal).
@@ -583,12 +691,21 @@
 
                 if (lm) {
                     self.landmarks = self.smoothLandmarks(lm);
-                    self.landmarksAt = Date.now();
+                    self.landmarksAt = completedAt;
+                    self.visualLandmarkSnapshot = self.landmarks;
+                    self.visualLandmarkAt = completedAt;
                 }
+            } else {
+                self.landmarksAt = 0;
             }
         }).catch(function (e) {
+            if (generation !== self.generation) {
+                if (self.inferenceGeneration === generation) self.inferenceActive = false;
+                return;
+            }
             self.detecting = false;
-            self.lastDetectError = String(e && e.message ? e.message : e);
+            self.inferenceActive = false;
+            self.markDetectionFailure(String(e && e.message ? e.message : e));
         });
 
         return true;
@@ -681,9 +798,10 @@
      * sudah tidak relevanan (mis. setelah wajah berganti arah).
      */
     FaceCoach.prototype.isBoxStale = function () {
-        if (!this.box) return true;
+        var at = this.lastValidDetectionAt || this.boxAt;
+        if (!this.box || !at) return true;
 
-        return (Date.now() - this.boxAt) > this.boxStaleMs;
+        return (Date.now() - at) > this.boxStaleMs;
     };
 
     /**
@@ -691,7 +809,17 @@
      * Detector sudah tidak sinkron, jadi inilah sumber kebenaran untuk tick.
      */
     FaceCoach.prototype.currentBox = function () {
-        if (this.isBoxStale()) return null;
+        var at = this.lastValidDetectionAt || this.boxAt;
+        if (!this.box || !at) return null;
+        if (Date.now() - at > this.boxStaleMs) return null;
+
+        return this.box;
+    };
+
+    FaceCoach.prototype.currentAuthBox = function () {
+        var at = this.lastValidDetectionAt || this.boxAt;
+        if (!this.box || !at) return null;
+        if (Date.now() - at > this.authFreshMs) return null;
 
         return this.box;
     };
@@ -730,16 +858,23 @@
             }
             var metrics = this.cachedMetrics;
 
-            // Luncurkan siklus deteksi (async, tidak memblokir rAF). Hasilnya
-            // dibaca ulang pada frame berikutnya lewat `currentBox()`.
+            // Inferensi dijadwalkan oleh detection loop terpisah. Rendering
+            // hanya membaca snapshot terakhir sehingga rAF tidak bergantung
+            // pada keberhasilan inferensi setiap frame.
             stage = 'detect';
-            this.detectBox();
             var box = this.currentBox();
+            var authBox = this.currentAuthBox();
 
             stage = 'guide';
             var guide = this.guideRect();
             stage = 'evaluate';
             var state = this.evaluate(metrics, box, guide);
+            var authState = this.evaluate(metrics, authBox, guide);
+            var rawAuthInside = !!authBox && this.insideOval(authBox, guide);
+            var stableInside = !!authBox && this.updatePositionState(authBox, guide);
+            // Autentikasi selalu memakai posisi aktual. Hysteresis hanya
+            // menstabilkan indikator/continuity, bukan meloloskan posisi lama.
+            var authReady = !!authBox && rawAuthInside && authState.ok;
             stage = 'display';
             // Hanya visual yang dihaluskan. `box`, `insideOval`, dan state
             // evaluasi tetap memakai hasil deteksi yang sama seperti sebelumnya.
@@ -757,15 +892,24 @@
             // guide yang digambar di layar benar-benar sebanding dengan
             // perhitungan occupancy di evaluate().
             display: displayBox,
-            landmarks: this.landmarks,
-            insideOval: inside,
+            landmarks: this.currentAuthLandmarks(),
+            landmarkUpdatedAt: this.currentAuthLandmarkAt(),
+            insideOval: stableInside,
+            authInsideOval: rawAuthInside,
+            stableInsideOval: stableInside,
+            authReady: authReady,
+            authValid: !!authBox,
+            detectionState: this.detectionState,
+            positionState: this.positionState,
             displayGuide: displayGuide,
             // Dibawa ke UI supaya bisa menjelaskan kenapa tertahan.
             detectorState: this.detectorState,
             detectError: this.lastDetectError,
             diagnostics: {
                 count: this.faceCount,
-                score: box && !box.multiple ? box.score : null,
+                score: box && !box.multiple ? box.score : this.lastValidScore,
+                actualScore: authBox && !authBox.multiple ? authBox.score : null,
+                scoreAt: this.lastValidDetectionAt,
                 detectorState: this.detectorState,
                 detectError: this.lastDetectError,
                 detecting: this.detecting,
@@ -777,13 +921,19 @@
                 readyState: this.video ? this.video.readyState : -1,
                 video: this.video.videoWidth + 'x' + this.video.videoHeight,
                 work: this.detectWidth + 'x' + this.detectHeight,
-                landmarked: !!this.landmarks,
+                landmarked: !!this.visualLandmarks(),
+                landmarkFresh: !!this.currentAuthLandmarks(),
+                detectionState: this.detectionState,
+                detectionFailures: this.detectionFailures,
+                authValid: !!authBox,
+                insideOval: rawAuthInside,
+                stableInsideOval: stableInside,
                 stale: this.isBoxStale(),
             },
             state: state,
         });
 
-        if (state.ok) {
+        if (authReady) {
                 this.stableFrames += 1;
 
                 if (this.stableFrames >= this.requiredFrames) {
