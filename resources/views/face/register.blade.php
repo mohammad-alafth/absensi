@@ -124,12 +124,14 @@
                               // Pekerjaan landmark + liveness cukup berat pada
                               // CPU HP. Preview tetap mengikuti kamera, tetapi
                               // coach memakai interval dan input lebih ringan.
-                              // Target coach sekitar 30 FPS (1000 / 30 ~= 33 ms).
-                              tickIntervalMs: 33,
-                              detectIntervalMs: 33,
-                              // Target landmark sekitar 30 FPS (1000 / 30 ~= 33 ms).
-                              landmarkIntervalMs: 33,
-                              metricsIntervalMs: 100,
+                              // Target seluruh loop coach sekitar 60 FPS.
+                              // Browser/webcam tetap membatasi FPS aktual pada
+                              // kemampuan perangkat; interval 16 ms tidak
+                              // memaksa promise deteksi menumpuk.
+                              tickIntervalMs: 16,
+                              detectIntervalMs: 16,
+                              landmarkIntervalMs: 16,
+                              metricsIntervalMs: 16,
                               useTinyLandmarks: true,
                               // Pertahankan input detector 320 agar confidence
                               // wajah di HP tidak turun saat wajah sudah berada

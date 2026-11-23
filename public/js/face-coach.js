@@ -83,6 +83,8 @@
         // penuh agar perilaku coach umum dan test/consumer lama tidak berubah.
         this.useTinyLandmarks = options.useTinyLandmarks === true;
         this.landmarkUseTiny = false;
+        this.landmarkSmoothAlpha = options.landmarkSmoothAlpha || 0.45;
+        this.landmarkSmooth = null;
         this.scoreThreshold = 0.3;
         this.detectIntervalMs = options.detectIntervalMs || 70;
         this.landmarkIntervalMs = options.landmarkIntervalMs || 180;
@@ -135,6 +137,9 @@
         this.lastTickAt = 0;
         this.metricsAt = 0;
         this.cachedMetrics = null;
+        this.landmarks = null;
+        this.landmarkSmooth = null;
+        this.landmarksAt = 0;
         this.detectorPromise = null;
     }
 
@@ -297,6 +302,8 @@
         this.metricsAt = 0;
         this.cachedMetrics = null;
         this.landmarksAt = 0;
+        this.landmarks = null;
+        this.landmarkSmooth = null;
     };
 
     /**
@@ -516,6 +523,7 @@
                 self.smooth = null;
                 self.box = null;
                 self.landmarks = null;
+                self.landmarkSmooth = null;
                 self.boxAt = now;
                 self.faceCount = 0;
 
@@ -529,6 +537,7 @@
                 self.smooth = null;
                 self.box = { multiple: true, count: results.length };
                 self.landmarks = null;
+                self.landmarkSmooth = null;
                 self.boxAt = now;
 
                 return;
@@ -542,6 +551,7 @@
                 self.smooth = null;
                 self.box = null;
                 self.landmarks = null;
+                self.landmarkSmooth = null;
                 self.boxAt = now;
 
                 return;
@@ -572,7 +582,7 @@
                 var lm = self.landmarksFrom(r);
 
                 if (lm) {
-                    self.landmarks = lm;
+                    self.landmarks = self.smoothLandmarks(lm);
                     self.landmarksAt = Date.now();
                 }
             }
@@ -613,6 +623,40 @@
             faceHeight: box ? box.height : 0,
             mirrored: this.mirror,
         };
+    };
+
+    /**
+     * Haluskan metrik landmark sebelum dikirim ke liveness. Model landmark
+     * tetap berjalan pada target FPS tinggi, tetapi jitter kecil pada EAR,
+     * yaw, dan mulut tidak membuat instruksi berkedip atau berubah-ubah.
+     */
+    FaceCoach.prototype.smoothLandmarks = function (raw) {
+        if (!raw) return null;
+
+        var prev = this.landmarkSmooth;
+        if (!prev) {
+            this.landmarkSmooth = {
+                ear: raw.ear,
+                yaw: raw.yaw,
+                mouth: raw.mouth,
+                faceWidth: raw.faceWidth,
+                faceHeight: raw.faceHeight,
+                mirrored: raw.mirrored,
+            };
+            return this.landmarkSmooth;
+        }
+
+        var a = this.landmarkSmoothAlpha;
+        this.landmarkSmooth = {
+            ear: prev.ear + (raw.ear - prev.ear) * a,
+            yaw: prev.yaw + (raw.yaw - prev.yaw) * a,
+            mouth: prev.mouth + (raw.mouth - prev.mouth) * a,
+            faceWidth: prev.faceWidth + (raw.faceWidth - prev.faceWidth) * a,
+            faceHeight: prev.faceHeight + (raw.faceHeight - prev.faceHeight) * a,
+            mirrored: raw.mirrored,
+        };
+
+        return this.landmarkSmooth;
     };
 
     /** Satu siklus: ukur -> deteksi -> nilai ambang ->Instruction. */
