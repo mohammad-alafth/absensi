@@ -45,7 +45,7 @@ class RoleMenuService
         ],
         'attendance' => [
             'label' => 'Absen',
-            'route' => 'face',
+            'route' => 'face.scan',
             'permission' => 'attendance.view',
             'icon' => 'fingerprint',
         ],

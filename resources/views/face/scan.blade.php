@@ -1,5 +1,6 @@
 {{-- Scan wajah: selfie + GPS, verifikasi server, retry sampai cocok. --}}
 <x-app-layout>
+    <script src="{{ asset('js/camera-permission.js') }}"></script>
 
     <style>
         @keyframes radarPulse {
@@ -97,7 +98,7 @@
     /* ---- Kamera: langsung dibuka begitu halaman dimuat ---- */
     async openCamera() {
         try {
-            this.stream = await navigator.mediaDevices.getUserMedia({
+             this.stream = await window.openAbsensiCamera({
                 video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: false,
             });
@@ -153,6 +154,7 @@
             this.busy = false;
             this.message = 'Lokasi tidak terbaca. Izinkan akses lokasi lalu coba lagi.';
             this.autoScan = false;
+            this.showRetryPopup(this.message);
             return;
         }
 
@@ -217,11 +219,7 @@
                     this.message = json.warning;
                 }
 
-                if (this.degraded) {
-                    this.redirectTimer = setTimeout(() => {
-                        window.location.href = '/face';
-                    }, 6000);
-                }
+                this.showSuccessPopup();
                 return;
             }
 
@@ -232,15 +230,20 @@
                 this.autoScan   = false;
                 this.redirectTo = json.redirect;
                 this.stopCamera();
-                this.redirectTimer = setTimeout(() => {
-                    window.location.href = this.redirectTo;
-                }, 6000);
+                this.showRetryPopup(this.message);
                 return;
             }
 
             this.attempt = (json.attempt ?? this.attempt) + 1;
+            this.autoScan = false;
+            this.stopCamera();
+            this.showRetryPopup(this.message);
         } catch (err) {
             this.message = 'Gagal menghubungi server absensi.';
+            this.autoScan = false;
+            this.stopCamera();
+            this.showRetryPopup(this.message);
+            return;
         }
 
         this.busy = false;
@@ -267,7 +270,51 @@
         this.autoScan  = true;
         this.attempt   = 1;
         this.remaining = {{ $maxAttempts }};
-        this.scan();
+        this.rejected  = false;
+        this.degraded  = false;
+        this.warning   = '';
+        this.ready     = false;
+        this.openCamera();
+    },
+
+    showSuccessPopup() {
+        const title = this.degraded
+            ? 'Absen Telah Tercatat'
+            : 'Scan Telah Tercatat';
+        const text = this.degraded
+            ? (this.warning || this.message)
+            : (this.message || 'Presensi berhasil dicatat.');
+
+        Promise.resolve(window.Swal?.fire({
+            icon: this.degraded ? 'warning' : 'success',
+            title,
+            text,
+            confirmButtonText: 'Ke Dashboard',
+            timer: 2500,
+            timerProgressBar: true,
+            allowOutsideClick: false,
+        })).then(() => {
+            window.location.href = '{{ route('dashboard') }}';
+        });
+    },
+
+    showRetryPopup(reason) {
+        this.busy = false;
+        Promise.resolve(window.Swal?.fire({
+            icon: 'error',
+            title: 'Absen Gagal',
+            text: reason || 'Wajah tidak dikenali. Silakan lakukan absen ulang.',
+            confirmButtonText: 'Absen Ulang',
+            showCancelButton: true,
+            cancelButtonText: 'Kembali ke Dashboard',
+            allowOutsideClick: false,
+        })).then((result) => {
+            if (result && result.isConfirmed) {
+                this.retryNow();
+                return;
+            }
+            window.location.href = '{{ route('dashboard') }}';
+        });
     },
 
     init() {
@@ -372,9 +419,9 @@
                                     Coba Pindai Lagi
                                 </button>
                             </div>
-                            <p class="text-[10px] text-rose-500 mt-2">
-                                Dialihkan otomatis ke halaman absen biasa dalam 6 detik.
-                            </p>
+                             <p class="text-[10px] text-rose-500 mt-2">
+                                 Pilih Absen Ulang pada popup untuk mencoba kembali.
+                             </p>
                         </div>
                     </template>
 
@@ -398,9 +445,9 @@
                                     Kembali ke Dashboard
                                 </a>
                             </div>
-                            <p class="text-[10px] text-amber-500 mt-2">
-                                Dialihkan otomatis ke /face dalam 6 detik.
-                            </p>
+                             <p class="text-[10px] text-amber-500 mt-2">
+                                 Status tercatat dan akan kembali ke dashboard.
+                             </p>
                         </div>
                     </template>
 

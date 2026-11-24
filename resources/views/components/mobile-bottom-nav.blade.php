@@ -10,7 +10,7 @@
         ->map(function (array $item) use ($isHistoryPage): array {
             $active = match ($item['route']) {
                 'dashboard' => request()->routeIs('dashboard'),
-                'face' => request()->routeIs('face') || request()->routeIs('face.scan*'),
+                'face.scan' => request()->routeIs('face') || request()->routeIs('face.scan*'),
                 'history' => $isHistoryPage,
                 default => false,
             };
@@ -41,7 +41,7 @@
 <nav id="mobileBottomNav" aria-label="Navigasi utama" class="font-app-body fixed inset-x-0 bottom-0 z-50 border border-[#c4c5d7]/50 bg-white/95 shadow-[0_-2px_10px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
     <div class="mx-auto grid h-[68px] w-full items-end px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]" style="grid-template-columns: repeat({{ $columnCount }}, minmax(0, 1fr));">
         @foreach($items as $index => $item)
-            @php $isCenterTab = $item['route'] === 'face'; @endphp
+            @php $isCenterTab = $item['route'] === 'face.scan'; @endphp
             <a
                 href="{{ route($item['route']) }}"
                 class="relative flex min-w-0 -translate-y-1 flex-col items-center justify-end gap-0.5 rounded-xl py-1.5 transition active:scale-95 {{ $isCenterTab || $item['active'] ? '-mt-5' : '' }} {{ $item['active'] ? 'font-bold text-[#0037b0]' : 'text-[#565e74] hover:text-[#0037b0]' }}"

@@ -1,5 +1,6 @@
 ﻿{{-- Registrasi wajah: ambil beberapa sampel, server menghitung vektor wajah. --}}
 <x-app-layout>
+    <script src="{{ asset('js/camera-permission.js') }}"></script>
     <div class="min-h-screen bg-[#f0f2f9] px-4 py-8 pb-28">
         <div class="max-w-3xl mx-auto space-y-6">
 
@@ -84,7 +85,7 @@
                           try {
                               const isMobile = window.matchMedia
                                   && window.matchMedia('(max-width: 768px)').matches;
-                              const stream = await navigator.mediaDevices.getUserMedia({
+                              const stream = await window.openAbsensiCamera({
                                   video: {
                                       facingMode: 'user',
                                       width: { ideal: isMobile ? 960 : 1280 },

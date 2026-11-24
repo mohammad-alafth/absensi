@@ -129,6 +129,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ asset('js/camera-permission.js') }}"></script>
     <script>
         // Nilai koordinat & radius diambil dari pengaturan face recognition (FaceSettings),
         // bukan angka yang ditulis mati di halaman ini.
@@ -144,7 +145,7 @@
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                const stream = await window.openAbsensiCamera({
                     video: {
                         facingMode: 'user'
                     }
