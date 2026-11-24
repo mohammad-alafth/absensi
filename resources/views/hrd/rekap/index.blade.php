@@ -76,8 +76,9 @@
                 <a href="{{ route('hrd.reports.absent.daily') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">person_off</span>Tidak Hadir</a>
                 <a href="{{ route('hrd.reports.leave') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">event_available</span>Cuti</a>
                 <a href="{{ route('hrd.reports.permission') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">assignment</span>Izin</a>
-                <a href="{{ route('hrd.reports.overtime') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">more_time</span>Lembur</a>
-            </section>
+                 <a href="{{ route('hrd.reports.overtime') }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">more_time</span>Lembur</a>
+                 <a href="{{ route('hrd.rekap.telat', ['start_date' => $startDate->format('Y-m-d'), 'end_date' => $endDate->format('Y-m-d')]) }}" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white"><span class="material-symbols-outlined text-base">schedule</span>Rekap Telat</a>
+             </section>
 
             {{-- Desktop workbench: search, role filter, and matrix --}}
             <section class="recap-desktop-only recap-desktop-workbench grid-cols-1 gap-5 xl:grid-cols-12 xl:items-start">

@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Exports\HRDRekapExport;
+use App\Exports\HRDLateExport;
 use App\Exports\HRDAbsentExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Leave;
@@ -29,6 +30,7 @@ use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use App\Exports\CalendarExport;
 use App\Exports\CalendarUserExport;
 use App\Services\ScheduleService;
+use App\Services\HRDLateReportService;
 use App\Exports\CalendarMultiExport;
 use App\Support\PermissionRange;
 use App\Support\PdfSignatureBlocks;
@@ -717,6 +719,45 @@ class HRDController extends Controller
             'success' => true,
             'events' => $events,
         ]);
+    }
+
+    public function lateReport(Request $request)
+    {
+        [$startDate, $endDate] = $this->lateReportPeriod($request);
+        $lateRows = app(HRDLateReportService::class)->rows($startDate, $endDate);
+
+        return view('hrd.rekap.telat', compact('lateRows', 'startDate', 'endDate'));
+    }
+
+    public function exportLateReport(Request $request)
+    {
+        [$startDate, $endDate] = $this->lateReportPeriod($request);
+
+        return Excel::download(
+            new HRDLateExport($startDate, $endDate),
+            'rekap-telat-' . $startDate->format('Y-m-d') . '-sampai-' . $endDate->format('Y-m-d') . '.xlsx'
+        );
+    }
+
+    private function lateReportPeriod(Request $request): array
+    {
+        try {
+            $startDate = $request->filled('start_date')
+                ? Carbon::parse($request->start_date)->startOfDay()
+                : now()->startOfMonth();
+            $endDate = $request->filled('end_date')
+                ? Carbon::parse($request->end_date)->endOfDay()
+                : now()->endOfMonth();
+        } catch (\Throwable $e) {
+            $startDate = now()->startOfMonth();
+            $endDate = now()->endOfMonth();
+        }
+
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        return [$startDate, $endDate];
     }
 
     public function calendarEmployee($userId)

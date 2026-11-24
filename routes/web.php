@@ -508,6 +508,8 @@ Route::get('/face', function () {
             |--------------------------------------------------------------------------
             */
             Route::get('/rekap', [HRDController::class, 'index'])->name('rekap');
+            Route::get('/rekap/telat', [HRDController::class, 'lateReport'])->name('rekap.telat');
+            Route::get('/rekap/telat/export', [HRDController::class, 'exportLateReport'])->name('rekap.telat.export');
             Route::get('/export-excel', [HRDController::class, 'exportExcel'])->name('export.excel');
             Route::get('/tracking', [HRDController::class, 'tracking'])->name('tracking');
 

@@ -118,6 +118,8 @@ return [
         ['method' => 'GET,HEAD', 'uri' => 'hrd/izin', 'name' => 'hrd.izin', 'action' => 'App\\Http\\Controllers\\HRD\\HRDPermissionController@index', 'key' => 'permission.view'],
         ['method' => 'GET,HEAD', 'uri' => 'hrd/lembur', 'name' => 'hrd.lembur', 'action' => 'App\\Http\\Controllers\\HRD\\HRDOvertimeController@index', 'key' => 'overtime.view'],
         ['method' => 'GET,HEAD', 'uri' => 'hrd/rekap', 'name' => 'hrd.rekap', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@index', 'key' => 'report.view'],
+        ['method' => 'GET,HEAD', 'uri' => 'hrd/rekap/telat', 'name' => 'hrd.rekap.telat', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@lateReport', 'key' => 'report.view'],
+        ['method' => 'GET,HEAD', 'uri' => 'hrd/rekap/telat/export', 'name' => 'hrd.rekap.telat.export', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@exportLateReport', 'key' => 'report.export'],
         ['method' => 'GET,HEAD', 'uri' => 'hrd/export-excel', 'name' => 'hrd.export.excel', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@exportExcel', 'key' => 'report.export'],
         ['method' => 'GET,HEAD', 'uri' => 'hrd/tracking', 'name' => 'hrd.tracking', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@tracking', 'key' => 'report.view'],
         ['method' => 'GET,HEAD', 'uri' => 'hrd/reports/attendance/daily', 'name' => 'hrd.reports.attendance.daily', 'action' => 'App\\Http\\Controllers\\HRD\\HRDController@reportAttendanceDaily', 'key' => 'report.view'],
