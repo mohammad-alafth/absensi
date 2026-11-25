@@ -156,11 +156,7 @@ class PJShiftController extends Controller
             'calendarDays' => $calendarDays,
             'initialDraft' => $initialDraft,
             'shiftOptions' => Shift::query()
-                ->where(function ($query) use ($divisionRoles) {
-                    foreach ($divisionRoles as $divisionRole) {
-                        $query->orWhereJsonContains('allowed_roles', $divisionRole);
-                    }
-                })
+                ->allowedForRoles($divisionRoles)
                 ->orderBy('name')
                 ->get()
                 ->map(fn (Shift $shift) => $this->serializeShift($shift))

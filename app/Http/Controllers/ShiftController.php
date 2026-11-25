@@ -27,13 +27,9 @@ class ShiftController extends Controller
 
         $employees = User::whereIn('role', $divisionRoles)->get();
 
-        // Filter shift: hanya tampilkan shift yang allowed_roles-nya
-        // mengandung salah satu role divisi PJ yang login
-        $shifts = Shift::where(function ($query) use ($divisionRoles) {
-            foreach ($divisionRoles as $divRole) {
-                $query->orWhereJsonContains('allowed_roles', $divRole);
-            }
-        })->get();
+        // Filter shift: hanya tampilkan shift yang allowed_roles-nya cocok
+        // dengan salah satu role divisi PJ (termasuk alias pj_ dan wildcard pj_*).
+        $shifts = Shift::allowedForRoles($divisionRoles)->get();
 
         return view('shifts.index', compact('employees', 'shifts', 'date'));
     }
@@ -399,15 +395,9 @@ class ShiftController extends Controller
 
     private function assertShiftAllowedForTargets(Shift $shift, $targets): void
     {
-        $allowedRoles = is_array($shift->allowed_roles) ? $shift->allowed_roles : [];
-
-        // Empty/null allowed_roles retains the existing unrestricted behavior.
-        if ($allowedRoles === []) {
-            return;
-        }
-
+        // Null/empty allowed_roles retains the existing unrestricted behavior.
         foreach ($targets as $target) {
-            if (!in_array($target->role, $allowedRoles, true)) {
+            if (!$shift->allowsRole($target->role)) {
                 throw ValidationException::withMessages([
                     'shift_id' => "Shift tidak diizinkan untuk role target {$target->role}.",
                 ]);

@@ -29,13 +29,9 @@ class PJShiftChangeController extends Controller
             ->latest()
             ->get();
 
-        // Filter shift: hanya tampilkan shift yang allowed_roles-nya
-        // mengandung salah satu role divisi PJ yang login
-        $shifts = Shift::where(function ($query) use ($divisionRoles) {
-            foreach ($divisionRoles as $divRole) {
-                $query->orWhereJsonContains('allowed_roles', $divRole);
-            }
-        })->get();
+        // Filter shift: hanya tampilkan shift yang allowed_roles-nya cocok
+        // dengan salah satu role divisi PJ (termasuk alias pj_ dan wildcard pj_*).
+        $shifts = Shift::allowedForRoles($divisionRoles)->get();
 
         return view('pj.shift-change.index', compact('shiftChangeRequests', 'divisionRoles', 'divisionRole', 'shifts'));
     }
@@ -86,10 +82,7 @@ class PJShiftChangeController extends Controller
                 throw new \Exception('Shift tujuan tidak ditemukan.');
             }
 
-            $allowedRoles = is_array($requestedShift->allowed_roles)
-                ? $requestedShift->allowed_roles
-                : [];
-            if ($allowedRoles !== [] && !in_array($shiftChangeRequest->user->role, $allowedRoles, true)) {
+            if (!$requestedShift->allowsRole($shiftChangeRequest->user->role)) {
                 throw new \Exception('Shift tujuan tidak diizinkan untuk role pegawai.');
             }
 

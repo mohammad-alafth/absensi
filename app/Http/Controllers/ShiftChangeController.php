@@ -22,34 +22,12 @@ class ShiftChangeController extends Controller
         }
 
         // Null/empty means unrestricted; every other policy value must be a
-        // valid list of exact role strings. Invalid policy data fails closed.
-        $availableShifts = Shift::all()->filter(function ($shift) use ($user) {
-            $rawAllowedRoles = $shift->getRawOriginal('allowed_roles');
-
-            if ($rawAllowedRoles === null) {
-                return true;
-            }
-
-            $allowedRoles = is_array($rawAllowedRoles)
-                ? $rawAllowedRoles
-                : json_decode((string) $rawAllowedRoles, true);
-
-            if (!is_array($allowedRoles) || !array_is_list($allowedRoles)) {
-                return false;
-            }
-
-            if ($allowedRoles === []) {
-                return true;
-            }
-
-            foreach ($allowedRoles as $allowedRole) {
-                if (!is_string($allowedRole) || $allowedRole === '') {
-                    return false;
-                }
-            }
-
-            return in_array((string) $user->role, $allowedRoles, true);
-        });
+        // valid list of role strings. Invalid policy data fails closed.
+        // Exact role, the `pj_` alias, and wildcards (e.g. `pj_*`) are matched
+        // against `shifts.allowed_roles` as the source of truth.
+        $availableShifts = Shift::all()->filter(
+            fn (Shift $shift) => $shift->allowsRole((string) $user->role)
+        );
 
         return view('shift-change.create', compact('availableShifts'));
     }
@@ -125,36 +103,8 @@ class ShiftChangeController extends Controller
                 ? Shift::find($requestedShiftId)
                 : null;
 
-            $isAllowed = false;
-            if ($requestedShift) {
-                $rawAllowedRoles = $requestedShift->getRawOriginal('allowed_roles');
-
-                if ($rawAllowedRoles === null) {
-                    $isAllowed = true;
-                } else {
-                    $allowedRoles = is_array($rawAllowedRoles)
-                        ? $rawAllowedRoles
-                        : json_decode((string) $rawAllowedRoles, true);
-
-                    if (is_array($allowedRoles) && array_is_list($allowedRoles)) {
-                        $isAllowed = $allowedRoles === [];
-
-                        if (!$isAllowed) {
-                            $isAllowed = true;
-                            foreach ($allowedRoles as $allowedRole) {
-                                if (!is_string($allowedRole) || $allowedRole === '') {
-                                    $isAllowed = false;
-                                    break;
-                                }
-                            }
-
-                            if ($isAllowed) {
-                                $isAllowed = in_array((string) $user->role, $allowedRoles, true);
-                            }
-                        }
-                    }
-                }
-            }
+            $isAllowed = $requestedShift
+                && $requestedShift->allowsRole((string) $user->role);
 
             if (!$isAllowed) {
                 return back()->withErrors(['requested_shift_id' => 'Shift yang dipilih tidak valid untuk role Anda.'])->withInput();

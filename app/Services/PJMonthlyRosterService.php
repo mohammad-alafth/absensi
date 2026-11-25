@@ -150,8 +150,7 @@ class PJMonthlyRosterService
                 continue;
             }
 
-            $allowedRoles = $shift->allowed_roles ?? [];
-            if (!in_array($employee->role, $allowedRoles, true)) {
+            if (!$shift->allowsRole($employee->role)) {
                 $errors[$date][] = 'Shift tidak diizinkan untuk pegawai ini.';
             }
         }
