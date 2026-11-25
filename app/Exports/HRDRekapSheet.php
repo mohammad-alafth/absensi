@@ -229,7 +229,7 @@ class HRDRekapSheet implements FromCollection, WithEvents, WithHeadings, WithCol
     {
         [$startDate, $endDate] = $this->resolvePeriod();
 
-        $employees = User::whereNotIn('role', ['admin']);
+        $employees = User::whereNotIn('role', ['admin'])->orderBy('name');
 
         if ($this->role != 'all') {
 

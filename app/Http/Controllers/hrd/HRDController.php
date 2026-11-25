@@ -78,6 +78,7 @@ class HRDController extends Controller
             */
         $employees = User::whereNotIn('role', ['admin'])
             ->select('id', 'name', 'role', 'leave_quota')
+            ->orderBy('name')
             ->get();
 
         /*
@@ -953,17 +954,26 @@ class HRDController extends Controller
                     ->where(function ($q) use ($startDate, $endDate) {
                         $q->where('start_date', '<=', $endDate)
                           ->where('end_date', '>=', $startDate);
-                    })->with('user')->latest()->get();
+                    })->with('user')
+                    ->orderBy(User::select('name')->whereColumn('users.id', 'leaves.user_id'))
+                    ->orderBy('start_date')
+                    ->get();
                 break;
             case 'permission':
                 $data = Permission::where('status', 'approved')
                     ->whereBetween('tanggal', [$startDate, $endDate])
-                    ->with('user')->latest()->get();
+                    ->with('user')
+                    ->orderBy(User::select('name')->whereColumn('users.id', 'permissions.user_id'))
+                    ->orderBy('tanggal')
+                    ->get();
                 break;
             case 'overtime':
                 $data = Overtime::where('status', 'approved')
                     ->whereBetween('overtime_date', [$startDate, $endDate])
-                    ->with('user')->latest()->get();
+                    ->with('user')
+                    ->orderBy(User::select('name')->whereColumn('users.id', 'overtimes.user_id'))
+                    ->orderBy('overtime_date')
+                    ->get();
                 break;
         }
         
@@ -1371,7 +1381,9 @@ class HRDController extends Controller
             })
             ->select('id', 'user_id', 'start_date', 'end_date', 'leave_type', 'reason', 'status', 'created_at')
             ->with('user:id,name')
-            ->latest()
+            // Urutkan berdasarkan nama pegawai agar rekap tidak acak.
+            ->orderBy(User::select('name')->whereColumn('users.id', 'leaves.user_id'))
+            ->orderBy('start_date')
             ->get();
 
         $title = 'Rekap Cuti (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
@@ -1396,7 +1408,9 @@ class HRDController extends Controller
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->select('id', 'user_id', 'tanggal', 'tanggal_selesai', 'jenis', 'jam_mulai', 'jam_selesai', 'alasan', 'status', 'created_at')
             ->with('user:id,name')
-            ->latest()
+            // Urutkan berdasarkan nama pegawai agar rekap tidak acak.
+            ->orderBy(User::select('name')->whereColumn('users.id', 'permissions.user_id'))
+            ->orderBy('tanggal')
             ->get();
 
         $title = 'Rekap Izin (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
@@ -1421,7 +1435,9 @@ class HRDController extends Controller
             ->whereBetween('overtime_date', [$startDate, $endDate])
             ->select('id', 'user_id', 'overtime_date', 'start_time', 'end_time', 'total_hours', 'day_type', 'reason', 'status', 'created_at')
             ->with('user:id,name')
-            ->latest()
+            // Urutkan berdasarkan nama pegawai agar rekap tidak acak.
+            ->orderBy(User::select('name')->whereColumn('users.id', 'overtimes.user_id'))
+            ->orderBy('overtime_date')
             ->get();
 
         $title = 'Rekap Lembur (' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y') . ')';
