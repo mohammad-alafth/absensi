@@ -96,8 +96,8 @@ class HRDController extends Controller
             'tanggal'
         ])
             ->whereBetween('tanggal', [
-                $startDate,
-                $endDate
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d')
             ])
             ->get()
             ->groupBy('user_id');
@@ -144,8 +144,8 @@ class HRDController extends Controller
             ->where('status', 'approved')
             ->where(function ($q) use ($startDate, $endDate) {
 
-                $q->where('start_date', '<=', $endDate)
-                    ->where('end_date', '>=', $startDate);
+                $q->where('start_date', '<=', $endDate->format('Y-m-d'))
+                    ->where('end_date', '>=', $startDate->format('Y-m-d'));
             })
             ->get()
             ->groupBy('user_id');
@@ -1717,8 +1717,8 @@ class HRDController extends Controller
         $leaves = Leave::where('user_id', $employee->id)
             ->where('status', 'approved')
             ->where(function ($q) use ($startDate, $endDate) {
-                $q->where('start_date', '<=', $endDate)
-                    ->where('end_date', '>=', $startDate);
+                $q->where('start_date', '<=', $endDate->format('Y-m-d'))
+                    ->where('end_date', '>=', $startDate->format('Y-m-d'));
             })
             ->get();
 

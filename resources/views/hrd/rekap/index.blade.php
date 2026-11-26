@@ -44,16 +44,17 @@
                     </div>
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <form method="GET" action="{{ route('hrd.rekap') }}" autocomplete="off" class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                            <label class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span class="material-symbols-outlined text-base text-[#0037b0]">date_range</span>Periode</label>
-                            <input type="date" id="recapStartDate" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal mulai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
+                            <label class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                <span class="material-symbols-outlined text-base text-[#0037b0]">date_range</span>Periode
+                            </label>
+                            <input type="date" id="recapStartDate" name="start_date" value="{{ $startDate->format('Y-m-d') }}" max="{{ $endDate->format('Y-m-d') }}" title="Tanggal mulai" class="h-9 min-w-[135px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-sm focus:border-[#0037b0] focus:ring-2 focus:ring-blue-100 cursor-pointer">
                             <span class="text-xs font-bold text-slate-400">s/d</span>
-                            <input type="date" id="recapEndDate" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal selesai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
-                            <input type="hidden" name="month" value="{{ $month }}">
-                            <button type="submit" class="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0037b0] px-3 text-xs font-bold text-white transition hover:bg-blue-800" title="Terapkan rentang tanggal">
+                            <input type="date" id="recapEndDate" name="end_date" value="{{ $endDate->format('Y-m-d') }}" min="{{ $startDate->format('Y-m-d') }}" title="Tanggal selesai" class="h-9 min-w-[135px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-sm focus:border-[#0037b0] focus:ring-2 focus:ring-blue-100 cursor-pointer">
+                            <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#0037b0] px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-800 active:scale-95" title="Terapkan rentang tanggal">
                                 <span class="material-symbols-outlined text-base">check</span>Terapkan
                             </button>
-                            <a href="{{ route('hrd.rekap') }}" class="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Kembali ke periode bulan ini">Reset</a>
-                            <span id="periodPreview" class="basis-full text-[10px] font-semibold text-slate-500" aria-live="polite">Periode dipilih: {{ $startDate->format('d M Y') }} – {{ $endDate->format('d M Y') }}</span>
+                            <a href="{{ route('hrd.rekap') }}" class="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100" title="Kembali ke periode bulan ini">Reset</a>
+                            <span id="periodPreview" class="basis-full text-[10px] font-semibold text-slate-500 mt-0.5" aria-live="polite">Periode dipilih: {{ $startDate->format('d M Y') }} – {{ $endDate->format('d M Y') }}</span>
                         </form>
                         <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex items-center gap-2">
                             <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
@@ -194,26 +195,28 @@
             const endInput = document.getElementById('recapEndDate');
             if (!startInput || !endInput) return;
 
-            // Fallback preview saat Flatpickr belum/gagal dimuat.
-            startInput.addEventListener('change', updatePeriodPreview);
-            endInput.addEventListener('change', updatePeriodPreview);
-            updatePeriodPreview();
+            function syncDates() {
+                if (startInput.value) {
+                    endInput.min = startInput.value;
+                }
+                if (endInput.value) {
+                    startInput.max = endInput.value;
+                }
+                updatePeriodPreview();
 
-            const flatpickr = window.flatpickr;
-            if (!flatpickr) return;
+                // Sinkronkan ke input form export excel
+                const exportStart = document.querySelector('form[action*="export-excel"] input[name="start_date"]');
+                const exportEnd = document.querySelector('form[action*="export-excel"] input[name="end_date"]');
+                if (exportStart && startInput.value) exportStart.value = startInput.value;
+                if (exportEnd && endInput.value) exportEnd.value = endInput.value;
+            }
 
-            const config = {
-                dateFormat: 'Y-m-d',
-                altInput: true,
-                altFormat: 'd M Y',
-                allowInput: false,
-                disableMobile: true,
-                altInputClass: 'h-8 w-[122px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100',
-                onChange: updatePeriodPreview,
-            };
+            startInput.addEventListener('input', syncDates);
+            startInput.addEventListener('change', syncDates);
+            endInput.addEventListener('input', syncDates);
+            endInput.addEventListener('change', syncDates);
 
-            flatpickr(startInput, config);
-            flatpickr(endInput, config);
+            syncDates();
         }
 
         function syncRecapSearch(value) {
