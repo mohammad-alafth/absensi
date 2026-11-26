@@ -45,14 +45,15 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <form method="GET" action="{{ route('hrd.rekap') }}" autocomplete="off" class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
                             <label class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span class="material-symbols-outlined text-base text-[#0037b0]">date_range</span>Periode</label>
-                            <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal mulai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
+                            <input type="date" id="recapStartDate" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal mulai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
                             <span class="text-xs font-bold text-slate-400">s/d</span>
-                            <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal selesai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
+                            <input type="date" id="recapEndDate" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal selesai" autocomplete="off" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
                             <input type="hidden" name="month" value="{{ $month }}">
                             <button type="submit" class="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0037b0] px-3 text-xs font-bold text-white transition hover:bg-blue-800" title="Terapkan rentang tanggal">
                                 <span class="material-symbols-outlined text-base">check</span>Terapkan
                             </button>
                             <a href="{{ route('hrd.rekap') }}" class="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Kembali ke periode bulan ini">Reset</a>
+                            <span id="periodPreview" class="basis-full text-[10px] font-semibold text-slate-500" aria-live="polite">Periode dipilih: {{ $startDate->format('d M Y') }} – {{ $endDate->format('d M Y') }}</span>
                         </form>
                         <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex items-center gap-2">
                             <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
@@ -154,6 +155,7 @@
         </div>
     </div>
 
+    @vite('resources/js/vendor-flatpickr.js')
     <script>
         const fullCalendarEntry = @js(Vite::asset('resources/js/vendor-fullcalendar.js'));
         const calendarEventsEndpoint = @js(route('hrd.calendar.events'));
@@ -163,6 +165,56 @@
         let calendarInitPromise = null;
         const calendarEventsCache = new Map();
         const calendarEventsRequests = new Map();
+
+        /*
+        | Pemilih tanggal periode memakai format tampilan yang eksplisit
+        | ("10 Nov 2026"). Nilai yang dikirim ke server tetap Y-m-d, sehingga
+        | tidak bergantung pada format lokal browser (MM/DD/YYYY vs DD/MM/YYYY).
+        */
+        function updatePeriodPreview() {
+            const start = document.getElementById('recapStartDate')?.value;
+            const end = document.getElementById('recapEndDate')?.value;
+            const preview = document.getElementById('periodPreview');
+            if (!preview) return;
+
+            const namaBulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const format = (value) => {
+                if (!value) return '—';
+                const parts = value.split('-');
+                if (parts.length !== 3) return value;
+                const [tahun, bulan, tanggal] = parts;
+                return `${parseInt(tanggal, 10)} ${namaBulan[parseInt(bulan, 10) - 1] ?? bulan} ${tahun}`;
+            };
+
+            preview.textContent = 'Periode dipilih: ' + format(start) + ' – ' + format(end);
+        }
+
+        function initPeriodDatePickers() {
+            const startInput = document.getElementById('recapStartDate');
+            const endInput = document.getElementById('recapEndDate');
+            if (!startInput || !endInput) return;
+
+            // Fallback preview saat Flatpickr belum/gagal dimuat.
+            startInput.addEventListener('change', updatePeriodPreview);
+            endInput.addEventListener('change', updatePeriodPreview);
+            updatePeriodPreview();
+
+            const flatpickr = window.flatpickr;
+            if (!flatpickr) return;
+
+            const config = {
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd M Y',
+                allowInput: false,
+                disableMobile: true,
+                altInputClass: 'h-8 w-[122px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100',
+                onChange: updatePeriodPreview,
+            };
+
+            flatpickr(startInput, config);
+            flatpickr(endInput, config);
+        }
 
         function syncRecapSearch(value) {
             document.querySelectorAll('#searchInputDesktop, #searchInputMobile, #quotaSearchDesktop, #quotaSearchMobile').forEach((input) => { if (input.value !== (value || '')) input.value = value || ''; });
@@ -346,6 +398,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            initPeriodDatePickers();
             const calendarModal = document.getElementById('shiftModal');
             const closeCalendar = document.getElementById('closeShiftModal');
             closeCalendar?.addEventListener('click', () => { calendarModal.classList.add('hidden'); calendarModal.classList.remove('flex'); document.body.classList.remove('overflow-hidden'); });
