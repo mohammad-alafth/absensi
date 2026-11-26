@@ -45,10 +45,14 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <form method="GET" action="{{ route('hrd.rekap') }}" class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
                             <label class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span class="material-symbols-outlined text-base text-[#0037b0]">date_range</span>Periode</label>
-                            <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal mulai" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100" onchange="this.form.submit()">
+                            <input type="date" name="start_date" value="{{ $startDate->format('Y-m-d') }}" title="Tanggal mulai" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
                             <span class="text-xs font-bold text-slate-400">s/d</span>
-                            <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal selesai" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100" onchange="this.form.submit()">
+                            <input type="date" name="end_date" value="{{ $endDate->format('Y-m-d') }}" title="Tanggal selesai" class="h-8 rounded-lg border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 focus:border-[#0037b0] focus:ring-blue-100">
                             <input type="hidden" name="month" value="{{ $month }}">
+                            <button type="submit" class="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0037b0] px-3 text-xs font-bold text-white transition hover:bg-blue-800" title="Terapkan rentang tanggal">
+                                <span class="material-symbols-outlined text-base">check</span>Terapkan
+                            </button>
+                            <a href="{{ route('hrd.rekap') }}" class="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Kembali ke periode bulan ini">Reset</a>
                         </form>
                         <form action="{{ route('hrd.export.excel') }}" method="GET" class="flex items-center gap-2">
                             <input type="hidden" name="start_date" value="{{ $startDate->format('Y-m-d') }}">
