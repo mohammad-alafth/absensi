@@ -5,7 +5,7 @@
 
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-100">
                     <div>
-                        <a href="{{ route('hrd.rekap') }}" class="inline-flex items-center gap-1.5 text-[#1E40AF] font-bold text-xs hover:underline transition mb-2">
+                        <a href="{{ route('hrd.rekap', array_filter(['start_date' => $start_date ?? null, 'end_date' => $end_date ?? null])) }}" class="inline-flex items-center gap-1.5 text-[#1E40AF] font-bold text-xs hover:underline transition mb-2">
                             ← Kembali ke Pusat Rekap HRD
                         </a>
                         <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">
@@ -16,6 +16,8 @@
 
                 <form method="GET" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-4">
                     <label class="text-xs font-bold text-gray-600">Filter:</label>
+                    @if(isset($start_date))<input type="hidden" name="start_date" value="{{ $start_date }}">@endif
+                    @if(isset($end_date))<input type="hidden" name="end_date" value="{{ $end_date }}">@endif
                     @if(isset($filter_date))
                     <input type="date" name="date" value="{{ $filter_date }}" onchange="this.form.submit()" class="text-xs rounded-xl border-gray-200 shadow-sm focus:ring-0">
                     @elseif(isset($filter_month))

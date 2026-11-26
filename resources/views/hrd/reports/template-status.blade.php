@@ -5,7 +5,7 @@
 
                 <div class="flex flex-col gap-4 pb-6 border-b border-gray-100">
                     <div class="flex items-center justify-between">
-                        <a href="{{ route('hrd.rekap') }}" class="text-xs font-bold text-[#1E40AF] hover:underline whitespace-nowrap">← Kembali</a>
+                        <a href="{{ route('hrd.rekap', ['start_date' => $start_date ?? now()->startOfMonth()->format('Y-m-d'), 'end_date' => $end_date ?? now()->format('Y-m-d')]) }}" class="text-xs font-bold text-[#1E40AF] hover:underline whitespace-nowrap">← Kembali</a>
 
                         <a href="{{ route('hrd.reports.export', ['type' => $reportType, 'start_date' => $start_date ?? now()->startOfMonth()->format('Y-m-d'), 'end_date' => $end_date ?? now()->format('Y-m-d')]) }}"
                             class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">

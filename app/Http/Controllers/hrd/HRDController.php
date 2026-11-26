@@ -922,11 +922,24 @@ class HRDController extends Controller
     {
         $request->validate([
             'leave_quota' => 'required|integer|min:0|max:365',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
         ]);
 
         $user->update([
             'leave_quota' => $request->leave_quota,
         ]);
+
+        // Pertahankan rentang tanggal rekap yang sedang aktif setelah simpan kuota,
+        // supaya periode tidak kembali ke bulan berjalan.
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            return redirect()
+                ->route('hrd.rekap', [
+                    'start_date' => $request->start_date,
+                    'end_date' => $request->end_date,
+                ])
+                ->with('success', 'Quota cuti berhasil diperbarui');
+        }
 
         return back()->with(
             'success',
@@ -1220,7 +1233,11 @@ class HRDController extends Controller
         return view('hrd.reports.template', [
             'data' => $data,
             'title' => 'Laporan Hadir ' . $date,
-            'filter_date' => $date
+            'filter_date' => $date,
+            // Rentang rekap asal, dipakai agar tombol "Kembali" tidak
+            // mengembalikan periode ke bulan berjalan.
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
         ]);
     }
 
